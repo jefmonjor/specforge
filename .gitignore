@@ -1,0 +1,26 @@
+# Binarios y distribución
+sdd
+sdd.exe
+*.exe
+*.dll
+*.so
+*.dylib
+dist/
+
+# Test & coverage artifacts
+*.test
+*.out
+coverage.html
+
+# Runtime state & cache
+.sdd-state.json
+.sdd-cache/
+.specify/
+.gemini/
+values/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

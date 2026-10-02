@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SecurityFindingsReport",
+  "type": "object",
+  "required": ["findings", "generated_at", "total_confirmed", "total_needs_validation", "total_rejected"],
+  "properties": {
+    "generated_at": { "type": "string" },
+    "total_confirmed": { "type": "integer" },
+    "total_needs_validation": { "type": "integer" },
+    "total_rejected": { "type": "integer" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "severity", "status", "file", "line", "attack_class", "description", "proof_of_impact"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
+          "status": { "type": "string", "enum": ["confirmed", "needs_validation", "rejected"] },
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "attack_class": { "type": "string" },
+          "description": { "type": "string" },
+          "proof_of_impact": { "type": "string" },
+          "remediation": { "type": "string" }
+        }
+      }
+    }
+  }
+}
