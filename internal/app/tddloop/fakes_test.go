@@ -144,7 +144,7 @@ type fakeGate struct {
 	results []quality.Result
 }
 
-func (g *fakeGate) Name() string                { return "fake-gate" }
+func (g *fakeGate) Name() string               { return "fake-gate" }
 func (g *fakeGate) Applies(stack.Profile) bool { return true }
 func (g *fakeGate) Check(context.Context, string, stack.Profile) (quality.Result, error) {
 	if len(g.results) == 0 {
@@ -234,9 +234,13 @@ func (h *harness) run(opts ...func(*Options)) (*tdd.State, error) {
 	return h.svc.Run(context.Background(), o)
 }
 
-func red(failed int) tdd.Outcome { return tdd.Outcome{Compiled: true, Exact: true, Failed: failed, Output: "want link"} }
-func green() tdd.Outcome         { return tdd.Outcome{Compiled: true, Exact: true, Passed: 1} }
-func notCompiled() tdd.Outcome   { return tdd.Outcome{Compiled: false, Exact: true, Output: "undefined: Reset"} }
+func red(failed int) tdd.Outcome {
+	return tdd.Outcome{Compiled: true, Exact: true, Failed: failed, Output: "want link"}
+}
+func green() tdd.Outcome { return tdd.Outcome{Compiled: true, Exact: true, Passed: 1} }
+func notCompiled() tdd.Outcome {
+	return tdd.Outcome{Compiled: false, Exact: true, Output: "undefined: Reset"}
+}
 
 const (
 	test1 = "reset_test.go"

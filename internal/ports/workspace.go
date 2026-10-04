@@ -61,6 +61,9 @@ type Files interface {
 	ReadFile(path string) ([]byte, error)
 	// WriteFile replaces path atomically, creating parent directories.
 	WriteFile(path string, data []byte) error
+	// WritePrivate is WriteFile with permissions limited to the owner, for
+	// sensitive content such as security findings.
+	WritePrivate(path string, data []byte) error
 	// AppendFile appends data, creating the file and its parents.
 	AppendFile(path string, data []byte) error
 	Exists(path string) bool

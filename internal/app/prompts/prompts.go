@@ -19,6 +19,7 @@ const (
 	Red      Name = "red"
 	Green    Name = "green"
 	Refactor Name = "refactor"
+	E2E      Name = "e2e"
 )
 
 // File is a file shown to the agent as context.
@@ -51,6 +52,49 @@ type Data struct {
 	Feedback     string
 	Attempt      int
 	MaxAttempts  int
+}
+
+// E2EData is what the E2E prompt references.
+type E2EData struct {
+	App       string
+	Index     int
+	Title     string
+	Scenario  string
+	Thens     []E2EThen
+	URL       string
+	PageTitle string
+	Elements  []E2EElement
+	Text      string
+	History   []string
+	Decisions string
+}
+
+// E2EThen is a Then step and whether it was verified.
+type E2EThen struct {
+	N        int
+	Text     string
+	Verified bool
+}
+
+// E2EElement is an element of the page.
+type E2EElement struct {
+	Selector, Tag, Type, Text, Placeholder, AriaLabel string
+}
+
+// RenderE2E renders the E2E prompt.
+func RenderE2E(lang string, d E2EData) (string, error) {
+	if !supported(lang) {
+		lang = "en"
+	}
+	t, err := template.ParseFS(assets.PromptsFS, "prompts/"+lang+"/e2e.md")
+	if err != nil {
+		return "", fmt.Errorf("parsing the e2e prompt: %w", err)
+	}
+	var b bytes.Buffer
+	if err := t.Execute(&b, d); err != nil {
+		return "", fmt.Errorf("rendering the e2e prompt: %w", err)
+	}
+	return b.String(), nil
 }
 
 // Languages with a full set of templates.

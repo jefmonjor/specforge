@@ -11,8 +11,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
+
+	"specforge/internal/jsontext"
 )
 
 // Status is what the agent reports about its turn.
@@ -46,38 +47,17 @@ type Response struct {
 // ErrNoContract reports an answer without a valid closing JSON object.
 var ErrNoContract = errors.New("the agent's answer does not end with the required JSON status object")
 
-var fencedJSON = regexp.MustCompile("(?s)```(?:json)?\\s*\\n(.*?)\\n?```")
-
 // Parse finds the status object in an agent's answer. It prefers the last
 // fenced JSON block and falls back to the last bare JSON object, so a
 // status quoted earlier in the answer never wins over the final one.
 func Parse(answer string) (Response, error) {
-	blocks := fencedJSON.FindAllStringSubmatch(answer, -1)
-	for i := len(blocks) - 1; i >= 0; i-- {
-		if r, err := decode(blocks[i][1]); err == nil {
-			return r, nil
-		}
-	}
-	for i := strings.LastIndex(answer, "{"); i >= 0; i = strings.LastIndex(answer[:i], "{") {
-		dec := json.NewDecoder(strings.NewReader(answer[i:]))
-		var raw json.RawMessage
-		if dec.Decode(&raw) != nil {
-			continue
-		}
-		if r, err := decode(string(raw)); err == nil {
+	for _, c := range jsontext.Candidates(answer) {
+		var r Response
+		if json.Unmarshal([]byte(c), &r) == nil && r.validate() == nil {
 			return r, nil
 		}
 	}
 	return Response{}, ErrNoContract
-}
-
-func decode(s string) (Response, error) {
-	var r Response
-	dec := json.NewDecoder(strings.NewReader(strings.TrimSpace(s)))
-	if err := dec.Decode(&r); err != nil {
-		return Response{}, err
-	}
-	return r, r.validate()
 }
 
 func (r *Response) validate() error {

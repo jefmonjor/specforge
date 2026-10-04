@@ -31,6 +31,11 @@ func (OS) WriteFile(path string, data []byte) error {
 	return WriteAtomic(path, data, 0o644)
 }
 
+// WritePrivate implements ports.Files with mode 0600.
+func (OS) WritePrivate(path string, data []byte) error {
+	return WriteAtomic(path, data, 0o600)
+}
+
 // AppendFile implements ports.Files.
 func (OS) AppendFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
