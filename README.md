@@ -1,273 +1,195 @@
-# 🚀 SpecForge: Resilient Spec-Driven & TDD Assembly Line for AI-Assisted Engineering
+<p align="center">
+  <img src="docs/media/hero.svg" alt="SpecForge: Spec, Red, Green, Refactor, Ship. Each stage is a gate the AI has to pass." width="900">
+</p>
 
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
-[![TDD](https://img.shields.io/badge/TDD-Red--Green--Refactor-brightgreen.svg)]()
-[![E2E](https://img.shields.io/badge/E2E-TesterArmy%20chromedp-orange.svg)]()
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20(Apple%20Silicon%20%26%20Intel)%20%7C%20Linux-lightgrey.svg)]()
-[![Zero Dependencies](https://img.shields.io/badge/Dependencies-Zero%20Runtime%20Deps-success)]()
+<p align="center">
+  <a href="https://github.com/jefmonjor/specforge/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/jefmonjor/specforge?style=flat-square&color=c2551a"></a>
+  <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/jefmonjor/specforge?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square"></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-lightgrey?style=flat-square">
+</p>
 
-> **Transform AI coding from hallucinated scripts into a deterministic, resilient software assembly line.**  
-> SpecForge is a standalone CLI tool written in pure Go (~8.9 MB) that orchestrates **Spec-Driven Development (SDD)**, **Test-Driven Development (TDD)**, and **Autonomous Visual E2E Testing (TesterArmy Engine)** with automated quality guardrails, fault tolerance, and zero configuration overhead.
->
-> 📖 **Comprehensive Documentation:** Read the full [SpecForge User & Architecture Guide](USER_GUIDE.md) for detailed tutorials and troubleshooting.
-
----
-
-## ⚡ The Philosophy: Why SpecForge?
-
-Direct AI coding assistants often produce fragile, hallucinated code that passes tests through tautologies or introduces duplicate logic, dead code, and security blind spots. 
-
-**SpecForge enforces software craftsmanship by treating the AI as an untrusted junior programmer supervised by automated gates:**
-
-```plaintext
-      ┌─────────────────────────────────────────────────────────────┐
-      │  1. SPECIFICATION (BDD & Gherkin)                           │
-      │  - Socratic dialogue defines domain invariants              │
-      │  - Sealed with cryptographic SHA-256 (tamper-evident)       │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  2. RED PHASE: Test Stubs First                             │
-      │  - AI generates failing unit tests based on Gherkin         │
-      │  - Tests executed: if they pass without code -> ABORT YAGNI │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  3. GREEN PHASE: Minimal Implementation                     │
-      │  - AI writes minimal code to make tests turn green (KISS)   │
-      │  - Self-healing retries with compiler/test feedback (max 3) │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  4. REFACTOR PHASE: Quality Guardrails Gate                 │
-      │  - DRY Check (jscpd: 0% duplicate code tolerance)           │
-      │  - Dead Code Detection (Knip: zero orphan dependencies)     │
-      │  - Mutation Testing (Stryker: tests must kill mutants)      │
-      │  - Strict Linters (ESLint, golangci-lint, Ruff)             │
-      │  - Clean Architecture Check (Hexagonal/ArchUnit)            │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  5. SECURITY AUDIT (Cloudflare Adversarial Harness)         │
-      │  - Reconnaissance -> Red Team Hunter -> Blue Team Verifier  │
-      │  - Incremental git diff scanning (--diff) for PRs           │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  6. AUTONOMOUS VISUAL E2E (TesterArmy Engine with chromedp) │
-      │  - Native Chrome/Edge navigation without Node.js            │
-      │  - Real-time DOM snapshot & deterministic CSS selectors     │
-      │  - AI actions: click, type, wait, assert + failure screens  │
-      └─────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <a href="#-see-it-say-no">Demo</a> ·
+  <a href="#-how-it-works">How it works</a> ·
+  <a href="#-quickstart">Quickstart</a> ·
+  <a href="#-whats-in-the-box">Commands</a> ·
+  <a href="USER_GUIDE.md">User guide</a>
+</p>
 
 ---
 
-## ✨ Key Capabilities
+**AI coding agents are fast and confidently wrong.** They write tests that pass before any code exists, guess at requirements nobody settled, copy logic they already wrote twice, and lose all progress when the network drops.
 
-### 1. Zero-Dependencies & Zero-Keys Onboarding
-* **Pure Static Binary:** Compiles into a single ~8.9 MB executable. You don't need Go, Node.js, Python, Puppeteer, or Playwright installed to run `specforge`.
-* **Zero Secrets in Code:** Automatically inherits Google Cloud Application Default Credentials (ADC) from `gcloud auth application-default login` or local environment variables.
-* **Automatic PATH Integration:** When executed, `specforge init` automatically registers itself into your Windows User PATH (or macOS/Linux `~/.zshrc`) **without requiring administrator or UAC elevation**.
-* **Flexible CLI Invocations:** The binary responds to three command names: `specforge`, `forge`, or `sdd`.
+**SpecForge is a single Go binary that puts your agent on an assembly line.** You agree on a spec first, and SpecForge seals it. Then it drives [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) through a strict **Red → Green → Refactor** loop. The agent writes the code, SpecForge checks it, and nothing moves forward until every gate passes.
 
-### 2. Autonomous Visual E2E Testing (`specforge e2e` — TesterArmy Engine)
-* **Native Go Browser Automation:** Built on `chromedp` (Chrome DevTools Protocol). Communicates directly with local Google Chrome or Microsoft Edge.
-* **Simplified UI Tree Extraction:** Executes in-page JavaScript to extract visible interactive elements (buttons, inputs, links, alerts) and assigns unique, deterministic CSS selectors (`data-sdd-id`), ignoring useless layout divs.
-* **Typed Action Loop:** AI reasoning produces structured `VisualAction` decisions (`click`, `type`, `assert`, `wait`). If the scenario fails or times out, it automatically captures a full screenshot in `docs/e2e/screenshot.png` and exits with code 1.
+> Think of it as CI for the *process*, not just the result: the agent is a fast junior developer, and SpecForge is the senior who won't approve the PR.
 
-### 3. Multi-Format Document Ingestion with Microsoft MarkItDown (`specforge doc`)
-* Drop architecture PDFs, Word documents (`.docx`), or Excel sheets (`.xlsx` with complex formulas and tables) into `docs/`.
-* `specforge ingest` and `specforge doc` detect them and convert them **automatically to high-fidelity Markdown**, extracting formulas and tabular data so the AI can reason over your business logic.
+## 🛑 See it say no
 
-### 4. Legacy Reverse-Engineering & Migration Ground Truth (`--from-repo`)
-* Modernizing a legacy codebase (COBOL, Java 6, PHP, Delphi) with zero documentation?
-* Point `specforge interview --from-repo /path/to/legacy-repo` to reverse-engineer the old codebase: the AI extracts pure business rules (the **WHAT**) and discards obsolete technology (the **HOW**), generating sealed BDD Gherkin specs in your new repository.
+The most useful thing a guardrail does is refuse. These are real runs of `specforge loop`, and no AI is involved: the run stops before a single token is spent.
 
-### 5. Resilient TDD Assembly Line with Checkpoints (`--resume`)
-* Atomic state machine persisted in `.sdd-state.json`.
-* If your VPN drops, API quota runs out, or laptop shuts down: simply run `specforge loop --resume` to continue at the exact micro-step without burning duplicate tokens.
-
-### 6. Adversarial Security Audit (`specforge audit`)
-* Multi-phase adversarial pipeline inspired by Cloudflare's security evaluation harness.
-* Simulates attacker reconnaissance, red team vulnerability hunting, and blue team false-positive verification.
-* Run incremental scans on your pull request diff: `specforge audit --diff`.
-
-### 7. Greenfield & Brownfield Ready
-* **New Projects (Greenfield):** `specforge setup --stack react` (or `java`, `go`, `python`) initializes a ready-to-compile project with testing frameworks, quality configs, and GitOps values.
-* **Existing Projects (Brownfield):** `specforge setup` detects your technology and **preserves 100% of your existing source code and build files**, only adding SDD standards and optional quality configs.
-
----
-
-## 📦 Installation & Download
-
-### Option A: Download Precompiled Binaries
-Download the binary for your platform from [Releases](../../releases):
-* **Windows x64:** `dist/specforge-windows-amd64.exe` (rename to `specforge.exe` or `sdd.exe`)
-* **macOS Apple Silicon (M1/M2/M3/M4):** `dist/specforge-darwin-arm64`
-* **macOS Intel:** `dist/specforge-darwin-amd64`
-* **Linux x64:** `dist/specforge-linux-amd64`
-
-> **macOS Note (Gatekeeper):** If macOS warns about an unidentified developer, run:
-> ```bash
-> chmod +x specforge-darwin-arm64
-> xattr -d com.apple.quarantine specforge-darwin-arm64
-> sudo mv specforge-darwin-arm64 /usr/local/bin/specforge
-> ```
-
-### Option B: Build from Source (Requires Go 1.24+)
-```bash
-git clone https://github.com/jefmonjor/specforge.git
-cd specforge
-
-# Build for current machine:
-go build -ldflags="-s -w" -trimpath -o specforge.exe .
-
-# Or cross-compile for all platforms (Windows, Mac ARM64/Intel, Linux):
-# On Windows:
-powershell -ExecutionPolicy Bypass -File .\build-all.ps1
-# On Linux / macOS:
-chmod +x ./build-all.sh && ./build-all.sh
-```
-
----
-
-## 🚀 Quickstart Guide (5 Minutes)
-
-### Step 1: Workstation Initialization (Run Once)
-```bash
-specforge init
-```
-*Detects your credentials, configures `~/.specforge/config.json`, and adds `specforge` to your user PATH.*
-
-### Step 2: Project Setup
-Inside your project directory:
-```bash
-git checkout -b feature/user-authentication
-
-# For an existing project (preserves all code):
-specforge setup
-
-# Or for a brand new project archetype:
-specforge setup --stack react    # Options: react, java, go, python
-```
-
-### Step 3: Ingest Architecture & Documents
-```bash
-specforge ingest
-```
-*Scans your project in ~20 ms, automatically converts any PDF/Excel files to Markdown, and generates `docs/_context/context-pack.md`.*
-
-### Step 4: Socratic BDD Interview
-```bash
-specforge interview --feature "OAuth2 login with biometric fallback"
-```
-*The AI architect interviews you interactively and seals the resulting Gherkin spec with a cryptographic hash in `specs/0001-oauth2-login.md`.*
-
-### Step 5: Execute the TDD Assembly Line
-```bash
-specforge loop
-```
-*Watches the Red -> Green -> Refactor cycle execute. If interrupted, run `specforge loop --resume`.*
-
-### Step 6: Adversarial Security Audit
-```bash
-specforge audit --diff
-```
-*Audits only the modified lines in your branch before opening a Pull Request.*
-
-### Step 7: Autonomous Visual E2E Test
-```bash
-specforge e2e --url http://localhost:3000
-```
-*Navigates the live web application using `chromedp` and verifies that the BDD scenario visually holds true.*
-
----
-
-## 📋 Command Reference
-
-| Command | Description | Key Flags |
-| :--- | :--- | :--- |
-| `specforge init` | Zero-Config initialization and ADC credential detection | `--agent`, `--project`, `--non-interactive`, `--force` |
-| `specforge setup` | Deploys baseline, GitOps values, and scaffolding | `--stack [react/java/go/python]`, `--force` |
-| `specforge ingest` | Ultra-fast project scanner and auto-document converter | `--output`, `--sync`, `--no-convert`, `--print` |
-| `specforge doc` | Converts PDF, Word, and Excel files to Markdown via MarkItDown | `--recursive`, `--output` |
-| `specforge interview` | Socratic BDD interview and SHA-256 specification sealing | `--feature`, `--from-repo`, `--output`, `--agent` |
-| `specforge loop` | Resilient TDD assembly line (Red -> Green -> Refactor) | `--resume`, `--spec`, `--agent` |
-| `specforge e2e` | Autonomous Visual E2E test engine (TesterArmy style) with chromedp | `--url`, `--spec`, `--headless`, `--max-steps`, `--screenshot` |
-| `specforge audit` | Adversarial security audit (Cloudflare 6-phase harness) | `--diff`, `--full`, `--fail-on [HIGH/MEDIUM]`, `--agent` |
-| `specforge consistency` | Deterministic architectural consistency verification | `--FailOn` |
-| `specforge build` | Project compilation validation | `--dry-run` |
-| `specforge version` | Displays binary telemetry, Go version, and platform info | — |
-
----
-
-## 🛡️ Built-in Quality Guardrails
-
-| Guardrail | Tool | Frontend (React/TS) | Java / Spring | Go | Python |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Strict Linter** | ESLint / golangci-lint / Ruff | ✅ | ✅ | ✅ | ✅ |
-| **DRY Enforcer** | `jscpd` (threshold: 0%) | ✅ | ✅ | ✅ | ✅ |
-| **Dead Code Detection** | `knip` | ✅ | — | — | — |
-| **Mutation Testing** | `stryker` (threshold: >= 80%) | ✅ | — | — | — |
-| **Clean Architecture** | `ArchUnit` | — | ✅ | — | — |
-| **GitOps Values** | Tekton / OpenShift values template | ✅ | ✅ | ✅ | ✅ |
-| **Health & Info Probes** | Root `/health` (HTTP 200) & `/info` | ✅ | ✅ | ✅ | ✅ |
-
----
-
-## ⚖️ Open Source & Apache License 2.0 Compliance
-
-SpecForge is licensed under the **[Apache License, Version 2.0](LICENSE)**.
-
-### What Apache 2.0 Grants to You:
-* **Commercial Use:** You are free to use SpecForge within commercial and proprietary products without paying royalties.
-* **Modification & Sublicensing:** You may modify the source code and distribute derivative works under terms of your choice (including proprietary licenses), provided you satisfy Section 4 conditions.
-* **Patent Grant (Section 3):** Contributors grant a perpetual, worldwide, non-exclusive patent license covering their contributions.
-* **Defensive Termination (Section 3):** If a party initiates patent litigation alleging that SpecForge infringes their patents, any patent license granted to that party under Apache 2.0 terminates automatically.
-
-### Requirements When Distributing SpecForge or Derivative Works:
-1. **Include LICENSE (Section 4(a)):** You must provide recipients with a full copy of the Apache License 2.0.
-2. **State Modifications (Section 4(b)):** You must cause any modified files to carry prominent notices stating that you changed the files.
-3. **Retain Notices (Section 4(c)):** You must retain all copyright, patent, and trademark notices in the source code.
-4. **Distribute NOTICE (Section 4(d)):** You must include a readable copy of the [NOTICE](NOTICE) file in distributions.
-5. **Third-Party Attribution:** When distributing binaries, you must include the third-party acknowledgments and disclaimers detailed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (especially for BSD-3-Clause dependencies like `oauth2` and `pflag`).
-
-### Trademarks (Section 6):
-The Apache License 2.0 **does not** grant trademark rights to use the trade names, trademarks, service marks, or product names of the project, except as required for reasonable and customary use in describing the origin of the Work.
-
----
-
-## 🤝 Contributing
-
-Contributions are warmly welcome! Please review:
-* [CONTRIBUTING.md](CONTRIBUTING.md) — Under **Section 5 of the Apache License 2.0**, all contributions submitted intentionally to the project are licensed under Apache 2.0 without additional terms. Contributors retain copyright over their patches.
-* [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Community standards and enforcement guidelines.
-* [SECURITY.md](SECURITY.md) — Responsible vulnerability disclosure instructions.
-* [LEGAL_AUDIT.md](LEGAL_AUDIT.md) — Comprehensive dependency and license compatibility matrix.
-
----
-
-## 📄 License Notice
+**Open questions in the spec? The agent doesn't get to guess.**
 
 ```text
-Copyright 2026 SpecForge Contributors | jefmonjor.dev
+$ specforge loop --spec specs/0001-password-reset.md
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at:
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+==================================================================
+🛑 BLOQUEO DURO: [NEEDS CLARIFICATION] DETECTADO EN LA ESPECIFICACIÓN
+==================================================================
+  • Causa:            Se encontraron 1 cuestión(es) abierta(s) sin resolver.
+  • Regla del SDD:    La IA tiene estrictamente prohibido programar o generar tests
+                      mientras quede una sola duda funcional sin aclarar por Negocio.
+  • Cuestiones pendientes:
+    - [NEEDS CLARIFICATION] Should the link be invalidated when a newer one is requested?
 ```
+
+**Someone edited the approved spec by hand? The seal catches it.**
+
+```text
+$ sed -i 's/30 minutes/24 hours/' specs/0001-password-reset.md
+$ specforge loop --spec specs/0001-password-reset.md
+
+Error: el sello criptográfico no coincide con el contenido de la especificación
+       (esperado: f15155fdec4e…, actual: be95487fb4ee…)
+
+  • Tipo de Hallazgo: Integridad Criptográfica: Especificación BDD Alterada
+```
+
+> CLI output is in Spanish today; English output is on the [roadmap](#-status--roadmap).
+
+## 🔧 How it works
+
+```mermaid
+flowchart LR
+    I["interview<br/>BDD spec"] --> S{{"sealed<br/>SHA-256"}}
+    S --> C{"open<br/>questions?"}
+    C -- yes --> X["🛑 blocked"]
+    C -- no --> R["🔴 RED<br/>agent writes test"]
+    R --> Y{"test fails?"}
+    Y -- "no: passes too early" --> YA["🛑 YAGNI violation"]
+    Y -- yes --> G["🟢 GREEN<br/>minimal code"]
+    G --> T{"tests pass?"}
+    T -- "no (max 3, error fed back)" --> G
+    T -- yes --> F["🔵 REFACTOR<br/>quality gates"]
+    F --> N["next scenario"]
+    N --> R
+```
+
+| Stage | What the agent does | What SpecForge enforces |
+| :--- | :--- | :--- |
+| **Spec** | Interviews you and writes Gherkin scenarios (`specforge interview`) | Seals the spec with a SHA-256 hash. Any `[NEEDS CLARIFICATION]` blocks the loop. |
+| **🔴 Red** | Writes a failing test for one scenario | Runs it. If it **passes** without an implementation, that's a YAGNI violation and the loop stops. |
+| **🟢 Green** | Writes the minimum code to make it pass | Re-runs the tests and feeds the compiler or test error back to the agent, up to 3 attempts. |
+| **🔵 Refactor** | Cleans up without breaking tests | Runs the quality gates for your stack and gives the agent one chance to fix the findings. |
+| **Resume** | — | Saves state to `.sdd-state.json` after every step. `specforge loop --resume` picks up at the exact phase and re-checks the seal first. |
+
+Every fix the agent needed is written to `.sdd/agent/lessons.md`. That file is part of the six-file project memory (mission, persona, forbidden patterns, glossary, golden examples, lessons) injected into every prompt, so the same mistake costs less the second time.
+
+## ✨ What's in the box
+
+| | Command | What it gives you |
+| :---: | :--- | :--- |
+| 🧭 | `init` | One-time workstation setup: picks your agent, detects Google Cloud credentials (ADC) and adds itself to your user `PATH` without admin rights. |
+| 🏗️ | `setup` | Drops the SDD baseline into an existing repo **without touching your code**, or scaffolds a new one with `--stack react \| java \| go \| python`. |
+| 🔎 | `ingest` | Scans the repo and writes a context pack the agent reads before working. |
+| 📄 | `doc` | Converts PDF, Word and Excel files in `docs/` to Markdown using [MarkItDown](https://github.com/microsoft/markitdown), so business rules locked in documents reach the agent. |
+| 🎙️ | `interview` | Socratic interview that turns a feature idea into a sealed BDD spec. `--from-repo <legacy>` extracts the business rules (the *what*) from an old codebase and leaves the obsolete tech (the *how*) behind. |
+| 🔁 | `loop` | The Red → Green → Refactor assembly line described above. |
+| 🛡 | `audit` | Adversarial security review inspired by Cloudflare's evaluation harness: reconnaissance, a red-team hunter and a blue-team verifier that filters false positives. `--diff` reviews only what your branch changed. |
+| 🌐 | `e2e` | Drives a real Chrome or Edge through [chromedp](https://github.com/chromedp/chromedp), with no Node.js or Playwright. The agent sees a simplified DOM, picks typed actions (`click`, `type`, `wait`, `assert`) and a failure saves a screenshot. |
+| 🧮 | `consistency` | Deterministic anti-contamination gate. On a legacy Java project it blocks the agent from introducing `jakarta` imports, Spring Boot dependencies or a Java 17+ compiler, and fails if the project's recorded classification is deleted or altered. |
+
+## 🚀 Quickstart
+
+**1. Install the binary.** Download it from the [latest release](https://github.com/jefmonjor/specforge/releases/latest):
+
+```bash
+# macOS (Apple Silicon). Swap the suffix for darwin-amd64 or linux-amd64.
+curl -L -o specforge https://github.com/jefmonjor/specforge/releases/latest/download/specforge-darwin-arm64
+chmod +x specforge && sudo mv specforge /usr/local/bin/
+xattr -d com.apple.quarantine /usr/local/bin/specforge   # macOS Gatekeeper only
+```
+
+On Windows, download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and run `specforge init` once. The binary also answers to `sdd` and `forge`.
+
+**2. Run the line on a feature:**
+
+```bash
+specforge init                                    # once per machine
+cd my-project && git checkout -b feature/password-reset
+specforge setup                                   # add the SDD baseline (your code stays untouched)
+specforge ingest                                  # build the context pack
+specforge interview --feature "Password reset"    # agree on and seal the spec
+specforge loop                                    # Red → Green → Refactor; --resume if interrupted
+specforge audit --diff                            # security review of your branch
+specforge e2e --url http://localhost:3000         # check the scenario in a real browser
+```
+
+### What you need
+
+| Required | Optional, unlocks more gates |
+| :--- | :--- |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`) **or** [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini`) on your `PATH`, already signed in. SpecForge drives the agent you already use and never asks for an API key. | `markitdown` for `doc` · Chrome or Edge for `e2e` · `golangci-lint`, `ruff`, `jscpd`, `knip`, `stryker`, Maven for the stack gates below |
+
+## 🧱 Quality gates by stack
+
+The Refactor stage chains the gates for the detected stack and stops at the first failure.
+
+| Gate | React / Node | Java | Go | Python |
+| :--- | :---: | :---: | :---: | :---: |
+| Linter | ESLint (`npm run lint`) | — | `golangci-lint`, falling back to `go vet` | Ruff |
+| Duplicate code | jscpd | jscpd | jscpd | jscpd |
+| Dead code | Knip | — | — | — |
+| Mutation testing | Stryker | — | — | — |
+| Architecture rules | — | ArchUnit (`*ArchitectureTest`) | — | — |
+
+The `react` and `java` scaffolds include these configs ready to use. The `go` and `python` scaffolds are minimal starters.
+
+## 🧩 Under the hood
+
+SpecForge applies to itself the architecture it asks of your code: hexagonal, with the domain free of I/O.
+
+```text
+cmd/                    Cobra commands: one file per verb
+internal/
+  domain/               spec parsing & sealing, TDD state machine, agent memory, diagnostics
+  ports/                interfaces: AgentRunner, Compiler, QualityGate, E2EEngine, SecurityAuditor…
+  adapters/
+    agent/              Claude Code and Gemini CLI runners (swappable)
+    compiler/           build & test dispatch per stack
+    quality/            linter, jscpd, knip, stryker, ArchUnit gates
+    e2e/                chromedp driver + vision agent loop
+    security/           adversarial audit pipeline
+    doc/ ingest/ auth/ storage/ system/
+assets/baseline/        embedded templates, scaffolds and agent memory (go:embed)
+```
+
+Build from source (Go version from [`go.mod`](go.mod)):
+
+```bash
+git clone https://github.com/jefmonjor/specforge.git && cd specforge
+go test ./...
+go build -ldflags="-s -w" -trimpath -o specforge .
+./build-all.sh            # cross-compile Windows, macOS (arm64 + amd64) and Linux into dist/
+```
+
+## 📍 Status & roadmap
+
+SpecForge is **v3.0.0**: it builds, ships as a binary for four platforms and has unit tests across the domain, commands and most adapters. Planned next:
+
+- [ ] CI on every push (`go vet`, `go test`, cross-platform build)
+- [ ] Crash-safe state writes (temp file + rename) for `.sdd-state.json`
+- [ ] Tool-dependent tests skip cleanly when a linter isn't installed
+- [ ] English CLI output alongside Spanish
+- [ ] Recorded demo of a full `loop` run
+
+Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
+
+## 🤝 Contributing & license
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md) before opening a PR. The full manual is in the [User & Architecture Guide](USER_GUIDE.md).
+
+Licensed under [Apache 2.0](LICENSE). Binary distributions must include [NOTICE](NOTICE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The dependency and license review is in [LEGAL_AUDIT.md](LEGAL_AUDIT.md).
+
+<p align="center"><sub>Built by <a href="https://www.jefmonjor.dev">Jefferson Montesdeoca</a> · <a href="https://github.com/jefmonjor">@jefmonjor</a></sub></p>
