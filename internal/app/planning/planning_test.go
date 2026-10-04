@@ -131,3 +131,28 @@ func TestDraftBlockedAndPending(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+type answering struct{}
+
+func (answering) Ask(context.Context, ports.Question) (string, error) { return "REST", nil }
+
+// An answer is recorded in the decisions log during the turn; that is
+// SpecForge's own write, not the agent working outside the plan.
+func TestDraftAcceptsTheDecisionsLogWrittenDuringTheTurn(t *testing.T) {
+	root := t.TempDir()
+	a := &agent{root: root,
+		writes:  []map[string]string{nil, {"specs/0001-reset/plan.md": planOK}},
+		replies: []string{"```json\n{\"status\":\"needs_clarification\",\"question\":\"REST or gRPC?\"}\n```", done}}
+	doc, _ := spec.Parse(specText, spec.ParseOptions{})
+	_, err := Draft(context.Background(), Deps{
+		Agent: a, Workspace: workspace.New(process.NewRunner(nil)), Files: fsys.OS{},
+		Asker:  &clarify.Asker{Prompter: answering{}, Files: fsys.OS{}, Lang: "en", Now: time.Now},
+		Lister: func(context.Context, string) ([]string, error) { return nil, nil }, Events: &events{},
+	}, Options{Root: root, SpecPath: filepath.Join(root, "specs", "0001-reset.md"), SpecID: "0001", Doc: doc, SpecText: specText, Language: "en"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "specs", "0001-reset", "decisions.md")); err != nil {
+		t.Fatal("the answer was not recorded")
+	}
+}

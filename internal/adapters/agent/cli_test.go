@@ -51,12 +51,23 @@ func TestRunSendsThePromptThroughStdinNeverArgv(t *testing.T) {
 }
 
 func TestHeadlessFlagsAllowEditsAndModel(t *testing.T) {
-	claude := Claude.Headless("opus")
-	if !slices.Contains(claude, "acceptEdits") || !slices.Contains(claude, "--model") || !slices.Contains(claude, "opus") {
+	claude := Claude.Headless("opus", nil)
+	if !slices.Contains(claude, "acceptEdits") || !slices.Contains(claude, "--model") || !slices.Contains(claude, "opus") || slices.Contains(claude, "--add-dir") {
 		t.Errorf("claude args = %v", claude)
 	}
-	gemini := Gemini.Headless("")
-	if !slices.Contains(gemini, "auto_edit") || slices.Contains(gemini, "-m") {
+	gemini := Gemini.Headless("", nil)
+	if !slices.Contains(gemini, "auto_edit") || slices.Contains(gemini, "-m") || slices.Contains(gemini, "--include-directories") {
+		t.Errorf("gemini args = %v", gemini)
+	}
+}
+
+func TestHeadlessReadDirs(t *testing.T) {
+	claude := Claude.Headless("", []string{"/legacy/a", "/legacy/b"})
+	if got := strings.Join(claude[len(claude)-4:], " "); got != "--add-dir /legacy/a --add-dir /legacy/b" {
+		t.Errorf("claude args = %v", claude)
+	}
+	gemini := Gemini.Headless("", []string{"/legacy/a", "/legacy/b"})
+	if got := strings.Join(gemini[len(gemini)-2:], " "); got != "--include-directories /legacy/a,/legacy/b" {
 		t.Errorf("gemini args = %v", gemini)
 	}
 }

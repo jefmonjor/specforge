@@ -148,3 +148,20 @@ func listFiles(root string) ([]string, error) {
 	})
 	return out, err
 }
+
+// legacyDir resolves the legacy repository of a rewrite: arg when given,
+// else migration.legacy in specforge.yaml; relative paths are relative to
+// the project. It returns "" when there is none.
+func (p project) legacyDir(arg string) string {
+	dir := arg
+	if dir == "" {
+		dir = p.settings.Migration.Legacy
+	}
+	if dir == "" {
+		return ""
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(p.root, dir)
+	}
+	return filepath.Clean(dir)
+}

@@ -119,9 +119,13 @@ func newerThan(root, dirName, suffix string, since time.Time) []string {
 	return out
 }
 
-// pythonCandidates returns the ways to launch pytest, most direct first.
-func pythonCandidates() [][]string {
+// pythonCandidates returns the ways to launch pytest, most direct first:
+// the project's virtual environment before anything on PATH.
+func pythonCandidates(root string) [][]string {
 	var out [][]string
+	if py, ok := process.VenvBin(root, "python"); ok {
+		out = append(out, []string{py, "-m", "pytest"})
+	}
 	if process.Available("pytest") {
 		out = append(out, []string{"pytest"})
 	}

@@ -11,6 +11,9 @@ var heading = regexp.MustCompile(`^(#{1,6})\s+(.*)$`)
 var (
 	GlossaryTitle   = regexp.MustCompile(`(?i)lenguaje ubicuo|glosario|glossary|ubiquitous language`)
 	InvariantsTitle = regexp.MustCompile(`(?i)invariant`)
+	// LegacySourcesTitle is the section of a specification drafted from
+	// legacy code that cites where each rule comes from.
+	LegacySourcesTitle = regexp.MustCompile(`(?i)legacy`)
 )
 
 // Section returns the body under the first Markdown heading whose text

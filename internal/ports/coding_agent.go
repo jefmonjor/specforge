@@ -14,6 +14,9 @@ type AgentRequest struct {
 	Dir string
 	// Model optionally overrides the agent's default model.
 	Model string
+	// ReadDirs are directories outside Dir the agent may read (a legacy
+	// repository). SpecForge verifies they are left unchanged.
+	ReadDirs []string
 	// Env holds extra KEY=VALUE pairs for the agent process.
 	Env []string
 	// Timeout bounds the invocation; zero means only ctx bounds it.

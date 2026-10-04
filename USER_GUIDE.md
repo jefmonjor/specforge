@@ -14,11 +14,12 @@ SpecForge drives a coding agent ([Claude Code](https://docs.anthropic.com/en/doc
 - [10. Security audit: `audit`](#10-security-audit-audit)
 - [11. Browser verification: `e2e`](#11-browser-verification-e2e)
 - [12. Hand-over: `deliver`](#12-hand-over-deliver)
-- [13. Configuration reference](#13-configuration-reference)
-- [14. Files SpecForge writes](#14-files-specforge-writes)
-- [15. Exit codes](#15-exit-codes)
-- [16. Troubleshooting](#16-troubleshooting)
-- [17. Architecture](#17-architecture)
+- [13. Legacy rewrites: `legacy`, `spec from-legacy`](#13-legacy-rewrites-legacy-spec-from-legacy)
+- [14. Configuration reference](#14-configuration-reference)
+- [15. Files SpecForge writes](#15-files-specforge-writes)
+- [16. Exit codes](#16-exit-codes)
+- [17. Troubleshooting](#17-troubleshooting)
+- [18. Architecture](#18-architecture)
 
 ## 1. How it works
 
@@ -80,6 +81,25 @@ specforge setup --agents claude,gemini --stack node
 | `.gitignore` | Adds `.specforge/`, the local loop state. | Unchanged. |
 
 The stack is detected from `go.mod`, `pom.xml`, `build.gradle(.kts)`, `package.json` (Vitest, Jest or `npm test`) or `pyproject.toml`/`requirements.txt`/`setup.py`. With several, SpecForge asks which one to drive, or fails in CI until you set `stack:`.
+
+### Starting a new project: `--new`
+
+```bash
+mkdir shop && cd shop && git init
+specforge setup --new react                  # or java, python, go; --name sets the project name
+specforge setup --new java --legacy ../old   # a Java 21 rewrite of ../old (see section 13)
+```
+
+`--new` writes a project skeleton with the tooling the loop drives, then does the usual setup. It refuses a directory that already holds a build file, and keeps any other file that exists. Every scaffold was installed and run end to end (tests, lint, and the other gates) with the versions it pins:
+
+| Stack | Files | Tooling |
+| :--- | :--- | :--- |
+| `java` | `pom.xml`, `domain`/`application`/`adapters` packages, `ArchitectureTest` | Java 21 (`maven.compiler.release`), JUnit 6, AssertJ, ArchUnit (the domain imports no framework, the application does not know the adapters, no `javax.*` Java EE, Log4j 1, JUnit 3, `Vector` or `Hashtable`), PMD quickstart rules |
+| `react` | Vite app, `App.test.tsx`, `src/test/setup.ts` | Vite 7, React 19, TypeScript strict, Vitest 4.0 with jsdom and Testing Library, ESLint with typescript-eslint and react-hooks, Knip, jscpd, Stryker |
+| `python` | `pyproject.toml`, `src/<module>/`, `tests/` | pytest, Ruff with a broad rule set (tests may carry the marker in their names) |
+| `go` | `go.mod`, `main.go`, `.golangci.yml` | golangci-lint v2 |
+
+Then install the tools: `mvn test`, `npm install`, or `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'`. Python projects use the `.venv`'s pytest and Ruff; Java and Gradle projects use `mvnw`/`gradlew` when present.
 
 ## 5. Specifications: `spec`
 
@@ -199,10 +219,13 @@ REFACTOR runs the gates that apply to the stack. Each reads its tool's machine-r
 
 | Gate | Go | Node | Java | Python |
 | :--- | :--- | :--- | :--- | :--- |
-| Lint | `golangci-lint` (falls back to `go vet` when absent) | `npm run lint` | — | `ruff check` |
+| Lint | `golangci-lint` (falls back to `go vet` when absent) | `npm run lint` | PMD, when `maven-pmd-plugin` is in the build (Maven) | `ruff check` (the `.venv`'s first) |
 | Duplication (`max_duplication_percent`, default 0) | jscpd | jscpd | jscpd | jscpd |
 | Dead code | — | Knip | — | — |
 | Mutation (`min_mutation_score`, default 80) | — | Stryker, when configured | — | — |
+| Migration | — | — | when `migration.java_release` or `forbidden_imports` is set: the declared release and every `import` in the Java sources | — |
+
+The migration gate needs no tool, so it never skips. Its findings name the file and line: `src/main/java/…/Payroll.java:3: imports javax.servlet.http.HttpServlet (forbidden: javax.servlet)`.
 
 ## 10. Security audit: `audit`
 
@@ -244,7 +267,29 @@ gh pr create --body-file specs/0001-password-reset/PR_BODY.md
 
 A delivery is honest about gaps: unfinished scenarios, open questions and checks that did not run are listed, and an incomplete delivery says so in its first line. Reviews and SpecForge's own verification questions are shown per scenario, not mixed with your product decisions. The loop state lives in `.specforge/`, so run `deliver` where the loop ran; `trace.json` keeps the trace once committed.
 
-## 13. Configuration reference
+## 13. Legacy rewrites: `legacy`, `spec from-legacy`
+
+Rewriting a legacy system (a Java 6 servlet application on Java 21, for example) happens in a **new project next to the old one**. The legacy repository is evidence, not a workspace: the agent may read it, and SpecForge hashes it before and after every agent turn (map, specification, plan and every loop phase) and refuses any change.
+
+```yaml
+# specforge.yaml (written by `setup --legacy`, or by hand)
+migration:
+  legacy: ../legacy-payroll   # relative to the project, or absolute
+  java_release: 21            # the build must declare it
+  # forbidden_imports: [javax.servlet, org.apache.log4j]   # default: see below
+```
+
+With `java_release` set and no list of its own, the forbidden imports are the Java EE packages Jakarta renamed (`javax.servlet`, `javax.persistence`, `javax.validation`, `javax.ejb`, `javax.jms`, `javax.ws.rs`, `javax.xml.bind`, `javax.xml.rpc`, `javax.annotation`, `javax.inject`, `javax.faces`, `javax.transaction`), Log4j 1, JUnit 3, `Vector` and `Hashtable`.
+
+| Command | What it does | What SpecForge verifies |
+| :--- | :--- | :--- |
+| `legacy scan [path]` | Writes `docs/legacy/INVENTORY.md` without an agent: build tool, declared Java release (the lowest of `pom.xml`, Gradle and Ant), size, frameworks found from imports and files, the largest packages, and what each finding means for Java 21. | It is measured, not generated. |
+| `legacy map [path]` | The agent reads the legacy code and writes `docs/legacy/CAPABILITIES.md`: one section per business capability with what it does, entry points, rules with their sources, data, dependencies and what is unclear, ordered so that what others depend on comes first. | Only that file may change; at least one capability; every `` `path:line` `` or `` `path:from-to` `` citation is opened in the legacy code. A file that does not exist or a line past its end sends the map back with the list. |
+| `spec from-legacy "<capability>"` | Creates the next specification and the agent fills it with the behaviour **as it is today**: rules as invariants, scenarios with the real values and messages, and a `## 13. Legacy sources` section citing the code of each rule and scenario. | Only the specification may change; the template lint (open questions aside); a sources section with citations; every citation in it, and every line citation elsewhere, resolves. One capability per specification: the others go to *Out of scope*. Run it again with the same capability to continue the draft. |
+
+What the code does that nobody can explain (a rule applied in one place and not another, floating-point money, dead code) is written as `[NEEDS CLARIFICATION]` with its source. Answer them with `spec clarify` (or edit them), then approve: the specification is now the contract the new code is tested against. During `plan` and `loop` the agent receives the legacy path, the sources section and the target release, reads the cited code to reproduce the behaviour, and the migration gate checks the result.
+
+## 14. Configuration reference
 
 Values resolve in this order: command-line flag, then `specforge.yaml`, then your user configuration, then the default.
 
@@ -264,13 +309,17 @@ quality:
   strict: false
   max_duplication_percent: 0
   min_mutation_score: 80
+migration:              # only for a rewrite (section 13)
+  legacy: ../old-system
+  java_release: 21
+  forbidden_imports: [javax.servlet, org.apache.log4j]
 ```
 
 Unknown keys are an error, so a typo never silently leaves a default in place.
 
 Global flags: `--verbose` (progress details and the agent's live output), `--debug` (debug records in the log), `--trace-io` (every prompt and answer in the log), `--quiet` (only warnings, errors and data), `--non-interactive` (never ask: write questions to a file and exit 5), `--json` (data from `version`, `spec list` and `deliver` as JSON on stdout, and errors as `{"exit", "title", "cause", "action"}` on stderr).
 
-## 14. Files SpecForge writes
+## 15. Files SpecForge writes
 
 | Path | Committed | Content |
 | :--- | :---: | :--- |
@@ -284,13 +333,15 @@ Global flags: `--verbose` (progress details and the agent's live output), `--deb
 | `specs/LESSONS.md` | yes | Lessons the agent wrote after a rejected attempt. |
 | `specs/NNNN-slug/DELIVERY.md`, `trace.json`, `PR_BODY.md` | yes | The hand-over written by `deliver`. |
 | `specs/NNNN-slug/questions.md` | yes | Questions asked when nobody was at the terminal. |
+| `docs/legacy/INVENTORY.md`, `CAPABILITIES.md` | yes | The legacy inventory and capability map. |
+| `docs/legacy/decisions.md`, `questions.md` | yes | Questions asked while mapping the legacy code, and your answers. |
 | `docs/security/` | your choice | Audit reports (owner-only permissions). |
 | `docs/e2e/<spec>/` | your choice | E2E reports and screenshots. |
 | `.specforge/state/<spec>.json` | no | Loop state for `--resume`. |
 
 The log file lives in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux), rotated, with owner-only permissions.
 
-## 15. Exit codes
+## 16. Exit codes
 
 | Code | Meaning |
 | :---: | :--- |
@@ -304,15 +355,17 @@ The log file lives in your user cache directory (`~/.cache/specforge/logs/specfo
 
 Every failure prints what happened, why and what to do next.
 
-## 16. Troubleshooting
+## 17. Troubleshooting
 
 - **What did the agent receive and answer?** Re-run with `--trace-io` and read the log file.
 - **The agent claims files it did not write.** The attempt is rejected and the agent is told which ones; that is the loop working. Repeated rejections exhaust `max_attempts` (exit 2).
 - **"Several stacks detected".** Set `stack:` in `specforge.yaml` or pass `--stack`.
 - **The loop says the specification changed.** Revert the edit, or review it and run `specforge spec approve` again; unchanged scenarios keep their progress.
 - **A gate shows ⚠ skipped.** Install the tool, or accept the warning; `--strict` makes it block.
+- **"The agent changed the legacy code".** Restore the legacy repository (`git checkout .` there) and run the command again; the agent may only read it.
+- **A legacy document keeps coming back.** The diagnosis lists each citation that did not resolve; the agent gets the same list. Check the paths are relative to the legacy repository.
 
-## 17. Architecture
+## 18. Architecture
 
 SpecForge follows the architecture it asks of your code: the domain is pure, use cases depend on small ports, adapters do the I/O and `cmd/` only wires them.
 
@@ -325,11 +378,15 @@ internal/
     delivery/             the delivery trace and its rendering
     tdd/                  loop state, test outcomes, typed errors
     stack/                stack detection, test commands, test-file rules
+    legacy/               legacy inventory, citations and their verification, migration conformance
     quality/ security/ e2e/
   app/                    use cases
     tddloop/              Red → Green → Refactor with verification, review and commit
     specs/ planning/      specification lifecycle and approvals; drafting the plan
     interview/            the turn-based interview
+    docturn/              one agent turn whose product is a document, verified (plan, map, legacy spec)
+    migrate/              legacy scan, capability map, specification from legacy
+    scaffold/             setup --new
     deliver/              the hand-over: DELIVERY.md, trace.json, PR_BODY.md
     conversation/         one agent turn under the response contract
     setup/                repository setup
@@ -339,7 +396,7 @@ internal/
   ports/                  interfaces the use cases depend on
   adapters/               agent CLI, process runner, test runners, gates, git, browser, files, logging
   config/ ui/             settings resolution; terminal output and diagnoses
-assets/                   embedded prompts, rules, standards, audit method, templates (es/en)
+assets/                   embedded prompts, rules, standards, audit method, templates, scaffolds (es/en)
 ```
 
 Tests run the real CLI against scripted agents and real `go test`, `git` and Chromium where available: `make test`.

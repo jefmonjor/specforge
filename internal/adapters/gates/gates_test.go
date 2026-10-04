@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"specforge/internal/domain/legacy"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/stack"
 	"specforge/internal/ports"
@@ -151,5 +152,68 @@ func TestCancelledContextStopsTheGates(t *testing.T) {
 	proc := &fakeProc{errs: map[string]error{"ruff": context.Canceled}}
 	if _, err := Run(ctx, []ports.Gate{&Lint{proc: proc}}, t.TempDir(), stack.Profile{Kind: stack.Python}); err == nil {
 		t.Fatal("cancellation must surface as an error")
+	}
+}
+
+func TestMigrationGate(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<maven.compiler.release>21</maven.compiler.release>"), 0o644)
+	os.MkdirAll(filepath.Join(root, "src/main/java/a"), 0o755)
+	g := &Migration{Target: legacy.Target{JavaRelease: 21, ForbiddenImports: []string{"javax.servlet"}}}
+	maven := stack.Profile{Kind: stack.Maven}
+	if !g.Applies(maven) || g.Applies(stack.Profile{Kind: stack.Go}) || (&Migration{}).Applies(maven) {
+		t.Fatal("applies")
+	}
+	res, err := g.Check(context.Background(), root, maven)
+	if err != nil || res.Status != quality.Passed {
+		t.Fatalf("%+v %v", res, err)
+	}
+	os.WriteFile(filepath.Join(root, "src/main/java/a/W.java"), []byte("package a;\nimport javax.servlet.Filter;\n"), 0o644)
+	res, _ = g.Check(context.Background(), root, maven)
+	if res.Status != quality.Failed || !strings.Contains(res.Details, "src/main/java/a/W.java:2") {
+		t.Fatalf("%+v", res)
+	}
+}
+
+func TestMavenLintRunsPMDOnlyWhenTheBuildDeclaresIt(t *testing.T) {
+	root := t.TempDir()
+	maven := stack.Profile{Kind: stack.Maven, Runner: stack.RunnerMaven}
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<project/>"), 0o644)
+	proc := &fakeProc{results: map[string]ports.CommandResult{}}
+	g := &Lint{proc: proc}
+	if res, _ := g.Check(context.Background(), root, maven); res.Status != quality.Skipped || len(proc.calls) != 0 {
+		t.Fatalf("%+v %v", res, proc.calls)
+	}
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<artifactId>maven-pmd-plugin</artifactId>"), 0o644)
+	proc.results["mvn"] = ports.CommandResult{ExitCode: 1, Stdout: "[WARNING] PMD Failure: a.Payroll:6 Rule:LooseCoupling Priority:3 Avoid Vector.\n[ERROR] PMD 7.17.0 has found 1 violation."}
+	res, _ := g.Check(context.Background(), root, maven)
+	if res.Status != quality.Failed || res.Details != "a.Payroll:6 Rule:LooseCoupling Priority:3 Avoid Vector." {
+		t.Fatalf("%+v", res)
+	}
+	proc.results["mvn"] = ports.CommandResult{ExitCode: 1, Stdout: "[ERROR] COMPILATION ERROR"}
+	if res, _ := g.Check(context.Background(), root, maven); res.Status != quality.Skipped {
+		t.Fatalf("%+v", res)
+	}
+	proc.results["mvn"] = ports.CommandResult{}
+	if res, _ := g.Check(context.Background(), root, maven); res.Status != quality.Passed {
+		t.Fatalf("%+v", res)
+	}
+}
+
+// Regression from a real React run: package-lock.json alone failed the
+// duplication gate. Only source formats count, and reports are ignored.
+func TestDuplicationCountsOnlySourceCode(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "package.json"), []byte(`{}`), 0o644)
+	proc := &fakeProc{results: map[string]ports.CommandResult{}}
+	_, _ = (&Duplication{proc: proc}).Check(context.Background(), root, nodeP)
+	call := strings.Join(proc.calls, " ")
+	for _, want := range []string{"--format go,java", "typescript,jsx,tsx", "**/reports/**", "**/.venv/**"} {
+		if !strings.Contains(call, want) {
+			t.Errorf("jscpd call lacks %q: %s", want, call)
+		}
+	}
+	if strings.Contains(call, "json,") || strings.Contains(call, "markdown") {
+		t.Errorf("non-source formats counted: %s", call)
 	}
 }

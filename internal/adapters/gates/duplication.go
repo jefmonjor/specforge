@@ -26,8 +26,14 @@ func (*Duplication) Name() string { return "duplication" }
 // Applies implements ports.Gate.
 func (*Duplication) Applies(stack.Profile) bool { return true }
 
-// jscpdIgnore keeps tests, dependencies and build output out of the count.
-const jscpdIgnore = "**/*_test.go,**/*.test.*,**/*.spec.*,**/test_*.py,**/src/test/**,**/node_modules/**,**/target/**,**/build/**,**/dist/**,**/vendor/**,**/.specforge/**"
+// jscpdIgnore keeps tests, dependencies, build output and tool reports out
+// of the count.
+const jscpdIgnore = "**/*_test.go,**/*.test.*,**/*.spec.*,**/test_*.py,**/tests/**,**/src/test/**,**/node_modules/**,**/target/**,**/build/**,**/dist/**,**/vendor/**,**/.venv/**,**/coverage/**,**/reports/**,**/.stryker-tmp/**,**/.specforge/**"
+
+// jscpdFormats limits the count to source code: lock files, JSON and the
+// specifications' Markdown repeat by nature and are not duplicated logic.
+// (Found in a real run: package-lock.json alone failed a React project.)
+const jscpdFormats = "go,java,kotlin,scala,groovy,javascript,typescript,jsx,tsx,vue,svelte,python,csharp,php,ruby"
 
 type jscpdReport struct {
 	Statistics struct {
@@ -51,7 +57,7 @@ func (d *Duplication) Check(ctx context.Context, root string, _ stack.Profile) (
 	}
 	defer func() { _ = os.RemoveAll(outDir) }() // best effort: a temp directory
 
-	res, err := globalOrLocal(ctx, d.proc, root, "jscpd", ".", "--silent", "--reporters", "json", "--output", outDir, "--ignore", jscpdIgnore)
+	res, err := globalOrLocal(ctx, d.proc, root, "jscpd", ".", "--silent", "--reporters", "json", "--output", outDir, "--ignore", jscpdIgnore, "--format", jscpdFormats)
 	if err != nil {
 		return toolError(ctx, d.Name(), err)
 	}

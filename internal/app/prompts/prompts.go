@@ -24,6 +24,10 @@ const (
 	Plan      Name = "plan"
 	// InterviewTurn is one turn of the interview SpecForge runs.
 	InterviewTurn Name = "interview_turn"
+	// LegacyMap maps the business capabilities of a legacy system.
+	LegacyMap Name = "legacy_map"
+	// FromLegacy drafts a specification from the legacy code.
+	FromLegacy Name = "from_legacy"
 )
 
 // File is a file shown to the agent as context.
@@ -70,6 +74,18 @@ type Data struct {
 	Answer           string
 	Attempt          int
 	MaxAttempts      int
+
+	// Migration: the legacy repository (read-only), its inventory, the
+	// capability map, the capability a specification is drafted for, the
+	// target Java release and the imports the new code may not use.
+	Legacy           string
+	LegacySources    string
+	Inventory        string
+	Capabilities     string
+	Capability       string
+	DocPath          string
+	JavaRelease      int
+	ForbiddenImports []string
 }
 
 // E2EData is what the E2E prompt references.

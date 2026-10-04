@@ -200,13 +200,19 @@ func (e *E2EEvents) Result(r e2e.ScenarioResult) {
 type PlanEvents struct {
 	C     *Console
 	Agent string
+	// Phase labels the activity indicator (PLAN when empty).
+	Phase string
 	stop  func()
 }
 
 func (e *PlanEvents) Working() {
 	e.Done()
 	if !e.C.Quiet {
-		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, "PLAN"))
+		phase := e.Phase
+		if phase == "" {
+			phase = "PLAN"
+		}
+		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, phase))
 	}
 }
 

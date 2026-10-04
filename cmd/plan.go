@@ -61,6 +61,10 @@ When plan.md exists the loop requires it approved and follows it.`,
 				return err // ambiguous: never guess
 			}
 
+			legacyDir, err := a.rewriteLegacy(p)
+			if err != nil {
+				return err
+			}
 			proc := a.NewProcess(a.log)
 			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
 			if err != nil {
@@ -90,6 +94,7 @@ When plan.md exists the loop requires it approved and follows it.`,
 				Root: p.root, SpecPath: entry.Path, SpecID: entry.ID, Doc: doc, SpecText: string(text),
 				Profile: prof, Language: p.settings.Language, Model: p.settings.Model,
 				AgentTimeout: p.settings.AgentTimeout, MaxAttempts: p.settings.MaxAttempts,
+				Legacy: legacyDir, JavaRelease: p.settings.Migration.JavaRelease, ForbiddenImports: p.settings.Migration.ForbiddenImports,
 			})
 			events.Done()
 			if err != nil {

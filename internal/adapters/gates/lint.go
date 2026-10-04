@@ -3,8 +3,10 @@ package gates
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"specforge/internal/adapters/process"
 	"specforge/internal/domain/quality"
@@ -30,6 +32,8 @@ func (l *Lint) Check(ctx context.Context, root string, p stack.Profile) (quality
 		return l.node(ctx, root)
 	case stack.Python:
 		return l.python(ctx, root)
+	case stack.Maven:
+		return l.maven(ctx, root)
 	default:
 		return skipped(l.Name(), "no linter configured for "+string(p.Kind)+" (add Checkstyle or PMD to the build)"), nil
 	}
@@ -80,7 +84,11 @@ func (l *Lint) node(ctx context.Context, root string) (quality.Result, error) {
 
 // ruff exits 1 with violations and 2 when it cannot run.
 func (l *Lint) python(ctx context.Context, root string) (quality.Result, error) {
-	res, err := l.proc.Run(ctx, ports.Command{Name: "ruff", Args: []string{"check", "."}, Dir: root})
+	ruff := "ruff"
+	if bin, ok := process.VenvBin(root, "ruff"); ok {
+		ruff = bin
+	}
+	res, err := l.proc.Run(ctx, ports.Command{Name: ruff, Args: []string{"check", "."}, Dir: root})
 	if err != nil {
 		return toolError(ctx, l.Name(), err)
 	}
@@ -92,6 +100,38 @@ func (l *Lint) python(ctx context.Context, root string) (quality.Result, error) 
 	default:
 		return skipped(l.Name(), "ruff could not run: "+res.Combined()), nil
 	}
+}
+
+// maven runs PMD when the build declares it (the SpecForge Java scaffold
+// does): pmd:check fails the build on any violation of its rule set.
+func (l *Lint) maven(ctx context.Context, root string) (quality.Result, error) {
+	pom, err := os.ReadFile(filepath.Join(root, "pom.xml"))
+	if err != nil || !strings.Contains(string(pom), "maven-pmd-plugin") {
+		return skipped(l.Name(), "no linter configured for maven (add maven-pmd-plugin to the build)"), nil
+	}
+	mvn := "mvn"
+	if _, err := os.Stat(filepath.Join(root, "mvnw")); err == nil {
+		mvn = filepath.Join(root, "mvnw")
+	}
+	res, err := l.proc.Run(ctx, ports.Command{Name: mvn, Args: []string{"-B", "test-compile", "pmd:check"}, Dir: root})
+	if err != nil {
+		return toolError(ctx, l.Name(), err)
+	}
+	if res.Success() {
+		return quality.Result{Gate: l.Name(), Status: quality.Passed, Summary: "PMD: no violations"}, nil
+	}
+	var found []string
+	for _, line := range strings.Split(res.Combined(), "\n") {
+		if i := strings.Index(line, "PMD Failure: "); i >= 0 {
+			found = append(found, strings.TrimSpace(line[i+len("PMD Failure: "):]))
+		}
+	}
+	if len(found) == 0 {
+		// The build failed before PMD judged anything (compilation, plugin).
+		return skipped(l.Name(), "PMD could not run: "+firstLine(res.Combined())), nil
+	}
+	return quality.Result{Gate: l.Name(), Status: quality.Failed,
+		Summary: fmt.Sprintf("PMD found %d violation(s)", len(found)), Details: strings.Join(found, "\n")}, nil
 }
 
 func hasScript(root, name string) bool {

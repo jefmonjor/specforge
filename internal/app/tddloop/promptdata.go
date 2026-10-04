@@ -41,7 +41,21 @@ func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
 		Lessons:     s.lessons(r),
 		MaxAttempts: r.o.MaxAttempts,
 		Attempt:     r.st.Attempts,
+
+		Legacy:           r.o.Legacy,
+		LegacySources:    legacySources(r.o.Legacy, r.md),
+		JavaRelease:      r.o.JavaRelease,
+		ForbiddenImports: r.o.ForbiddenImports,
 	}
+}
+
+// legacySources is the specification's section that cites the legacy
+// code, shown only in a rewrite.
+func legacySources(legacyDir, md string) string {
+	if legacyDir == "" {
+		return ""
+	}
+	return spec.Section(md, spec.LegacySourcesTitle)
 }
 
 func (s *Service) lessons(r *run) string {

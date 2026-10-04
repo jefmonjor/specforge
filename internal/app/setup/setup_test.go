@@ -100,3 +100,19 @@ func TestBlockWithoutStackHasOnlyRules(t *testing.T) {
 		t.Fatalf("block:\n%s", b)
 	}
 }
+
+func TestProjectConfigLoadsForARewrite(t *testing.T) {
+	for _, legacy := range []string{"", "../old system"} {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, config.ProjectFile), []byte(ProjectConfig("en", nil, legacy, 21)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		p, err := config.LoadProject(root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if legacy != "" && (p.Migration.Legacy != legacy || p.Migration.JavaRelease != 21) {
+			t.Fatalf("%+v", p.Migration)
+		}
+	}
+}

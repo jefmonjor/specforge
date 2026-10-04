@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"strconv"
 	"strings"
 
 	"specforge/assets"
@@ -35,6 +36,10 @@ type Options struct {
 	Agents []string
 	// Stack is the detected or chosen stack; nil when there is none yet.
 	Stack *stack.Profile
+	// Legacy, when set, makes the project the rewrite of that legacy
+	// repository (path as written in specforge.yaml) targeting JavaRelease.
+	Legacy      string
+	JavaRelease int
 }
 
 // Action is what happened to one file.
@@ -178,11 +183,12 @@ func writeProjectConfig(files ports.Files, o Options) (Action, error) {
 	if files.Exists(path) {
 		return Unchanged, nil
 	}
-	return Created, files.WriteFile(path, []byte(ProjectConfig(o.Language, o.Stack)))
+	return Created, files.WriteFile(path, []byte(ProjectConfig(o.Language, o.Stack, o.Legacy, o.JavaRelease)))
 }
 
-// ProjectConfig renders a commented specforge.yaml with the defaults.
-func ProjectConfig(lang string, p *stack.Profile) string {
+// ProjectConfig renders a commented specforge.yaml with the defaults and,
+// for a rewrite, the migration section.
+func ProjectConfig(lang string, p *stack.Profile, legacy string, javaRelease int) string {
 	stackLine := "# stack: go            # go | maven | gradle | node | python (detected when unset)"
 	if p != nil {
 		stackLine = "stack: " + string(p.Kind)
@@ -203,6 +209,28 @@ func ProjectConfig(lang string, p *stack.Profile) string {
 		"#   strict: false                # true: a gate that cannot run blocks instead of warning",
 		"#   max_duplication_percent: 0   # jscpd",
 		"#   min_mutation_score: 80       # Stryker",
-		"",
+		migrationConfig(legacy, javaRelease),
 	}, "\n")
+}
+
+func migrationConfig(legacy string, javaRelease int) string {
+	if legacy == "" {
+		return strings.Join([]string{
+			"# migration:                     # rewriting a legacy system (see `specforge legacy`)",
+			"#   legacy: ../old-system        # read-only reference for the agent",
+			"#   java_release: 21             # the build must declare it",
+			"#   forbidden_imports: [javax.servlet, javax.persistence, org.apache.log4j]",
+			"",
+		}, "\n")
+	}
+	lines := []string{
+		"migration:",
+		"  legacy: " + strconv.Quote(legacy) + "  # read-only reference for the agent",
+	}
+	if javaRelease > 0 {
+		lines = append(lines,
+			"  java_release: "+strconv.Itoa(javaRelease)+"  # the build must declare it",
+			"  # forbidden_imports: [...]   # default: the javax.* that Jakarta renamed, Log4j 1, JUnit 3, Vector, Hashtable")
+	}
+	return strings.Join(append(lines, ""), "\n")
 }
