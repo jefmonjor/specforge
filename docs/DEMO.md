@@ -1,6 +1,6 @@
 # A real session
 
-These are real runs of SpecForge 4 with Claude Code on a new Go module, shortened where marked `…` and with local paths made relative. Two features: **discount codes** goes from specification to pull request body, and **gift cards** shows the interview. They also show what this README promises: the agent asked instead of guessing, and SpecForge checked each step itself.
+These are real runs of SpecForge with Claude Code: first on a new Go module, shortened where marked `…` and with local paths made relative. Two features: **discount codes** goes from specification to pull request body, and **gift cards** shows the interview. They also show what this README promises: the agent asked instead of guessing, and SpecForge checked each step itself. Section 7 is a SpecForge 5 run: a Java 6 payroll application rewritten on Java 21.
 
 - [1. Set up](#1-set-up)
 - [2. The interview (gift cards)](#2-the-interview-gift-cards)
@@ -8,6 +8,7 @@ These are real runs of SpecForge 4 with Claude Code on a new Go module, shortene
 - [4. The loop, with your review](#4-the-loop-with-your-review)
 - [5. The hand-over](#5-the-hand-over)
 - [6. What the runs taught SpecForge](#6-what-the-runs-taught-specforge)
+- [7. A legacy rewrite: Java 6 → 21](#7-a-legacy-rewrite-java-6--21)
 
 ## 1. Set up
 
@@ -173,3 +174,90 @@ Every live run found something the unit tests had not, and each became a fix wit
 | Resume after a stop | RED kept rejecting "no test file changed" because the test already existed. | RED runs an existing test with the marker before calling the agent. |
 | `deliver` | A message key was missing in both languages. | A test now checks that every key used in the code exists. |
 | Interview | The pending-question hint pointed to `loop --resume` for every command. | The hint says to run the same command again. |
+
+## 7. A legacy rewrite: Java 6 → 21
+
+The legacy system is a small Java 6 payroll application, the way many still run: an Ant build, a servlet, a JDBC DAO returning a raw `Vector`, a `Hashtable` passed to a JSP, Log4j 1, `java.util.Calendar`, money in `double`, and one JUnit 3 test. The rewrite is a new project next to it.
+
+```text
+$ specforge setup --new java --legacy ../legacy-payroll
+  ✓ created · pom.xml
+  ✓ created · src/test/java/com/example/payroll/ArchitectureTest.java
+  …
+  stack: maven
+$ specforge legacy scan
+  ✓ inventory written: docs/legacy/INVENTORY.md
+  build ant · Java 1.6 · 4 source file(s), 1 test file(s), 166 line(s)
+  found: Servlet API (javax.servlet), JSP views, Plain JDBC, Log4j 1.x, JUnit 3, Vector / Hashtable / Enumeration, java.util.Date / Calendar / SimpleDateFormat
+$ specforge legacy map
+  … claude is working (LEGACY)
+  ✓ capability map written, every cited source checked: docs/legacy/CAPABILITIES.md
+```
+
+The map named five capabilities in migration order (roster, withholding, seniority bonus, net pay, payroll run), each rule with its source, and listed what it could not explain instead of explaining it. One of them is a real bug in the legacy code that nobody had asked about:
+
+```markdown
+- **Unclear**:
+  - The servlet's data access object is never assigned in this code (`src/com/acme/payroll/web/PayrollServlet.java:18`, used at line 23); how it is supplied is unknown, and without it the run fails with error 500.
+```
+
+```text
+$ specforge spec from-legacy "Net pay calculation"
+  ✓ created specs/0001-net-pay-calculation.md
+  ✓ specification drafted from the legacy code, every cited source checked: specs/0001-net-pay-calculation.md
+  6 open question(s) about the legacy behaviour: answer them with `specforge spec clarify 0001`, then approve
+```
+
+The first draft took in the payroll run too (16 scenarios, 16 questions). That is another capability, so the prompt now requires one capability per specification, and the second draft kept 6 scenarios and sent the rest to *Out of scope*. Every rule cites its line, and SpecForge opened each one:
+
+```markdown
+## 13. Legacy sources
+
+- INV-02: `src/com/acme/payroll/PayrollCalculator.java:58`
+- INV-03: `src/com/acme/payroll/PayrollCalculator.java:54-56`
+- INV-04: `src/com/acme/payroll/PayrollCalculator.java:61`
+- Scenario "The net pay is truncated to whole cents": `src/com/acme/payroll/PayrollCalculator.java:61`
+```
+
+The six questions were the oddities a rewrite must not settle by itself. The developer answered them, and each answer went into the specification in place of its question:
+
+| The agent found | The developer decided |
+| :--- | :--- |
+| Withholding excludes the seniority bonus; the comment gives no reason. | Keep it: HR pays the bonus gross. |
+| Money is `double`, so an exact cent can fall one cent short before truncation. | Exact decimals, truncated down to cents; do not reproduce floating-point errors. |
+| The log shows the net pay before truncation, the result is truncated. | Log the truncated amount, the one actually paid. |
+| Only one legacy test exists, and it does not cover the net pay. | Validated against the March 2026 payroll. |
+
+The plan chose `BigDecimal` with `RoundingMode.DOWN`, a `Money` record and a log port, and flagged building decimals from strings in the tests. In the loop, SpecForge's gates ran on every REFACTOR: PMD rejected the first version and the agent fixed it, the migration gate checked the declared release and the imports, and ArchUnit ran with the suite. Two scenarios were already satisfied by the first implementation; SpecForge asked instead of counting a test that passed before any code as a RED.
+
+```text
+Scenario 1/6 · REFACTOR · Net pay adds the seniority bonus and subtracts the withholding
+  ✗ lint · failed · PMD found 1 violation(s)
+  ✓ migration · passed · Java 21 declared, no forbidden import
+  ✓ lint · passed · PMD: no violations
+  ✓ migration · passed · Java 21 declared, no forbidden import
+  ✓ REFACTOR accepted
+  ✓ committed fa8a360
+```
+
+```java
+public record Money(BigDecimal amount) {
+    public Money truncated() {
+        return new Money(amount.setScale(2, RoundingMode.DOWN));
+    }
+    …
+}
+```
+
+```text
+6 scenario(s) done: 4 through RED → GREEN → REFACTOR, 2 already satisfied
+$ mvn test
+Tests run: 4, Failures: 0 … in com.example.payroll.ArchitectureTest
+Tests run: 6, Failures: 0 … in com.example.payroll.application.CalculateNetPayTest
+$ specforge deliver 0001
+  ✓ delivery written: 6/6 scenario(s) finished
+```
+
+The legacy repository had no change at the end (`git status` clean): SpecForge hashed it around every agent turn.
+
+The same release was run on the other scaffolds. Python (`setup --new python`): two scenarios, `Decimal` with `ROUND_HALF_UP`, Ruff from the project's `.venv`. React (`setup --new react`): two scenarios with ESLint and `tsc`, Knip, jscpd and Stryker (mutation score 100 %) on every REFACTOR. The first run found a bug in SpecForge itself: the duplication gate counted `package-lock.json` and stopped the loop with exit 2. It now counts source code only, and `loop --resume` finished the feature.
