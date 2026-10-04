@@ -1,109 +1,118 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
-	"os"
+	"errors"
+	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
-	"specforge/internal/adapters/e2e"
-	"specforge/internal/adapters/storage"
-	"specforge/internal/domain"
-	"specforge/internal/ports"
+
+	"specforge/internal/adapters/browser"
+	"specforge/internal/adapters/fsys"
+	"specforge/internal/app/clarify"
+	"specforge/internal/app/e2erun"
+	"specforge/internal/config"
+	"specforge/internal/domain/spec"
+	"specforge/internal/ui"
 )
 
-var (
-	flagE2EURL        string
-	flagE2ESpec       string
-	flagE2EHeadless   bool
-	flagE2EMaxSteps   int
-	flagE2EScreenshot string
-	flagE2EAgent      string
-)
+func (a *App) e2eCommand() *cobra.Command {
+	var (
+		o           config.Overrides
+		baseURL     string
+		scenarios   []int
+		minPassRate float64
+		maxSteps    int
+		headed      bool
+		insecure    bool
+	)
+	c := &cobra.Command{
+		Use:   "e2e [spec] --url <url>",
+		Short: "Verify the scenarios of an approved specification in a real browser",
+		Long: `e2e drives Chrome, Chromium or Edge (found on your system or through
+CHROME_PATH) scenario by scenario. The agent sees a compact view of the page
+and answers with one typed action at a time; SpecForge validates each action
+(known element, same origin) before running it, and checks each Then itself
+against the evidence the agent names. The page is untrusted input: its text
+never becomes an instruction.
 
-var e2eCmd = &cobra.Command{
-	Use:   "e2e",
-	Short: "Ejecuta pruebas E2E visuales y autónomas (estilo TesterArmy) con chromedp",
-	Long: `Motor de pruebas de extremo a extremo (E2E) autónomo en Go puro utilizando chromedp.
-El agente de IA lee la especificación BDD, inspecciona el árbol simplificado de la UI
-en tiempo real y navega e interactúa con la aplicación web (click, type, assert)
-sin depender de Node.js, Puppeteer, Playwright ni APIs de terceros.`,
-	RunE: runE2E,
-}
-
-func init() {
-	e2eCmd.Flags().StringVar(&flagE2EURL, "url", "", "URL objetivo de la aplicación web (requerido, ej. http://localhost:3000)")
-	e2eCmd.Flags().StringVar(&flagE2ESpec, "spec", "", "ruta a la especificación BDD a validar (por defecto la última en specs/)")
-	e2eCmd.Flags().BoolVar(&flagE2EHeadless, "headless", true, "ejecutar el navegador en segundo plano (headless)")
-	e2eCmd.Flags().IntVar(&flagE2EMaxSteps, "max-steps", 15, "límite máximo de acciones autónomas")
-	e2eCmd.Flags().StringVar(&flagE2EScreenshot, "screenshot", "docs/e2e/screenshot.png", "ruta donde guardar la captura en caso de fallo")
-	e2eCmd.Flags().StringVar(&flagE2EAgent, "agent", "", "agente de IA a utilizar ('gemini' o 'claude')")
-
-	_ = e2eCmd.MarkFlagRequired("url")
-	rootCmd.AddCommand(e2eCmd)
-}
-
-func runE2E(cmd *cobra.Command, args []string) error {
-	logger := storage.GetLogger()
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("error obteniendo directorio actual: %w", err)
-	}
-
-	if flagE2EURL == "" {
-		return fmt.Errorf("debes especificar la URL objetivo con --url <URL>")
-	}
-
-	// 1. Cargar configuración
-	store := storage.NewConfigStorage(cfgFile)
-	cfg, err := store.Load()
-	if err != nil {
-		cfg = domain.NewDefaultConfig()
-	}
-
-	if flagE2EAgent != "" {
-		cfg.Agent = strings.ToLower(flagE2EAgent)
-	}
-
-	// 2. Localizar y cargar la especificación BDD
-	specPath := flagE2ESpec
-	if specPath == "" {
-		specPath = findLatestSpec(filepath.Join(cwd, "specs"))
-	}
-
-	var spec *domain.Spec
-	if specPath != "" && fileExists(specPath) {
-		data, err := os.ReadFile(specPath)
-		if err == nil {
-			spec = &domain.Spec{
-				FilePath: specPath,
-				Content:  string(data),
+Results, a screenshot per step and REPORT.md go to docs/e2e/<spec>/.`,
+		Example: "  specforge e2e 0001 --url http://localhost:3000\n  specforge e2e 0001 --url http://localhost:3000 --scenario 2 --headed",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			u, err := url.Parse(baseURL)
+			if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return errors.New("--url must be an absolute http(s) URL, e.g. http://localhost:3000")
 			}
-			fmt.Printf("✓ Especificación BDD cargada desde: %s\n", specPath)
-		}
-	} else {
-		fmt.Println("ℹ️ No se encontró especificación BDD en specs/. Se ejecutará verificación exploratoria general.")
-		spec = &domain.Spec{
-			Content: "Verificar que la aplicación web responde, los elementos principales son visibles y no hay errores de consola.",
-		}
-	}
+			if minPassRate < 0 || minPassRate > 100 {
+				return errors.New("--min-pass-rate is a percentage between 0 and 100")
+			}
+			p, err := a.openProject(o, true)
+			if err != nil {
+				return err
+			}
+			entry, err := a.resolveSpec(ctx, p, argOrEmpty(args))
+			if err != nil {
+				return err
+			}
+			files := fsys.OS{}
+			data, err := files.ReadFile(entry.Path)
+			if err != nil {
+				return err
+			}
+			if err := spec.Verify(string(data)); err != nil {
+				return err
+			}
+			proc := a.NewProcess(a.log)
+			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
+			if err != nil {
+				return err
+			}
+			br, err := a.LaunchBrowser(ctx, browser.Options{Headless: !headed, IgnoreCertErrors: insecure})
+			if err != nil {
+				return err
+			}
+			defer br.Close()
 
-	opts := ports.E2EOptions{
-		Headless:       flagE2EHeadless,
-		MaxSteps:       flagE2EMaxSteps,
-		ScreenshotPath: flagE2EScreenshot,
-		Agent:          cfg.Agent,
+			con := a.console()
+			con.Title(con.T("e2e.title", entry.Title))
+			svc := e2erun.New(e2erun.Deps{
+				Agent:   ag,
+				Browser: br,
+				Files:   files,
+				Asker:   &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
+				Events:  &ui.E2EEvents{C: con},
+				Log:     a.log,
+			})
+			report, err := svc.Run(ctx, e2erun.Options{
+				Root:         p.root,
+				SpecPath:     entry.Path,
+				BaseURL:      baseURL,
+				Language:     p.settings.Language,
+				Scenarios:    scenarios,
+				MaxSteps:     maxSteps,
+				MinPassRate:  minPassRate / 100,
+				Model:        p.settings.Model,
+				AgentTimeout: p.settings.AgentTimeout,
+			})
+			if err != nil {
+				return err
+			}
+			dir := filepath.Join("docs", "e2e", filepath.Base(p.layout.SpecDir(entry.Path)))
+			con.OK(con.T("e2e.passed", report.PassRate()*100, filepath.ToSlash(dir)))
+			return nil
+		},
 	}
-
-	// 3. Arrancar el motor E2E con el agente visual
-	engine := e2e.NewVisionAgent(cfg)
-	if err := engine.RunVisualSpec(context.Background(), spec, flagE2EURL, opts); err != nil {
-		logger.Error("Prueba E2E fallida: %v", err)
-		return err
-	}
-
-	logger.Info("Prueba E2E superada exitosamente en %s", flagE2EURL)
-	return nil
+	f := c.Flags()
+	f.StringVar(&baseURL, "url", "", "base URL of the running application (required)")
+	f.IntSliceVar(&scenarios, "scenario", nil, "run only these scenario numbers (repeatable)")
+	f.Float64Var(&minPassRate, "min-pass-rate", 100, "percentage of scenarios that must pass")
+	f.IntVar(&maxSteps, "max-steps", 15, "maximum browser actions per scenario")
+	f.BoolVar(&headed, "headed", false, "show the browser window")
+	f.BoolVar(&insecure, "insecure", false, "accept invalid TLS certificates (local test servers only)")
+	f.StringVar(&o.Agent, "agent", "", "claude | gemini (default: configured)")
+	f.StringVar(&o.Model, "model", "", "model passed to the agent")
+	_ = c.MarkFlagRequired("url")
+	return c
 }

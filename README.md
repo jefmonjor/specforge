@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/jefmonjor/specforge/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/jefmonjor/specforge/ci.yml?style=flat-square&label=CI"></a>
   <a href="https://github.com/jefmonjor/specforge/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/jefmonjor/specforge?style=flat-square&color=c2551a"></a>
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/github/go-mod/go-version/jefmonjor/specforge?style=flat-square"></a>
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/license-Apache_2.0-blue?style=flat-square"></a>
@@ -13,183 +14,187 @@
   <a href="#-see-it-say-no">Demo</a> ·
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-quickstart">Quickstart</a> ·
-  <a href="#-whats-in-the-box">Commands</a> ·
+  <a href="#-commands">Commands</a> ·
   <a href="USER_GUIDE.md">User guide</a>
 </p>
 
 ---
 
-**AI coding agents are fast and confidently wrong.** They write tests that pass before any code exists, guess at requirements nobody settled, copy logic they already wrote twice, and lose all progress when the network drops.
+**AI coding agents are fast and confidently wrong.** They write tests that pass before any code exists, guess at requirements nobody settled, edit the test until it passes, and claim files they never wrote.
 
-**SpecForge is a single Go binary that puts your agent on an assembly line.** You agree on a spec first, and SpecForge seals it. Then it drives [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) through a strict **Red → Green → Refactor** loop. The agent writes the code, SpecForge checks it, and nothing moves forward until every gate passes.
+**SpecForge is a single Go binary that puts your agent on an assembly line and checks its work.** You agree on a specification and approve it; SpecForge seals it. Then it drives [Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli) through **Red → Green → Refactor**, one scenario at a time. The agent writes the code. SpecForge runs the tests, compares the files on disk, fingerprints the tests and runs the quality gates. Nothing moves forward on the agent's word.
 
-> Think of it as CI for the *process*, not just the result: the agent is a fast junior developer, and SpecForge is the senior who won't approve the PR.
+> The agent is a fast junior developer. SpecForge is the senior who reads the diff, runs the tests and asks you when something was never decided.
 
 ## 🛑 See it say no
 
-The most useful thing a guardrail does is refuse. These are real runs of `specforge loop`, and no AI is involved: the run stops before a single token is spent.
+These are real runs of SpecForge 4. The first two stop before a single token is spent.
 
-**Open questions in the spec? The agent doesn't get to guess.**
-
-```text
-$ specforge loop --spec specs/0001-password-reset.md
-
-==================================================================
-🛑 BLOQUEO DURO: [NEEDS CLARIFICATION] DETECTADO EN LA ESPECIFICACIÓN
-==================================================================
-  • Causa:            Se encontraron 1 cuestión(es) abierta(s) sin resolver.
-  • Regla del SDD:    La IA tiene estrictamente prohibido programar o generar tests
-                      mientras quede una sola duda funcional sin aclarar por Negocio.
-  • Cuestiones pendientes:
-    - [NEEDS CLARIFICATION] Should the link be invalidated when a newer one is requested?
-```
-
-**Someone edited the approved spec by hand? The seal catches it.**
+**An open question blocks approval. The agent never builds on a guess.**
 
 ```text
-$ sed -i 's/30 minutes/24 hours/' specs/0001-password-reset.md
-$ specforge loop --spec specs/0001-password-reset.md
+$ specforge spec approve 0001
 
-Error: el sello criptográfico no coincide con el contenido de la especificación
-       (esperado: f15155fdec4e…, actual: be95487fb4ee…)
-
-  • Tipo de Hallazgo: Integridad Criptográfica: Especificación BDD Alterada
+✗ The specification is not ready for approval
+    specs/0001-password-reset.md
+    open question: Does a newer link invalidate the previous one? [open-question]
+  → fix each line above (`specforge spec lint` shows the advice too) and approve again
+  (exit 3)
 ```
 
-> CLI output is in Spanish today; English output is on the [roadmap](#-status--roadmap).
+**Someone edited the approved specification? The seal catches it.**
+
+```text
+$ sed -i "s/31 minutes/24 hours/" specs/0001-password-reset.md
+$ specforge loop 0001
+
+✗ The specification changed after approval
+    the specification changed after it was sealed (sealed 8483154cbd9a, now da34d8aa9982)
+  → revert the edit or approve the new version with `specforge spec approve`
+  (exit 3)
+```
+
+**The agent asks instead of inventing.** In this live run with Claude Code, GREEN for scenario 1 had already implemented the behaviour of scenario 2, so no honest failing test was possible. Instead of weakening the code to fake a RED, the agent asked. In CI the question goes to a file and the run exits with code 5. You answer it there or at a terminal, and `--resume` continues the same step.
+
+```text
+Scenario 2/2 · RED · An unknown code is refused (INV-01)
+  … claude is working (RED)
+
+✗ A question needs your answer
+    The behaviour for scenario SDD_0001_002 already exists in internal/checkout/order.go
+    (Apply returns ErrUnknownCode and leaves the total unchanged), so the new test should
+    pass instead of failing in RED. How should I proceed?
+  → write the answer in place of the placeholder in specs/0001-discount-codes/questions.md
+    (or run the command again in a terminal), then `specforge loop --resume`
+  (exit 5)
+```
 
 ## 🔧 How it works
 
 ```mermaid
 flowchart LR
-    I["interview<br/>BDD spec"] --> S{{"sealed<br/>SHA-256"}}
-    S --> C{"open<br/>questions?"}
-    C -- yes --> X["🛑 blocked"]
-    C -- no --> R["🔴 RED<br/>agent writes test"]
-    R --> Y{"test fails?"}
-    Y -- "no: passes too early" --> YA["🛑 YAGNI violation"]
-    Y -- yes --> G["🟢 GREEN<br/>minimal code"]
-    G --> T{"tests pass?"}
-    T -- "no (max 3, error fed back)" --> G
-    T -- yes --> F["🔵 REFACTOR<br/>quality gates"]
-    F --> N["next scenario"]
-    N --> R
+    N["spec new<br/>interview"] --> A{{"spec approve<br/>lint · approver · seal"}}
+    A --> R["🔴 RED<br/>agent writes the test"]
+    R --> RV{"compiles, runs,<br/>fails on an assertion?"}
+    RV -- "passes already" --> Q1["❓ asks you"]
+    RV -- yes --> G["🟢 GREEN<br/>minimum code"]
+    G --> GV{"tests untouched,<br/>scenario test passes?"}
+    GV -- "no (error fed back, max 3)" --> G
+    GV -- yes --> F["🔵 REFACTOR<br/>full suite + gates"]
+    F --> NX["next scenario"]
+    R -. "needs_clarification" .-> Q2["❓ asks you<br/>decisions.md"]
+    G -. "needs_clarification" .-> Q2
 ```
 
-| Stage | What the agent does | What SpecForge enforces |
+| Stage | What the agent does | What SpecForge verifies itself |
 | :--- | :--- | :--- |
-| **Spec** | Interviews you and writes Gherkin scenarios (`specforge interview`) | Seals the spec with a SHA-256 hash. Any `[NEEDS CLARIFICATION]` blocks the loop. |
-| **🔴 Red** | Writes a failing test for one scenario | Runs it. If it **passes** without an implementation, that's a YAGNI violation and the loop stops. |
-| **🟢 Green** | Writes the minimum code to make it pass | Re-runs the tests and feeds the compiler or test error back to the agent, up to 3 attempts. |
-| **🔵 Refactor** | Cleans up without breaking tests | Runs the quality gates for your stack and gives the agent one chance to fix the findings. |
-| **Resume** | — | Saves state to `.sdd-state.json` after every step. `specforge loop --resume` picks up at the exact phase and re-checks the seal first. |
+| **Spec** | Helps you fill a 12-section template in a conversation (`spec interview`). | `spec approve` refuses a `TODO`, an open question or a scenario without `When`/`Then`; records who approved; seals the content with SHA-256. The loop runs only an approved, unchanged spec. |
+| **🔴 Red** | Writes one test named with the scenario marker (`SDD_0001_003`). | The files it lists really changed; a test with the marker exists; the filtered run compiles, runs it and **fails on an assertion**. A test that passes too early goes to you. |
+| **🟢 Green** | Writes the minimum code. | The test files are byte-for-byte as RED left them (*tampering* stops the loop); the scenario's tests pass. Failures are fed back, up to 3 attempts. |
+| **🔵 Refactor** | Fixes the suite or the findings, only when something blocks. | The whole suite passes and no quality gate blocks. A gate whose tool is missing shows ⚠ *skipped*, never ✓. |
+| **❓ Questions** | Answers `needs_clarification` instead of guessing, at any phase. | You answer once, at the terminal or in `questions.md`; the answer lands in `decisions.md` and in every later prompt. |
+| **↩ Resume** | — | State saved atomically after every step. `--resume` re-checks the seal; an amended spec redoes only the scenarios whose text changed. |
 
-Every fix the agent needed is written to `.sdd/agent/lessons.md`. That file is part of the six-file project memory (mission, persona, forbidden patterns, glossary, golden examples, lessons) injected into every prompt, so the same mistake costs less the second time.
+Test results come from each runner's machine-readable report (`go test -json`, Surefire/JUnit XML, Vitest and Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "failed on an assertion" are told apart.
 
-## ✨ What's in the box
+## 🧰 Commands
 
 | | Command | What it gives you |
 | :---: | :--- | :--- |
-| 🧭 | `init` | One-time workstation setup: picks your agent, detects Google Cloud credentials (ADC) and adds itself to your user `PATH` without admin rights. |
-| 🏗️ | `setup` | Drops the SDD baseline into an existing repo **without touching your code**, or scaffolds a new one with `--stack react \| java \| go \| python`. |
-| 🔎 | `ingest` | Scans the repo and writes a context pack the agent reads before working. |
-| 📄 | `doc` | Converts PDF, Word and Excel files in `docs/` to Markdown using [MarkItDown](https://github.com/microsoft/markitdown), so business rules locked in documents reach the agent. |
-| 🎙️ | `interview` | Socratic interview that turns a feature idea into a sealed BDD spec. `--from-repo <legacy>` extracts the business rules (the *what*) from an old codebase and leaves the obsolete tech (the *how*) behind. |
-| 🔁 | `loop` | The Red → Green → Refactor assembly line described above. |
-| 🛡 | `audit` | Adversarial security review inspired by Cloudflare's evaluation harness: reconnaissance, a red-team hunter and a blue-team verifier that filters false positives. `--diff` reviews only what your branch changed. |
-| 🌐 | `e2e` | Drives a real Chrome or Edge through [chromedp](https://github.com/chromedp/chromedp), with no Node.js or Playwright. The agent sees a simplified DOM, picks typed actions (`click`, `type`, `wait`, `assert`) and a failure saves a screenshot. |
-| 🧮 | `consistency` | Deterministic anti-contamination gate. On a legacy Java project it blocks the agent from introducing `jakarta` imports, Spring Boot dependencies or a Java 17+ compiler, and fails if the project's recorded classification is deleted or altered. |
+| 🧭 | `init` | Picks your agent and language, once per machine. No API keys, no PATH edits. |
+| 🏗️ | `setup` | Writes `specforge.yaml`, a managed block of rules and your stack's standard in `CLAUDE.md`/`GEMINI.md` (the rest of the file stays yours) and `.specforge/` in `.gitignore`. Never touches your code. |
+| 📝 | `spec new · interview · lint · approve · list` | The specification lifecycle: a numbered file from the template, a conversation with your agent to complete it, the lint, and the approval gate that seals it. |
+| 🔁 | `loop` | The Red → Green → Refactor line described above, with `--resume` and `--restart`. |
+| 🛡 | `audit` | Adversarial security review of your branch: reconnaissance, a red-team hunter and a blue-team validator. Every answer must match a JSON schema, or the audit fails closed. Doubtful findings are questions for you. |
+| 🌐 | `e2e` | Verifies each scenario in a real Chrome, Chromium or Edge through [chromedp](https://github.com/chromedp/chromedp). The agent picks typed actions; SpecForge validates each one (known element, same origin) and checks each `Then` against evidence itself. A screenshot per step. |
 
 ## 🚀 Quickstart
 
-**1. Install the binary.** Download it from the [latest release](https://github.com/jefmonjor/specforge/releases/latest):
+**1. Install the binary** from the [latest release](https://github.com/jefmonjor/specforge/releases/latest):
 
 ```bash
-# macOS (Apple Silicon). Swap the suffix for darwin-amd64 or linux-amd64.
+# macOS (Apple Silicon). Swap the suffix for darwin-amd64, linux-amd64 or linux-arm64.
 curl -L -o specforge https://github.com/jefmonjor/specforge/releases/latest/download/specforge-darwin-arm64
 chmod +x specforge && sudo mv specforge /usr/local/bin/
-xattr -d com.apple.quarantine /usr/local/bin/specforge   # macOS Gatekeeper only
 ```
 
-On Windows, download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and run `specforge init` once. The binary also answers to `sdd` and `forge`.
+On Windows, download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and put it in a folder on your `PATH`.
 
 **2. Run the line on a feature:**
 
 ```bash
-specforge init                                    # once per machine
-cd my-project && git checkout -b feature/password-reset
-specforge setup                                   # add the SDD baseline (your code stays untouched)
-specforge ingest                                  # build the context pack
-specforge interview --feature "Password reset"    # agree on and seal the spec
-specforge loop                                    # Red → Green → Refactor; --resume if interrupted
-specforge audit --diff                            # security review of your branch
-specforge e2e --url http://localhost:3000         # check the scenario in a real browser
+specforge init                              # once per machine: agent and language
+cd my-project && specforge setup            # once per repository
+specforge spec new "Password reset"         # specs/0001-password-reset.md
+specforge spec interview 0001               # complete it with your agent (or edit it by hand)
+specforge spec approve 0001                 # review gate: lint, approver, seal
+specforge loop 0001                         # Red → Green → Refactor; --resume after any stop
+specforge audit                             # security review of your branch
+specforge e2e 0001 --url http://localhost:3000
 ```
 
 ### What you need
 
-| Required | Optional, unlocks more gates |
+| Required | Optional, unlocks more |
 | :--- | :--- |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`) **or** [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini`) on your `PATH`, already signed in. SpecForge drives the agent you already use and never asks for an API key. | `markitdown` for `doc` · Chrome or Edge for `e2e` · `golangci-lint`, `ruff`, `jscpd`, `knip`, `stryker`, Maven for the stack gates below |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (`claude`) **or** [Gemini CLI](https://github.com/google-gemini/gemini-cli) (`gemini`) on your `PATH`, signed in · `git` · your stack's test runner | Chrome, Chromium or Edge for `e2e` · `golangci-lint`, `ruff`, `jscpd`, `knip`, `stryker` for the quality gates |
 
 ## 🧱 Quality gates by stack
 
-The Refactor stage chains the gates for the detected stack and stops at the first failure.
-
-| Gate | React / Node | Java | Go | Python |
+| Gate | Go | Node | Java | Python |
 | :--- | :---: | :---: | :---: | :---: |
-| Linter | ESLint (`npm run lint`) | — | `golangci-lint`, falling back to `go vet` | Ruff |
-| Duplicate code | jscpd | jscpd | jscpd | jscpd |
-| Dead code | Knip | — | — | — |
-| Mutation testing | Stryker | — | — | — |
-| Architecture rules | — | ArchUnit (`*ArchitectureTest`) | — | — |
+| Lint | `golangci-lint`, else `go vet` | `npm run lint` | — | Ruff |
+| Duplicate code (threshold, default 0 %) | jscpd | jscpd | jscpd | jscpd |
+| Dead code | — | Knip | — | — |
+| Mutation score (threshold, default 80) | — | Stryker | — | — |
 
-The `react` and `java` scaffolds include these configs ready to use. The `go` and `python` scaffolds are minimal starters.
+Node tools run with `npx --no-install`: nothing is downloaded during the loop. Thresholds and `strict` mode live in `specforge.yaml`.
+
+## 📏 The CLI contract
+
+- **Exit codes**: `0` ok · `1` error · `2` a gate said no · `3` the specification or loop state needs attention · `4` a tool or setting is missing · `5` a question awaits your answer · `130` interrupted.
+- **Streams**: status on stderr, data on stdout. `--quiet`, `--verbose`, `--non-interactive`, `--trace-io` (every prompt and answer in the log file).
+- **Languages**: prompts, templates and messages in English or Spanish (`language:`); Gherkin in any language Cucumber supports.
 
 ## 🧩 Under the hood
 
-SpecForge applies to itself the architecture it asks of your code: hexagonal, with the domain free of I/O.
+SpecForge applies to itself the architecture it asks of your code: a pure domain, use cases behind small ports, adapters at the edges and a composition root in `cmd/`.
 
 ```text
-cmd/                    Cobra commands: one file per verb
+cmd/                  CLI and composition root: signals → context, errors → exit codes
 internal/
-  domain/               spec parsing & sealing, TDD state machine, agent memory, diagnostics
-  ports/                interfaces: AgentRunner, Compiler, QualityGate, E2EEngine, SecurityAuditor…
-  adapters/
-    agent/              Claude Code and Gemini CLI runners (swappable)
-    compiler/           build & test dispatch per stack
-    quality/            linter, jscpd, knip, stryker, ArchUnit gates
-    e2e/                chromedp driver + vision agent loop
-    security/           adversarial audit pipeline
-    doc/ ingest/ auth/ storage/ system/
-assets/baseline/        embedded templates, scaffolds and agent memory (go:embed)
+  domain/             pure: spec (official Gherkin parser, seal, lint), tdd, stack, quality, security, e2e
+  app/                use cases: tddloop, specs, setup, audit, e2erun, clarify, protocol, prompts
+  ports/              the interfaces the use cases need
+  adapters/           agent CLI, process runner, test runners, gates, git, browser, files, logging
+  config/ ui/         settings resolution; terminal output and diagnoses
+assets/               embedded prompts, rules, standards, audit method and templates (en, es)
 ```
-
-Build from source (Go version from [`go.mod`](go.mod)):
 
 ```bash
 git clone https://github.com/jefmonjor/specforge.git && cd specforge
-go test ./...
-go build -ldflags="-s -w" -trimpath -o specforge .
-./build-all.sh            # cross-compile Windows, macOS (arm64 + amd64) and Linux into dist/
+make test     # go test -race -cover ./...  (real go, git and Chromium where installed)
+make build    # version, commit and date injected with -ldflags
 ```
 
 ## 📍 Status & roadmap
 
-SpecForge is **v3.0.0**: it builds, ships as a binary for four platforms and has unit tests across the domain, commands and most adapters. Planned next:
+SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**. CI runs `gofmt`, `go vet`, `go mod tidy`, the race detector with a 70 % coverage floor and builds for Linux, macOS and Windows.
 
-- [ ] CI on every push (`go vet`, `go test`, cross-platform build)
-- [ ] Crash-safe state writes (temp file + rename) for `.sdd-state.json`
-- [ ] Tool-dependent tests skip cleanly when a linter isn't installed
-- [ ] English CLI output alongside Spanish
-- [ ] Recorded demo of a full `loop` run
+- [x] Verified loop: real test reports, file snapshots, test fingerprints, response contract, questions with resume
+- [x] Specification lifecycle with lint, approval and a line-ending-proof seal
+- [x] Fail-closed audit and per-scenario browser verification
+- [ ] Plan step and per-scenario review with a commit per scenario
+- [ ] `spec clarify` and `spec amend` with deltas
+- [ ] `deliver`: a delivery report and PR body traced from scenario to test to commit
+- [ ] Turn-based interview owned by SpecForge
 
-Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
+The full plan, with the reasoning behind each item, is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 
 ## 🤝 Contributing & license
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md) before opening a PR. The full manual is in the [User & Architecture Guide](USER_GUIDE.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md), the [Code of Conduct](CODE_OF_CONDUCT.md) and the [security policy](SECURITY.md) before opening a PR. The full manual is the [user guide](USER_GUIDE.md).
 
-Licensed under [Apache 2.0](LICENSE). Binary distributions must include [NOTICE](NOTICE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). The dependency and license review is in [LEGAL_AUDIT.md](LEGAL_AUDIT.md).
+Licensed under [Apache 2.0](LICENSE). Binary distributions must include [NOTICE](NOTICE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), which lists every module compiled into the binary with its license.
 
 <p align="center"><sub>Built by <a href="https://www.jefmonjor.dev">Jefferson Montesdeoca</a> · <a href="https://github.com/jefmonjor">@jefmonjor</a></sub></p>

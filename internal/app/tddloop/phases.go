@@ -2,10 +2,12 @@ package tddloop
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
+	"specforge/internal/app/clarify"
 	"specforge/internal/app/prompts"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/tdd"
@@ -26,15 +28,35 @@ func (s *Service) red(ctx context.Context, r *run) error {
 		data.LastFailure = r.st.LastFailure
 		data.Feedback = fb
 
-		testsBefore, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
+		pending, err := s.answerPending(ctx, r, sc)
 		if err != nil {
 			return err
 		}
-		resp, changed, err := s.agentStep(ctx, r, prompts.Red, data)
+		var (
+			t           turn
+			testsBefore map[string]string
+		)
+		switch {
+		case pending != nil && pending.Kind == tdd.PendingVerify:
+			testsBefore = pending.Tests
+			t, err = s.observe(ctx, r, pending)
+		case pending != nil:
+			testsBefore = pending.Tests
+			s.withAnswer(r, sc, &data, pending)
+			t, err = s.agentStep(ctx, r, prompts.Red, data, pending.Workspace)
+		default:
+			if testsBefore, err = s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile); err != nil {
+				return err
+			}
+			t, err = s.agentStep(ctx, r, prompts.Red, data, nil)
+		}
 		if err != nil {
+			if r.st.Pending != nil {
+				r.st.Pending.Tests = testsBefore
+			}
 			return err
 		}
-		if bad := falseClaims(resp.FilesWritten, changed); len(bad) > 0 {
+		if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
 			fb = s.reject(r, RejectFalseClaim, joinPaths(bad), "")
 			continue
 		}
@@ -66,8 +88,12 @@ func (s *Service) red(ctx context.Context, r *run) error {
 			continue
 		case tdd.RedPremature:
 			accepted, stricter, err := s.decidePremature(ctx, r, sc)
-			if err != nil || accepted {
+			if err != nil {
+				s.pendVerify(r, sc, t, testsBefore, err)
 				return err
+			}
+			if accepted {
+				return nil
 			}
 			fb = stricter
 			continue
@@ -75,6 +101,7 @@ func (s *Service) red(ctx context.Context, r *run) error {
 		if !out.Exact {
 			ok, why, err := s.confirmInexact(ctx, r, out)
 			if err != nil {
+				s.pendVerify(r, sc, t, testsBefore, err)
 				return err
 			}
 			if !ok {
@@ -84,7 +111,7 @@ func (s *Service) red(ctx context.Context, r *run) error {
 		}
 
 		r.st.TestHashes = testsAfter
-		r.st.AddFiles(changed...)
+		r.st.AddFiles(t.Changed...)
 		r.st.LastFailure = out.Output
 		r.st.Record("red", "accepted", fmt.Sprintf("%d failing test(s)", out.Failed), s.d.Now())
 		s.d.Events.Accepted(tdd.PhaseRed, sc)
@@ -107,18 +134,27 @@ func (s *Service) green(ctx context.Context, r *run) error {
 		data.LastFailure = r.st.LastFailure
 		data.Feedback = fb
 
-		resp, changed, err := s.agentStep(ctx, r, prompts.Green, data)
+		pending, err := s.answerPending(ctx, r, sc)
+		if err != nil {
+			return err
+		}
+		var before ports.Snapshot
+		if pending != nil {
+			before = pending.Workspace
+			s.withAnswer(r, sc, &data, pending)
+		}
+		t, err := s.agentStep(ctx, r, prompts.Green, data, before)
 		if err != nil {
 			return err
 		}
 		if err := s.checkTampering(r); err != nil {
 			return err
 		}
-		if bad := falseClaims(resp.FilesWritten, changed); len(bad) > 0 {
+		if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
 			fb = s.reject(r, RejectFalseClaim, joinPaths(bad), r.st.LastFailure)
 			continue
 		}
-		r.st.AddFiles(changed...)
+		r.st.AddFiles(t.Changed...)
 
 		out, err := s.runTests(ctx, r, sc.Marker)
 		if err != nil {
@@ -145,6 +181,10 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 	sc, _ := r.st.Scenario()
 	fb := ""
 	for {
+		pending, err := s.answerPending(ctx, r, sc)
+		if err != nil {
+			return err
+		}
 		suite, err := s.runTests(ctx, r, "")
 		if err != nil {
 			return err
@@ -179,16 +219,21 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		data.GateReport = report.Explain(r.o.Strict)
 		data.Feedback = fb
 
-		resp, changed, err := s.agentStep(ctx, r, prompts.Refactor, data)
+		var before ports.Snapshot
+		if pending != nil {
+			before = pending.Workspace
+			s.withAnswer(r, sc, &data, pending)
+		}
+		t, err := s.agentStep(ctx, r, prompts.Refactor, data, before)
 		if err != nil {
 			return err
 		}
 		if err := s.checkTampering(r); err != nil {
 			return err
 		}
-		r.st.AddFiles(changed...)
+		r.st.AddFiles(t.Changed...)
 		r.st.Fail(strings.TrimSpace(suiteFailure+"\n"+data.GateReport), s.d.Now())
-		if bad := falseClaims(resp.FilesWritten, changed); len(bad) > 0 {
+		if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
 			fb = feedback(r.o.Language, RejectFalseClaim, joinPaths(bad))
 		} else {
 			fb = ""
@@ -199,25 +244,97 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 	}
 }
 
+// turn is one agent turn as observed on disk.
+type turn struct {
+	// Claimed are the files the agent says it wrote.
+	Claimed []string
+	// Before is the snapshot the turn is measured from.
+	Before ports.Snapshot
+	// Changed are the files that really changed since Before.
+	Changed []string
+}
+
 // agentStep runs one agent turn and returns what the agent says plus what
-// really changed on disk.
-func (s *Service) agentStep(ctx context.Context, r *run, name prompts.Name, data prompts.Data) (respFiles, []string, error) {
-	before, err := s.d.Workspace.Snapshot(ctx, r.o.Root)
-	if err != nil {
-		return respFiles{}, nil, err
+// really changed on disk since before (a fresh snapshot when nil). When the
+// agent asks something nobody can answer now, the turn is saved as pending
+// with its baseline, so --resume continues it instead of starting over.
+func (s *Service) agentStep(ctx context.Context, r *run, name prompts.Name, data prompts.Data, before ports.Snapshot) (turn, error) {
+	if before == nil {
+		var err error
+		if before, err = s.d.Workspace.Snapshot(ctx, r.o.Root); err != nil {
+			return turn{}, err
+		}
 	}
 	resp, err := s.converse(ctx, r, name, data)
 	if err != nil {
-		return respFiles{}, nil, err
+		var pending *clarify.PendingQuestionError
+		if errors.As(err, &pending) {
+			sc, _ := r.st.Scenario()
+			r.st.Pending = &tdd.Pending{
+				Kind: tdd.PendingAgent, Phase: r.st.Phase, Scenario: sc.Index,
+				Question: resp.Question, Context: resp.Context, Options: resp.Options,
+				Workspace: before,
+			}
+		}
+		return turn{}, err
 	}
+	r.st.Pending = nil
 	after, err := s.d.Workspace.Snapshot(ctx, r.o.Root)
 	if err != nil {
-		return respFiles{}, nil, err
+		return turn{}, err
 	}
-	return respFiles{FilesWritten: resp.FilesWritten}, before.Changed(after), nil
+	return turn{Claimed: resp.FilesWritten, Before: before, Changed: before.Changed(after)}, nil
 }
 
-type respFiles struct{ FilesWritten []string }
+// answerPending answers the question that interrupted the current step,
+// from the questions file or the terminal, before anything else runs. It
+// returns the interrupted step, or nil when nothing is pending. Without an
+// answer it returns the pending error again and the agent is not called.
+func (s *Service) answerPending(ctx context.Context, r *run, sc tdd.ScenarioRef) (*tdd.Pending, error) {
+	p := r.st.PendingFor()
+	if p == nil || p.Kind != tdd.PendingAgent {
+		return p, nil
+	}
+	q := ports.Question{Text: p.Question, Context: p.Context, Options: p.Options}
+	answer, err := s.d.Asker.Ask(ctx, s.origin(r, sc), q)
+	if err != nil {
+		return nil, err
+	}
+	p.Answer = answer
+	r.st.Record("question", "answered", p.Question+" → "+answer, s.d.Now())
+	s.d.Events.Answered(p.Question, answer)
+	return p, s.save(r)
+}
+
+// withAnswer adds the answer to a pending question to the prompt, with the
+// decisions log as it is now.
+func (s *Service) withAnswer(r *run, sc tdd.ScenarioRef, data *prompts.Data, p *tdd.Pending) {
+	data.Decisions = s.d.Asker.Decisions(s.origin(r, sc))
+	data.AnsweredQuestion, data.Answer = p.Question, p.Answer
+}
+
+// observe measures an interrupted turn again without calling the agent.
+func (s *Service) observe(ctx context.Context, r *run, p *tdd.Pending) (turn, error) {
+	after, err := s.d.Workspace.Snapshot(ctx, r.o.Root)
+	if err != nil {
+		return turn{}, err
+	}
+	r.st.Pending = nil
+	before := ports.Snapshot(p.Workspace)
+	return turn{Claimed: p.Claimed, Before: before, Changed: before.Changed(after)}, nil
+}
+
+// pendVerify saves a RED step whose verification asked a question nobody
+// could answer, so --resume verifies it again with the answer.
+func (s *Service) pendVerify(r *run, sc tdd.ScenarioRef, t turn, tests map[string]string, err error) {
+	var pending *clarify.PendingQuestionError
+	if errors.As(err, &pending) {
+		r.st.Pending = &tdd.Pending{
+			Kind: tdd.PendingVerify, Phase: r.st.Phase, Scenario: sc.Index,
+			Claimed: t.Claimed, Workspace: t.Before, Tests: tests,
+		}
+	}
+}
 
 // checkTampering compares the test files with the fingerprints taken when
 // RED was accepted. Any difference stops the loop: an implementation that

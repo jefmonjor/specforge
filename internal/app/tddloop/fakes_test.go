@@ -72,8 +72,8 @@ func (p *project) read(rel string) string {
 	return string(data)
 }
 
-// turn is one scripted agent answer: it edits the project and replies.
-type turn func(p *project, prompt string) string
+// reply is one scripted agent answer: it edits the project and replies.
+type reply func(p *project, prompt string) string
 
 func done(files ...string) string {
 	return fmt.Sprintf("Done.\n```json\n{\"status\":\"done\",\"files_written\":[%s]}\n```", quoted(files))
@@ -87,8 +87,8 @@ func quoted(files []string) string {
 	return strings.Join(q, ",")
 }
 
-// writes returns a turn that writes files and reports exactly them.
-func writes(files map[string]string) turn {
+// writes returns a reply that writes files and reports exactly them.
+func writes(files map[string]string) reply {
 	return func(p *project, _ string) string {
 		var names []string
 		for name, content := range files {
@@ -99,7 +99,7 @@ func writes(files map[string]string) turn {
 	}
 }
 
-func ask(question string) turn {
+func ask(question string) reply {
 	return func(*project, string) string {
 		return "```json\n{\"status\":\"needs_clarification\",\"question\":\"" + question + "\",\"options\":[\"a\",\"b\"]}\n```"
 	}
@@ -107,7 +107,7 @@ func ask(question string) turn {
 
 type fakeAgent struct {
 	p       *project
-	turns   []turn
+	turns   []reply
 	prompts []string
 }
 

@@ -209,17 +209,21 @@ func (s *Service) loadState(r *run) error {
 		return ErrNothingToResume
 	case !r.o.Resume && !saved.Done():
 		return ErrLoopInProgress
-	case !r.o.Resume:
-		r.st = fresh // the previous loop finished: start a new one
-		return s.save(r)
 	case saved.SpecPath != fresh.SpecPath:
 		return fmt.Errorf("%w (%s)", tdd.ErrStateMismatch, saved.SpecPath)
 	case saved.SpecHash != seal.Hash:
+		// An amended specification: keep the scenarios that did not change
+		// and redo the rest, whether or not the previous loop had finished.
 		pending := fresh.Carry(saved, s.d.Now())
 		fresh.Record("spec-amended", "resumed", fmt.Sprintf("%d scenario(s) to (re)do", len(pending)), s.d.Now())
 		s.d.Events.Amended(pending)
 		r.st = fresh
 		return s.save(r)
+	case !r.o.Resume:
+		// Finished and unchanged: report it instead of redoing everything;
+		// --restart runs it again on purpose.
+		r.st = saved
+		return nil
 	default:
 		saved.Attempts = 0 // a resume is a deliberate new try
 		r.st = saved

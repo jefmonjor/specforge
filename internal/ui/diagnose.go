@@ -11,6 +11,7 @@ import (
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/e2erun"
 	"specforge/internal/app/protocol"
+	"specforge/internal/app/specs"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/config"
 	"specforge/internal/domain/spec"
@@ -57,12 +58,16 @@ func Diagnose(lang string, err error) Diagnosis {
 		secBlock *audit.BlockedError
 		stepErr  *audit.StepError
 		e2eBelow *e2erun.BelowThresholdError
+		lint     *specs.LintError
+		ambig    *specs.AmbiguousError
+		notFound *specs.NotFoundError
 	)
 	switch {
 	case errors.Is(err, context.Canceled):
 		set(ExitInterrupted, "interrupted")
 	case errors.As(err, &pending):
 		set(ExitQuestion, "pending")
+		d.Cause = pending.Question
 		d.Action = T(lang, "diag.pending.action", pending.File)
 	case errors.As(err, &tamper):
 		set(ExitSpec, "tampering")
@@ -73,6 +78,17 @@ func Diagnose(lang string, err error) Diagnosis {
 	case errors.As(err, &openQ):
 		set(ExitSpec, "openquestions")
 		d.Cause = strings.Join(openQ.Questions, "\n")
+	case errors.As(err, &lint):
+		set(ExitSpec, "lint")
+		var lines []string
+		for _, i := range lint.Issues {
+			lines = append(lines, i.String())
+		}
+		d.Cause = lint.Path + "\n" + strings.Join(lines, "\n")
+	case errors.As(err, &ambig):
+		set(ExitSpec, "ambiguous")
+	case errors.As(err, &notFound), errors.Is(err, specs.ErrNoSpecs):
+		set(ExitSpec, "nospec")
 	case errors.Is(err, spec.ErrNoScenarios):
 		set(ExitSpec, "noscenarios")
 	case errors.Is(err, tddloop.ErrLoopInProgress), errors.Is(err, tddloop.ErrNothingToResume), errors.Is(err, tdd.ErrStateMismatch):
@@ -140,7 +156,7 @@ func init() {
 			"diag.interrupted.title":    "Interrupted",
 			"diag.interrupted.action":   "the state was saved: continue with `specforge loop --resume`",
 			"diag.pending.title":        "A question needs your answer",
-			"diag.pending.action":       "answer it in %s or run the command again in a terminal",
+			"diag.pending.action":       "write the answer in place of the placeholder in %s (or run the command again in a terminal), then `specforge loop --resume`",
 			"diag.tampering.title":      "A test file was modified outside RED",
 			"diag.tampering.action":     "revert the test change (git checkout -- <file>) and continue with `specforge loop --resume`",
 			"diag.tampered.title":       "The specification changed after approval",
@@ -149,6 +165,12 @@ func init() {
 			"diag.notsealed.action":     "review it and run `specforge spec approve <spec>`",
 			"diag.openquestions.title":  "The specification has open questions",
 			"diag.openquestions.action": "resolve every [NEEDS CLARIFICATION] and approve the specification again",
+			"diag.lint.title":           "The specification is not ready for approval",
+			"diag.lint.action":          "fix each line above (`specforge spec lint` shows the advice too) and approve again",
+			"diag.ambiguous.title":      "Which specification?",
+			"diag.ambiguous.action":     "name it: `specforge <command> 0001` (number, file name or path)",
+			"diag.nospec.title":         "Specification not found",
+			"diag.nospec.action":        "list them with `specforge spec list` or create one with `specforge spec new \"<title>\"`",
 			"diag.noscenarios.title":    "The specification has no Gherkin scenarios",
 			"diag.noscenarios.action":   "add the acceptance criteria as Gherkin scenarios in a ```gherkin block",
 			"diag.state.title":          "Loop state",
@@ -181,7 +203,7 @@ func init() {
 			"diag.interrupted.title":    "Interrumpido",
 			"diag.interrupted.action":   "el estado quedó guardado: continúa con `specforge loop --resume`",
 			"diag.pending.title":        "Una pregunta espera tu respuesta",
-			"diag.pending.action":       "respóndela en %s o vuelve a lanzar el comando en una terminal",
+			"diag.pending.action":       "escribe la respuesta en lugar del marcador en %s (o vuelve a lanzar el comando en una terminal) y después `specforge loop --resume`",
 			"diag.tampering.title":      "Se modificó un fichero de test fuera de RED",
 			"diag.tampering.action":     "revierte el cambio del test (git checkout -- <fichero>) y continúa con `specforge loop --resume`",
 			"diag.tampered.title":       "La especificación cambió después de aprobarse",
@@ -190,6 +212,12 @@ func init() {
 			"diag.notsealed.action":     "revísala y ejecuta `specforge spec approve <spec>`",
 			"diag.openquestions.title":  "La especificación tiene preguntas abiertas",
 			"diag.openquestions.action": "resuelve cada [NEEDS CLARIFICATION] y vuelve a aprobar la especificación",
+			"diag.lint.title":           "La especificación no está lista para aprobarse",
+			"diag.lint.action":          "corrige cada línea de arriba (`specforge spec lint` muestra también los consejos) y vuelve a aprobar",
+			"diag.ambiguous.title":      "¿Qué especificación?",
+			"diag.ambiguous.action":     "indícala: `specforge <comando> 0001` (número, nombre de fichero o ruta)",
+			"diag.nospec.title":         "Especificación no encontrada",
+			"diag.nospec.action":        "lístalas con `specforge spec list` o crea una con `specforge spec new \"<título>\"`",
 			"diag.noscenarios.title":    "La especificación no tiene escenarios Gherkin",
 			"diag.noscenarios.action":   "añade los criterios de aceptación como escenarios en un bloque ```gherkin",
 			"diag.state.title":          "Estado del ciclo",

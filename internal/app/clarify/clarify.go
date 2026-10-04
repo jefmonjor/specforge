@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +25,7 @@ type PendingQuestionError struct {
 }
 
 func (e *PendingQuestionError) Error() string {
-	return fmt.Sprintf("a question needs the developer's answer (saved to %s): %s", e.File, e.Question)
+	return "a question awaits the developer's answer: " + e.Question
 }
 
 // Origin says where a question comes from.
@@ -45,23 +46,89 @@ type Asker struct {
 	Lang     string
 }
 
-// Ask asks q and returns the answer once it is recorded.
+// Ask returns the developer's answer to q and records it in the decisions
+// log. An answer the developer already wrote in the questions file is used
+// first; otherwise the question is asked at the terminal. Without a
+// terminal the question is written to the questions file (once) and Ask
+// returns a *PendingQuestionError.
 func (a *Asker) Ask(ctx context.Context, o Origin, q ports.Question) (string, error) {
-	answer, err := a.Prompter.Ask(ctx, q)
-	if errors.Is(err, ports.ErrNonInteractive) {
-		if werr := a.Files.AppendFile(o.QuestionsFile, []byte(a.entry(o, q, ""))); werr != nil {
-			return "", errors.Join(err, werr)
+	written, pending := a.lookup(o, q)
+	answer := written
+	if answer == "" {
+		var err error
+		answer, err = a.Prompter.Ask(ctx, q)
+		if errors.Is(err, ports.ErrNonInteractive) {
+			if !pending {
+				if werr := a.Files.AppendFile(o.QuestionsFile, []byte(a.entry(o, q, ""))); werr != nil {
+					return "", errors.Join(err, werr)
+				}
+			}
+			return "", &PendingQuestionError{Question: q.Text, File: o.QuestionsFile}
 		}
-		return "", &PendingQuestionError{Question: q.Text, File: o.QuestionsFile}
-	}
-	if err != nil {
-		return "", err
+		if err != nil {
+			return "", err
+		}
 	}
 	answer = strings.TrimSpace(answer)
 	if err := a.Files.AppendFile(o.DecisionsFile, []byte(a.entry(o, q, answer))); err != nil {
 		return "", fmt.Errorf("recording the decision: %w", err)
 	}
 	return answer, nil
+}
+
+// lookup searches the questions file for q. answer is what the developer
+// wrote in place of the placeholder (an option number becomes the option);
+// pending is true when q is there still unanswered.
+func (a *Asker) lookup(o Origin, q ports.Question) (answer string, pending bool) {
+	data, err := a.Files.ReadFile(o.QuestionsFile)
+	if err != nil {
+		return "", false
+	}
+	want := oneLine(q.Text)
+	var question string
+	for _, line := range strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n") {
+		if strings.HasPrefix(line, "### ") {
+			question = ""
+			continue
+		}
+		if v, ok := field(line, func(l labels) string { return l.question }); ok {
+			question = v
+			continue
+		}
+		v, ok := field(line, func(l labels) string { return l.answer })
+		if !ok || question != want {
+			continue
+		}
+		if v == "" || isPlaceholder(v) {
+			pending = true
+			continue
+		}
+		answer, pending = v, false
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= len(q.Options) {
+			answer = q.Options[n-1]
+		}
+	}
+	return answer, pending
+}
+
+// field reads "- **Label:** value" for the label of any language.
+func field(line string, label func(labels) string) (string, bool) {
+	for _, l := range catalog {
+		prefix := "- **" + label(l) + ":**"
+		if strings.HasPrefix(line, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(line, prefix)), true
+		}
+	}
+	return "", false
+}
+
+func isPlaceholder(v string) bool {
+	for _, l := range catalog {
+		if v == l.pending {
+			return true
+		}
+	}
+	return false
 }
 
 // Decisions returns the decisions log of a specification, or "".

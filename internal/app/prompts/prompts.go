@@ -16,10 +16,11 @@ import (
 type Name string
 
 const (
-	Red      Name = "red"
-	Green    Name = "green"
-	Refactor Name = "refactor"
-	E2E      Name = "e2e"
+	Red       Name = "red"
+	Green     Name = "green"
+	Refactor  Name = "refactor"
+	E2E       Name = "e2e"
+	Interview Name = "interview"
 )
 
 // File is a file shown to the agent as context.
@@ -50,8 +51,12 @@ type Data struct {
 	SuiteFailure string
 	GateReport   string
 	Feedback     string
-	Attempt      int
-	MaxAttempts  int
+	// AnsweredQuestion and Answer carry the developer's answer to the
+	// question the agent asked in this turn.
+	AnsweredQuestion string
+	Answer           string
+	Attempt          int
+	MaxAttempts      int
 }
 
 // E2EData is what the E2E prompt references.
@@ -81,18 +86,34 @@ type E2EElement struct {
 	Selector, Tag, Type, Text, Placeholder, AriaLabel string
 }
 
+// InterviewData is what the interview prompt references.
+type InterviewData struct {
+	ID, Title, SpecPath string
+	// Context lists the other specifications, one per line.
+	Context string
+}
+
 // RenderE2E renders the E2E prompt.
-func RenderE2E(lang string, d E2EData) (string, error) {
+func RenderE2E(lang string, d E2EData) (string, error) { return renderStandalone(lang, E2E, d) }
+
+// RenderInterview renders the prompt of an interactive interview.
+func RenderInterview(lang string, d InterviewData) (string, error) {
+	return renderStandalone(lang, Interview, d)
+}
+
+// renderStandalone renders a template that does not end with the response
+// contract (the agent talks to a person, or answers with actions).
+func renderStandalone(lang string, name Name, d any) (string, error) {
 	if !supported(lang) {
 		lang = "en"
 	}
-	t, err := template.ParseFS(assets.PromptsFS, "prompts/"+lang+"/e2e.md")
+	t, err := template.ParseFS(assets.FS, "prompts/"+lang+"/"+string(name)+".md")
 	if err != nil {
-		return "", fmt.Errorf("parsing the e2e prompt: %w", err)
+		return "", fmt.Errorf("parsing the %s prompt: %w", name, err)
 	}
 	var b bytes.Buffer
 	if err := t.Execute(&b, d); err != nil {
-		return "", fmt.Errorf("rendering the e2e prompt: %w", err)
+		return "", fmt.Errorf("rendering the %s prompt: %w", name, err)
 	}
 	return b.String(), nil
 }
@@ -106,7 +127,7 @@ func Render(lang string, name Name, d Data) (string, error) {
 	if !supported(lang) {
 		lang = "en"
 	}
-	sub, err := fs.Sub(assets.PromptsFS, "prompts/"+lang)
+	sub, err := fs.Sub(assets.FS, "prompts/"+lang)
 	if err != nil {
 		return "", err
 	}

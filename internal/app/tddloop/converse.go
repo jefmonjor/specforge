@@ -70,7 +70,7 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 			}
 			s.d.Events.Answered(resp.Question, answer)
 			data.Decisions = s.d.Asker.Decisions(origin)
-			data.Feedback = feedback(r.o.Language, "answered")
+			data.AnsweredQuestion, data.Answer = resp.Question, answer
 		}
 	}
 }

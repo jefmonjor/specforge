@@ -43,6 +43,47 @@ type Checkpoint struct {
 	Details  string    `json:"details,omitempty"`
 }
 
+// PendingKind says what a pending question interrupted.
+type PendingKind string
+
+const (
+	// PendingAgent: the agent asked during its turn. The resumed turn
+	// starts with the answer, from the same baselines.
+	PendingAgent PendingKind = "agent"
+	// PendingVerify: SpecForge asked while verifying the agent's work.
+	// The resumed step verifies again without calling the agent.
+	PendingVerify PendingKind = "verify"
+)
+
+// Pending is an interrupted step. The baselines are the files as they were
+// before the interrupted agent turn, so what the agent wrote before asking
+// still counts as written in that turn.
+type Pending struct {
+	Kind     PendingKind `json:"kind"`
+	Phase    Phase       `json:"phase"`
+	Scenario int         `json:"scenario"`
+	Question string      `json:"question,omitempty"`
+	Context  string      `json:"context,omitempty"`
+	Options  []string    `json:"options,omitempty"`
+	// Answer is filled once the developer answered.
+	Answer string `json:"answer,omitempty"`
+	// Claimed are the files the agent reported for the interrupted turn.
+	Claimed []string `json:"claimed,omitempty"`
+	// Workspace and Tests are the snapshots taken before that turn.
+	Workspace map[string]string `json:"workspace,omitempty"`
+	Tests     map[string]string `json:"tests,omitempty"`
+}
+
+// PendingFor returns the pending step if it belongs to the current phase
+// and scenario.
+func (s *State) PendingFor() *Pending {
+	sc, ok := s.Scenario()
+	if !ok || s.Pending == nil || s.Pending.Phase != s.Phase || s.Pending.Scenario != sc.Index {
+		return nil
+	}
+	return s.Pending
+}
+
 // State is everything --resume needs to continue exactly where the loop
 // stopped.
 type State struct {
@@ -63,9 +104,12 @@ type State struct {
 	// GREEN and REFACTOR must leave them untouched.
 	TestHashes map[string]string `json:"test_hashes,omitempty"`
 	// FilesWritten lists files changed while working on the current scenario.
-	FilesWritten []string     `json:"files_written,omitempty"`
-	Checkpoints  []Checkpoint `json:"checkpoints"`
-	UpdatedAt    time.Time    `json:"updated_at"`
+	FilesWritten []string `json:"files_written,omitempty"`
+	// Pending is the step a question interrupted when nobody could answer
+	// it. --resume answers it first and continues that same step.
+	Pending     *Pending     `json:"pending,omitempty"`
+	Checkpoints []Checkpoint `json:"checkpoints"`
+	UpdatedAt   time.Time    `json:"updated_at"`
 }
 
 // NewState starts a loop at RED of the first scenario not yet done.
@@ -130,6 +174,7 @@ func (s *State) Scenario() (ScenarioRef, bool) {
 // what the first GREEN prompt needs.
 func (s *State) Advance(now time.Time) {
 	s.Attempts = 0
+	s.Pending = nil
 	switch s.Phase {
 	case PhaseRed:
 		s.Phase = PhaseGreen
@@ -150,6 +195,7 @@ func (s *State) MarkSatisfied(now time.Time) {
 	}
 	s.Scenarios[s.Current].Satisfied = true
 	s.Attempts = 0
+	s.Pending = nil
 	s.nextScenario()
 	s.UpdatedAt = now
 }

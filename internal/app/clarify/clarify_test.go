@@ -75,3 +75,48 @@ func TestOtherPrompterErrorsPropagate(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestAnswerWrittenInTheQuestionsFileIsUsed(t *testing.T) {
+	dir := t.TempDir()
+	o := origin(dir)
+	q := ports.Question{Text: "Which   channel\nsends the link?", Options: []string{"email", "sms"}}
+
+	// First run, nobody at the terminal: written once, even if asked twice.
+	ci := asker(&fakePrompter{err: ports.ErrNonInteractive})
+	for range 2 {
+		if _, err := ci.Ask(context.Background(), o, q); err == nil {
+			t.Fatal("want a pending question")
+		}
+	}
+	data, _ := fsys.OS{}.ReadFile(o.QuestionsFile)
+	if strings.Count(string(data), "Which channel sends the link?") != 1 {
+		t.Fatalf("questions.md:\n%s", data)
+	}
+
+	// The developer answers in the file with an option number.
+	answered := strings.Replace(string(data), "_pendiente de respuesta_", "2", 1)
+	if err := (fsys.OS{}).WriteFile(o.QuestionsFile, []byte(answered)); err != nil {
+		t.Fatal(err)
+	}
+	prompter := &fakePrompter{err: errors.New("the terminal must not be used")}
+	got, err := asker(prompter).Ask(context.Background(), o, q)
+	if err != nil || got != "sms" {
+		t.Fatalf("Ask = %q, %v", got, err)
+	}
+	if !strings.Contains(asker(prompter).Decisions(o), "**Respuesta:** sms") {
+		t.Fatal("the written answer must be recorded as a decision")
+	}
+}
+
+func TestEnglishQuestionsFileIsReadToo(t *testing.T) {
+	dir := t.TempDir()
+	o := origin(dir)
+	q := ports.Question{Text: "Free text?"}
+	en := &Asker{Prompter: &fakePrompter{err: ports.ErrNonInteractive}, Files: fsys.OS{}, Lang: "en", Now: time.Now}
+	en.Ask(context.Background(), o, q)
+	data, _ := fsys.OS{}.ReadFile(o.QuestionsFile)
+	fsys.OS{}.WriteFile(o.QuestionsFile, []byte(strings.Replace(string(data), "_awaiting an answer_", "from the request", 1)))
+	if got, err := asker(&fakePrompter{err: ports.ErrNonInteractive}).Ask(context.Background(), o, q); err != nil || got != "from the request" {
+		t.Fatalf("Ask = %q, %v", got, err)
+	}
+}

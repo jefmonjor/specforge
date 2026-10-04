@@ -7,17 +7,13 @@ LDFLAGS := -s -w \
   -X $(MODULE)/internal/buildinfo.Commit=$(COMMIT) \
   -X $(MODULE)/internal/buildinfo.Date=$(DATE)
 
-.PHONY: build test test-integration lint fmt tidy-check release-snapshot
+.PHONY: build test lint fmt tidy-check release-snapshot
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o specforge .
 
 test:
 	go test -race -cover ./...
-
-## Runs the tests that shell out to real tools (golangci-lint, npx, markitdown).
-test-integration:
-	go test -tags integration ./...
 
 lint:
 	@test -z "$$(gofmt -l .)" || { echo "gofmt: files need formatting:"; gofmt -l .; exit 1; }

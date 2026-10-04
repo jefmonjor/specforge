@@ -13,17 +13,17 @@ func TestDetectSingleStacks(t *testing.T) {
 		files fstest.MapFS
 		want  Profile
 	}{
-		{"go", fstest.MapFS{"go.mod": file("module x")}, Profile{Kind: Go, Runner: RunnerGo, StandardDoc: "standards/go.md"}},
-		{"maven", fstest.MapFS{"pom.xml": file("<project/>")}, Profile{Kind: Maven, Runner: RunnerMaven, StandardDoc: "standards/java.md"}},
-		{"gradle kts", fstest.MapFS{"build.gradle.kts": file("")}, Profile{Kind: Gradle, Runner: RunnerGradle, StandardDoc: "standards/java.md"}},
-		{"python", fstest.MapFS{"pyproject.toml": file("")}, Profile{Kind: Python, Runner: RunnerPytest, StandardDoc: "standards/python.md"}},
+		{"go", fstest.MapFS{"go.mod": file("module x")}, Profile{Kind: Go, Runner: RunnerGo, Standard: "go"}},
+		{"maven", fstest.MapFS{"pom.xml": file("<project/>")}, Profile{Kind: Maven, Runner: RunnerMaven, Standard: "java"}},
+		{"gradle kts", fstest.MapFS{"build.gradle.kts": file("")}, Profile{Kind: Gradle, Runner: RunnerGradle, Standard: "java"}},
+		{"python", fstest.MapFS{"pyproject.toml": file("")}, Profile{Kind: Python, Runner: RunnerPytest, Standard: "python"}},
 		{"vitest + react", fstest.MapFS{"package.json": file(`{"dependencies":{"react":"19"},"devDependencies":{"vitest":"3"}}`)},
-			Profile{Kind: Node, Runner: RunnerVitest, Framework: "react", StandardDoc: "standards/react.md"}},
+			Profile{Kind: Node, Runner: RunnerVitest, Framework: "react", Standard: "node"}},
 		{"jest via script", fstest.MapFS{"package.json": file(`{"scripts":{"test":"jest --ci"}}`)},
-			Profile{Kind: Node, Runner: RunnerJest, StandardDoc: "standards/react.md"}},
+			Profile{Kind: Node, Runner: RunnerJest, Standard: "node"}},
 		{"angular", fstest.MapFS{"package.json": file(`{"dependencies":{"@angular/core":"18","react":"x"}}`)},
-			Profile{Kind: Node, Runner: RunnerNPM, Framework: "angular", StandardDoc: "standards/react.md"}},
-		{"broken package.json", fstest.MapFS{"package.json": file(`{`)}, Profile{Kind: Node, Runner: RunnerNPM, StandardDoc: "standards/react.md"}},
+			Profile{Kind: Node, Runner: RunnerNPM, Framework: "angular", Standard: "node"}},
+		{"broken package.json", fstest.MapFS{"package.json": file(`{`)}, Profile{Kind: Node, Runner: RunnerNPM, Standard: "node"}},
 	}
 	for _, c := range cases {
 		got := Detect(c.files)

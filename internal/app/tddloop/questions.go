@@ -15,7 +15,7 @@ var choices = map[string]map[string]choice{
 			options: []string{"Yes: mark the scenario as already satisfied", "No: ask the agent for a stricter test", "Stop the loop"},
 		},
 		"inexact": {
-			text:    "The %s runner gives no report, so SpecForge cannot tell why the test fails. Is this a valid RED (the test fails on its assertion)?\n\n%s",
+			text:    "The %s runner gives no report, so SpecForge cannot tell why the test fails. Is this a valid RED (the test fails on its assertion)? The output is below.",
 			options: []string{"Yes: accept it", "No: ask the agent to fix the test"},
 		},
 	},
@@ -25,7 +25,7 @@ var choices = map[string]map[string]choice{
 			options: []string{"Sí: marcar el escenario como ya satisfecho", "No: pedir al agente un test más estricto", "Detener el ciclo"},
 		},
 		"inexact": {
-			text:    "El runner %s no ofrece informe, así que SpecForge no puede saber por qué falla el test. ¿Es un RED válido (el test falla en su aserción)?\n\n%s",
+			text:    "El runner %s no ofrece informe, así que SpecForge no puede saber por qué falla el test. ¿Es un RED válido (el test falla en su aserción)? La salida está debajo.",
 			options: []string{"Sí: aceptarlo", "No: pedir al agente que corrija el test"},
 		},
 	},

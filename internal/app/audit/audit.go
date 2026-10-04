@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -132,7 +133,7 @@ type method struct {
 
 func loadMethod() (method, error) {
 	read := func(name string) (string, error) {
-		b, err := assets.ReadEmbeddedFile("security-audit/" + name)
+		b, err := fs.ReadFile(assets.FS, "audit/"+name)
 		return string(b), err
 	}
 	var m method
@@ -150,7 +151,7 @@ func loadMethod() (method, error) {
 	if m.attackClasses, err = read("ATTACK-CLASSES.md"); err != nil {
 		errs = append(errs, err)
 	}
-	schemaBytes, err := assets.ReadEmbeddedFile("security-audit/report-schema.json")
+	schemaBytes, err := fs.ReadFile(assets.FS, "audit/report-schema.json")
 	if err != nil {
 		errs = append(errs, err)
 	} else {

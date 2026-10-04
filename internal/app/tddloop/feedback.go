@@ -15,7 +15,6 @@ var feedbackText = map[string]map[Rejection]string{
 		RejectStillFailing: "The test still fails. The output above shows why.",
 		RejectPremature:    "The test passed before any implementation. Write a test that fails until the behaviour of this scenario exists.",
 		RejectUnconfirmed:  "The developer did not accept the previous test as a valid RED: %s",
-		"answered":         "The developer answered your question; the answer is in the decisions log below. Continue the task.",
 	},
 	"es": {
 		RejectNoContract:   "Tu respuesta no terminaba con el objeto JSON de estado. Repite la tarea y termina con el contrato.",
@@ -27,7 +26,6 @@ var feedbackText = map[string]map[Rejection]string{
 		RejectStillFailing: "El test sigue fallando. La salida de arriba muestra por qué.",
 		RejectPremature:    "El test pasó antes de existir la implementación. Escribe un test que falle hasta que el comportamiento de este escenario exista.",
 		RejectUnconfirmed:  "El desarrollador no aceptó el test anterior como un RED válido: %s",
-		"answered":         "El desarrollador respondió tu pregunta; la respuesta está en el registro de decisiones de abajo. Continúa la tarea.",
 	},
 }
 

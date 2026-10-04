@@ -43,15 +43,22 @@ type Profile struct {
 	Runner Runner
 	// Framework is a notable UI framework ("react", "angular"), if any.
 	Framework string
-	// StandardDoc is the baseline standards file for the stack.
-	StandardDoc string
+	// Standard names the embedded coding standard for the stack
+	// ("go", "java", "node", "python").
+	Standard string
 }
 
 // Name is a short human label, e.g. "node (vitest, react)".
 func (p Profile) Name() string {
-	parts := []string{string(p.Runner)}
+	var parts []string
+	if string(p.Runner) != string(p.Kind) {
+		parts = append(parts, string(p.Runner))
+	}
 	if p.Framework != "" {
 		parts = append(parts, p.Framework)
+	}
+	if len(parts) == 0 {
+		return string(p.Kind)
 	}
 	return string(p.Kind) + " (" + strings.Join(parts, ", ") + ")"
 }
@@ -96,19 +103,19 @@ func (p Profile) IsTestFile(rel string) bool {
 func Detect(fsys fs.FS) []Profile {
 	var out []Profile
 	if exists(fsys, "go.mod") {
-		out = append(out, Profile{Kind: Go, Runner: RunnerGo, StandardDoc: "standards/go.md"})
+		out = append(out, Profile{Kind: Go, Runner: RunnerGo, Standard: "go"})
 	}
 	if exists(fsys, "pom.xml") {
-		out = append(out, Profile{Kind: Maven, Runner: RunnerMaven, StandardDoc: "standards/java.md"})
+		out = append(out, Profile{Kind: Maven, Runner: RunnerMaven, Standard: "java"})
 	}
 	if exists(fsys, "build.gradle") || exists(fsys, "build.gradle.kts") {
-		out = append(out, Profile{Kind: Gradle, Runner: RunnerGradle, StandardDoc: "standards/java.md"})
+		out = append(out, Profile{Kind: Gradle, Runner: RunnerGradle, Standard: "java"})
 	}
 	if data, err := fs.ReadFile(fsys, "package.json"); err == nil {
 		out = append(out, nodeProfile(data))
 	}
 	if exists(fsys, "pyproject.toml") || exists(fsys, "requirements.txt") || exists(fsys, "setup.py") {
-		out = append(out, Profile{Kind: Python, Runner: RunnerPytest, StandardDoc: "standards/python.md"})
+		out = append(out, Profile{Kind: Python, Runner: RunnerPytest, Standard: "python"})
 	}
 	return out
 }
@@ -130,7 +137,7 @@ type packageJSON struct {
 }
 
 func nodeProfile(data []byte) Profile {
-	p := Profile{Kind: Node, Runner: RunnerNPM, StandardDoc: "standards/react.md"}
+	p := Profile{Kind: Node, Runner: RunnerNPM, Standard: "node"}
 	var pkg packageJSON
 	if json.Unmarshal(data, &pkg) != nil {
 		return p
