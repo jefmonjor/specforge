@@ -238,3 +238,21 @@ func TestJSONOutput(t *testing.T) {
 		t.Fatalf("error json %q: %v", h.err, err)
 	}
 }
+
+func TestSetupNewJavaForARewrite(t *testing.T) {
+	h := newHarness(t)
+	h.expect(0, "init", "--agent", "claude", "--language", "en")
+	h.expect(0, "setup", "--new", "java", "--name", "payroll", "--legacy", "../old")
+	if !strings.Contains(h.read("pom.xml"), "<maven.compiler.release>21</maven.compiler.release>") ||
+		!strings.Contains(h.read("src/test/java/com/example/payroll/ArchitectureTest.java"), "package com.example.payroll;") {
+		t.Fatal("java scaffold not written")
+	}
+	if y := h.read("specforge.yaml"); !strings.Contains(y, "stack: maven") || !strings.Contains(y, `legacy: "../old"`) || !strings.Contains(y, "java_release: 21") {
+		t.Fatalf("specforge.yaml:\n%s", y)
+	}
+	if !strings.Contains(h.err.String(), "mvn test") {
+		t.Fatalf("stderr:\n%s", h.err)
+	}
+	// A second scaffold over an existing project is refused.
+	h.expect(1, "setup", "--new", "react")
+}

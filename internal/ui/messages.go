@@ -23,6 +23,10 @@ func T(lang, key string, args ...any) string {
 
 var messages = map[string]map[string]string{
 	"en": {
+		"setup.new.java":          "install and check the tooling: mvn test (JUnit, ArchUnit), mvn pmd:check",
+		"setup.new.react":         "install and check the tooling: npm install && npm test && npm run lint",
+		"setup.new.python":        "install and check the tooling: python3 -m venv .venv && .venv/bin/pip install -e '.[dev]' && .venv/bin/pytest",
+		"setup.new.go":            "check the tooling: go test ./... && golangci-lint run",
 		"legacy.scanned":          "inventory written: %s",
 		"legacy.summary":          "build %s · Java %s · %d source file(s), %d test file(s), %d line(s)",
 		"legacy.frameworks":       "found: %s",
@@ -117,6 +121,10 @@ var messages = map[string]map[string]string{
 		"e2e.passed":              "pass rate %.0f%% · report in %s",
 	},
 	"es": {
+		"setup.new.java":          "instala y comprueba las herramientas: mvn test (JUnit, ArchUnit), mvn pmd:check",
+		"setup.new.react":         "instala y comprueba las herramientas: npm install && npm test && npm run lint",
+		"setup.new.python":        "instala y comprueba las herramientas: python3 -m venv .venv && .venv/bin/pip install -e '.[dev]' && .venv/bin/pytest",
+		"setup.new.go":            "comprueba las herramientas: go test ./... && golangci-lint run",
 		"legacy.scanned":          "inventario escrito: %s",
 		"legacy.summary":          "build %s · Java %s · %d fichero(s) fuente, %d de test, %d línea(s)",
 		"legacy.frameworks":       "encontrado: %s",

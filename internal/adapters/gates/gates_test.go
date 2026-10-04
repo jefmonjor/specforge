@@ -174,3 +174,28 @@ func TestMigrationGate(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 }
+
+func TestMavenLintRunsPMDOnlyWhenTheBuildDeclaresIt(t *testing.T) {
+	root := t.TempDir()
+	maven := stack.Profile{Kind: stack.Maven, Runner: stack.RunnerMaven}
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<project/>"), 0o644)
+	proc := &fakeProc{results: map[string]ports.CommandResult{}}
+	g := &Lint{proc: proc}
+	if res, _ := g.Check(context.Background(), root, maven); res.Status != quality.Skipped || len(proc.calls) != 0 {
+		t.Fatalf("%+v %v", res, proc.calls)
+	}
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<artifactId>maven-pmd-plugin</artifactId>"), 0o644)
+	proc.results["mvn"] = ports.CommandResult{ExitCode: 1, Stdout: "[WARNING] PMD Failure: a.Payroll:6 Rule:LooseCoupling Priority:3 Avoid Vector.\n[ERROR] PMD 7.17.0 has found 1 violation."}
+	res, _ := g.Check(context.Background(), root, maven)
+	if res.Status != quality.Failed || res.Details != "a.Payroll:6 Rule:LooseCoupling Priority:3 Avoid Vector." {
+		t.Fatalf("%+v", res)
+	}
+	proc.results["mvn"] = ports.CommandResult{ExitCode: 1, Stdout: "[ERROR] COMPILATION ERROR"}
+	if res, _ := g.Check(context.Background(), root, maven); res.Status != quality.Skipped {
+		t.Fatalf("%+v", res)
+	}
+	proc.results["mvn"] = ports.CommandResult{}
+	if res, _ := g.Check(context.Background(), root, maven); res.Status != quality.Passed {
+		t.Fatalf("%+v", res)
+	}
+}

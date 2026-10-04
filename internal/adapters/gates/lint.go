@@ -3,6 +3,7 @@ package gates
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -112,19 +113,25 @@ func (l *Lint) maven(ctx context.Context, root string) (quality.Result, error) {
 	if _, err := os.Stat(filepath.Join(root, "mvnw")); err == nil {
 		mvn = filepath.Join(root, "mvnw")
 	}
-	res, err := l.proc.Run(ctx, ports.Command{Name: mvn, Args: []string{"-B", "-q", "test-compile", "pmd:check"}, Dir: root})
+	res, err := l.proc.Run(ctx, ports.Command{Name: mvn, Args: []string{"-B", "test-compile", "pmd:check"}, Dir: root})
 	if err != nil {
 		return toolError(ctx, l.Name(), err)
 	}
-	out := res.Combined()
-	switch {
-	case res.Success():
+	if res.Success() {
 		return quality.Result{Gate: l.Name(), Status: quality.Passed, Summary: "PMD: no violations"}, nil
-	case strings.Contains(out, "PMD Failure") || strings.Contains(out, "PMD violation"):
-		return quality.Result{Gate: l.Name(), Status: quality.Failed, Summary: "PMD found violations", Details: out}, nil
-	default:
-		return skipped(l.Name(), "PMD could not run: "+firstLine(out)), nil
 	}
+	var found []string
+	for _, line := range strings.Split(res.Combined(), "\n") {
+		if i := strings.Index(line, "PMD Failure: "); i >= 0 {
+			found = append(found, strings.TrimSpace(line[i+len("PMD Failure: "):]))
+		}
+	}
+	if len(found) == 0 {
+		// The build failed before PMD judged anything (compilation, plugin).
+		return skipped(l.Name(), "PMD could not run: "+firstLine(res.Combined())), nil
+	}
+	return quality.Result{Gate: l.Name(), Status: quality.Failed,
+		Summary: fmt.Sprintf("PMD found %d violation(s)", len(found)), Details: strings.Join(found, "\n")}, nil
 }
 
 func hasScript(root, name string) bool {
