@@ -189,3 +189,22 @@ func invariants(markdown string) []Issue {
 	}
 	return out
 }
+
+// RulePlanMarker reports a scenario the plan does not place.
+const RulePlanMarker Rule = "plan-marker"
+
+// LintPlan checks a technical plan against its specification: every
+// scenario marker must appear (so each scenario has a planned test) and no
+// placeholder may be left.
+func LintPlan(plan string, markers []string) []Issue {
+	issues := placeholders(plan)
+	if strings.TrimSpace(plan) == "" {
+		return append(issues, Issue{Rule: RulePlanMarker, Message: "the plan is empty", Blocking: true})
+	}
+	for _, m := range markers {
+		if !strings.Contains(plan, m) {
+			issues = append(issues, Issue{Rule: RulePlanMarker, Message: "no planned test for " + m, Blocking: true})
+		}
+	}
+	return issues
+}

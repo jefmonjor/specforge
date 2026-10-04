@@ -20,7 +20,7 @@ import (
 var (
 	Agents    = []string{"claude", "gemini"}
 	Languages = []string{"es", "en"}
-	Reviews   = []string{"scenario", "end", "off"}
+	Reviews   = []string{"scenario", "off"}
 )
 
 // ProjectFile is the committed per-repository configuration file.
@@ -45,6 +45,7 @@ type Project struct {
 	Stack       string `yaml:"stack,omitempty"`
 	MaxAttempts int    `yaml:"max_attempts,omitempty"`
 	Review      string `yaml:"review,omitempty"`
+	Commit      *bool  `yaml:"commit,omitempty"`
 	Timeouts    struct {
 		Agent time.Duration `yaml:"agent,omitempty"`
 		Tests time.Duration `yaml:"tests,omitempty"`
@@ -58,10 +59,12 @@ type Project struct {
 
 // Overrides are command-line flags; empty values do not override.
 type Overrides struct {
-	Agent  string
-	Model  string
-	Stack  string
-	Strict bool
+	Agent    string
+	Model    string
+	Stack    string
+	Strict   bool
+	Review   string
+	NoCommit bool
 }
 
 // Settings are the resolved values every command uses.
@@ -72,6 +75,7 @@ type Settings struct {
 	Stack        string
 	MaxAttempts  int
 	Review       string
+	Commit       bool
 	AgentTimeout time.Duration
 	TestTimeout  time.Duration
 	Quality      quality.Thresholds
@@ -95,7 +99,8 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		Language:     first(p.Language, u.Language, DefaultLanguage),
 		Stack:        first(f.Stack, p.Stack),
 		MaxAttempts:  DefaultMaxAttempts,
-		Review:       first(p.Review, DefaultReview),
+		Review:       first(f.Review, p.Review, DefaultReview),
+		Commit:       !f.NoCommit && (p.Commit == nil || *p.Commit),
 		AgentTimeout: DefaultAgentTimeout,
 		TestTimeout:  DefaultTestTimeout,
 		Quality:      quality.DefaultThresholds(),
@@ -122,6 +127,7 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		s.Quality.Strict = true
 	}
 
+	s.Review = strings.ToLower(s.Review)
 	s.Agent = strings.ToLower(s.Agent)
 	s.Language = strings.ToLower(s.Language)
 	s.Stack = strings.ToLower(s.Stack)

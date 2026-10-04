@@ -81,3 +81,14 @@ func TestLintUnreferencedInvariant(t *testing.T) {
 		t.Fatalf("got %v", msgs)
 	}
 }
+
+func TestLintPlan(t *testing.T) {
+	plan := "| SDD_0001_001 | reset_test.go |\nTODO decide the port\n"
+	got := LintPlan(plan, []string{"SDD_0001_001", "SDD_0001_002"})
+	if len(got) != 2 || got[0].Rule != RulePlaceholder || got[1].Message != "no planned test for SDD_0001_002" {
+		t.Fatalf("got %v", got)
+	}
+	if got := LintPlan("  ", nil); len(got) != 1 || !got[0].Blocking {
+		t.Fatalf("empty plan: %v", got)
+	}
+}

@@ -8,71 +8,51 @@ import (
 	"strings"
 
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/conversation"
 	"specforge/internal/app/prompts"
 	"specforge/internal/app/protocol"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/ports"
 )
 
-// converse sends a prompt and handles the protocol until the agent reports
-// done: one retry for a missing contract, questions routed to the
-// developer, and blocked turned into an error.
+// converse runs one agent turn under the response contract and turns a
+// blocked agent into an error. Answers are recorded in the loop state.
 func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data prompts.Data) (protocol.Response, error) {
-	retried := false
-	questions := 0
 	sc, _ := r.st.Scenario()
-	for {
-		prompt, err := prompts.Render(r.o.Language, name, data)
-		if err != nil {
-			return protocol.Response{}, err
+	origin := s.origin(r, sc)
+	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Model, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout}
+	render := func(t conversation.Turn) (string, error) {
+		d := data
+		if t.Retry {
+			d.Feedback = feedback(r.o.Language, RejectNoContract)
 		}
-		s.d.Events.AgentWorking(r.st.Phase)
-		out, err := s.d.Agent.Run(ctx, ports.AgentRequest{
-			Prompt: prompt, Dir: r.o.Root, Model: r.o.Model, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
-		})
-		if err != nil {
-			return protocol.Response{}, fmt.Errorf("agent %s during %s: %w", s.d.Agent.Name(), r.st.Phase, err)
+		if t.Answer != "" {
+			d.Decisions = s.d.Asker.Decisions(origin)
+			d.AnsweredQuestion, d.Answer = t.Question, t.Answer
 		}
-
-		resp, err := protocol.Parse(out)
-		if err != nil {
-			if retried {
-				return protocol.Response{}, fmt.Errorf("%s: %w", r.st.Phase, err)
-			}
-			retried = true
-			s.d.Events.Rejected(RejectNoContract, "")
-			data.Feedback = feedback(r.o.Language, RejectNoContract)
-			continue
-		}
-
-		switch resp.Status {
-		case protocol.Done:
-			return resp, nil
-		case protocol.Blocked:
-			return resp, &tdd.AgentBlockedError{Phase: r.st.Phase, Reason: resp.Reason, SuggestedAction: resp.SuggestedAction}
-		case protocol.NeedsClarification:
-			questions++
-			if questions > r.o.MaxClarifications {
-				return resp, ErrTooManyQuestions
-			}
-			origin := s.origin(r, sc)
-			answer, err := s.d.Asker.Ask(ctx, origin, ports.Question{Text: resp.Question, Context: resp.Context, Options: resp.Options})
-			if err != nil {
-				var pending *clarify.PendingQuestionError
-				if errors.As(err, &pending) {
-					r.st.Record("question", "pending", resp.Question, s.d.Now())
-				}
-				return resp, err
-			}
-			r.st.Record("question", "answered", resp.Question+" → "+answer, s.d.Now())
-			if err := s.save(r); err != nil {
-				return resp, err
-			}
-			s.d.Events.Answered(resp.Question, answer)
-			data.Decisions = s.d.Asker.Decisions(origin)
-			data.AnsweredQuestion, data.Answer = resp.Question, answer
-		}
+		return prompts.Render(r.o.Language, name, d)
 	}
+	hooks := conversation.Hooks{
+		Working: func() { s.d.Events.AgentWorking(r.st.Phase) },
+		Retried: func() { s.d.Events.Rejected(RejectNoContract, "") },
+		Answered: func(q, a string) error {
+			r.st.Record("question", "answered", q+" → "+a, s.d.Now())
+			s.d.Events.Answered(q, a)
+			return s.save(r)
+		},
+	}
+	resp, err := conversation.Talk(ctx, s.d.Agent, s.d.Asker, origin, r.o.MaxClarifications, req, render, hooks)
+	var pending *clarify.PendingQuestionError
+	switch {
+	case errors.As(err, &pending):
+		r.st.Record("question", "pending", resp.Question, s.d.Now())
+		return resp, err
+	case err != nil:
+		return resp, fmt.Errorf("%s: %w", r.st.Phase, err)
+	case resp.Status == protocol.Blocked:
+		return resp, &tdd.AgentBlockedError{Phase: r.st.Phase, Reason: resp.Reason, SuggestedAction: resp.SuggestedAction}
+	}
+	return resp, nil
 }
 
 func (s *Service) origin(r *run, sc tdd.ScenarioRef) clarify.Origin {

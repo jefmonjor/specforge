@@ -20,6 +20,8 @@ const (
 	RejectPremature     Rejection = "premature-green"
 	RejectGatesBlocking Rejection = "gates-blocking"
 	RejectUnconfirmed   Rejection = "unconfirmed"
+	RejectReviewChange  Rejection = "review-change"
+	RejectReviewRed     Rejection = "review-red"
 )
 
 // Events lets the presentation layer follow the loop. Implementations must
@@ -35,6 +37,9 @@ type Events interface {
 	Gates(report quality.Report)
 	Accepted(phase tdd.Phase, sc tdd.ScenarioRef)
 	Satisfied(sc tdd.ScenarioRef)
+	// Committed reports the commit that recorded a scenario; sha is ""
+	// when committing is off or the project is not a git repository.
+	Committed(sc tdd.ScenarioRef, sha string)
 	Finished(st *tdd.State)
 }
 
@@ -51,4 +56,5 @@ func (NopEvents) Answered(string, string)             {}
 func (NopEvents) Gates(quality.Report)                {}
 func (NopEvents) Accepted(tdd.Phase, tdd.ScenarioRef) {}
 func (NopEvents) Satisfied(tdd.ScenarioRef)           {}
+func (NopEvents) Committed(tdd.ScenarioRef, string)   {}
 func (NopEvents) Finished(*tdd.State)                 {}

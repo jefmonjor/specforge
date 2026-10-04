@@ -35,6 +35,7 @@ func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
 		TestCommand: p.TestCommand(sc.Marker),
 		Glossary:    spec.Section(r.md, spec.GlossaryTitle),
 		Invariants:  spec.Section(r.md, spec.InvariantsTitle),
+		Plan:        r.plan,
 		Decisions:   s.d.Asker.Decisions(s.origin(r, sc)),
 		Lessons:     s.lessons(r),
 		MaxAttempts: r.o.MaxAttempts,

@@ -21,6 +21,7 @@ const (
 	Refactor  Name = "refactor"
 	E2E       Name = "e2e"
 	Interview Name = "interview"
+	Plan      Name = "plan"
 )
 
 // File is a file shown to the agent as context.
@@ -43,9 +44,19 @@ type Data struct {
 
 	Glossary   string
 	Invariants string
-	Decisions  string
-	Lessons    string
-	TestFiles  []File
+	// Plan is the approved technical plan, when there is one.
+	Plan string
+	// For the plan prompt: the specification, the project's files and
+	// where the plan goes.
+	Spec     string
+	Tree     string
+	PlanPath string
+	Markers  []string
+	// Draft is the current plan, revised instead of rewritten.
+	Draft     string
+	Decisions string
+	Lessons   string
+	TestFiles []File
 
 	LastFailure  string
 	SuiteFailure string

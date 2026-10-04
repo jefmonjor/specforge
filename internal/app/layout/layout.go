@@ -33,6 +33,11 @@ func (l Layout) Decisions(specPath string) string {
 	return filepath.Join(l.SpecDir(specPath), "decisions.md")
 }
 
+// Plan is the technical plan of a specification.
+func (l Layout) Plan(specPath string) string {
+	return filepath.Join(l.SpecDir(specPath), "plan.md")
+}
+
 // Questions holds questions asked when nobody was at the terminal.
 func (l Layout) Questions(specPath string) string {
 	return filepath.Join(l.SpecDir(specPath), "questions.md")

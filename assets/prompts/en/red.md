@@ -14,16 +14,7 @@ You are working on the specification **{{.SpecTitle}}** (`{{.SpecPath}}`) in a {
 5. Do not modify any other test.
 
 SpecForge will run `{{.TestCommand}}` and expects it to fail on your assertion.
-{{if .Answer}}
-## Your question was answered
-You asked: {{.AnsweredQuestion}}
-The developer answered: **{{.Answer}}**
-It is recorded in the decisions log. Continue the task with it.
-{{end}}
-{{if .Feedback}}
-## Your previous attempt ({{.Attempt}} of {{.MaxAttempts}}) was rejected
-{{.Feedback}}
-{{end}}
+{{template "turn" .}}
 {{- if .LastFailure}}
 ### Output of the previous run
 ```

@@ -15,8 +15,12 @@ var feedbackText = map[string]map[Rejection]string{
 		RejectStillFailing: "The test still fails. The output above shows why.",
 		RejectPremature:    "The test passed before any implementation. Write a test that fails until the behaviour of this scenario exists.",
 		RejectUnconfirmed:  "The developer did not accept the previous test as a valid RED: %s",
+		RejectReviewChange: "The developer reviewed this scenario and asked for a change: %s. Change the implementation accordingly; the tests stay as they are.",
+		RejectReviewRed:    "The developer reviewed this scenario and sent it back to RED: the test does not express the scenario. Rewrite the test so it checks exactly what the scenario says.",
 	},
 	"es": {
+		RejectReviewChange: "El desarrollador revisó este escenario y pidió un cambio: %s. Cambia la implementación en consecuencia; los tests se quedan como están.",
+		RejectReviewRed:    "El desarrollador revisó este escenario y lo devolvió a RED: el test no expresa el escenario. Reescribe el test para que compruebe exactamente lo que dice el escenario.",
 		RejectNoContract:   "Tu respuesta no terminaba con el objeto JSON de estado. Repite la tarea y termina con el contrato.",
 		RejectFalseClaim:   "Incluiste ficheros que no cambiaron: %s. Lista solo los ficheros que escribiste.",
 		RejectNoTest:       "No cambió ningún fichero de test. Escribe el test de este escenario.",

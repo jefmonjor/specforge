@@ -27,6 +27,9 @@ func (s *Service) red(ctx context.Context, r *run) error {
 		data.TestFiles = s.specTests(r, nil)
 		data.LastFailure = r.st.LastFailure
 		data.Feedback = fb
+		if fb == "" {
+			data.Feedback = r.st.ReviewNote
+		}
 
 		pending, err := s.answerPending(ctx, r, sc)
 		if err != nil {
@@ -133,6 +136,9 @@ func (s *Service) green(ctx context.Context, r *run) error {
 		data.TestFiles = s.specTests(r, r.st.FilesWritten)
 		data.LastFailure = r.st.LastFailure
 		data.Feedback = fb
+		if fb == "" {
+			data.Feedback = r.st.ReviewNote
+		}
 
 		pending, err := s.answerPending(ctx, r, sc)
 		if err != nil {
@@ -180,6 +186,10 @@ func (s *Service) green(ctx context.Context, r *run) error {
 func (s *Service) refactor(ctx context.Context, r *run) error {
 	sc, _ := r.st.Scenario()
 	fb := ""
+	if p := r.st.PendingFor(); p != nil && p.Kind == tdd.PendingReview {
+		// Everything was verified already; only the review is missing.
+		return s.close(ctx, r, sc, p.Context)
+	}
 	for {
 		pending, err := s.answerPending(ctx, r, sc)
 		if err != nil {
@@ -202,8 +212,7 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		if suiteFailure == "" && report.OK(r.o.Strict) {
 			r.st.Record("refactor", "accepted", gateSummary(report), s.d.Now())
 			s.d.Events.Accepted(tdd.PhaseRefactor, sc)
-			r.st.Advance(s.d.Now())
-			return s.save(r)
+			return s.close(ctx, r, sc, gateSummary(report))
 		}
 		if suiteFailure == "" && onlySkipped(report, r.o.Strict) {
 			// The agent cannot install tools: stop and tell the developer.
@@ -218,6 +227,9 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		data.SuiteFailure = suiteFailure
 		data.GateReport = report.Explain(r.o.Strict)
 		data.Feedback = fb
+		if fb == "" {
+			data.Feedback = r.st.ReviewNote
+		}
 
 		var before ports.Snapshot
 		if pending != nil {

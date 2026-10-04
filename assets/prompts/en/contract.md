@@ -20,3 +20,16 @@ If you cannot continue for a reason the developer must fix (a missing tool, a br
 
 SpecForge checks `files_written` against the files that really changed. Never list a file you did not write.
 {{end}}
+
+{{define "turn"}}
+{{if .Answer}}
+## Your question was answered
+You asked: {{.AnsweredQuestion}}
+The developer answered: **{{.Answer}}**
+It is recorded in the decisions log. Continue the task with it.
+{{end}}
+{{if .Feedback}}
+## Your previous attempt ({{.Attempt}} of {{.MaxAttempts}}) was rejected
+{{.Feedback}}
+{{end}}
+{{end}}

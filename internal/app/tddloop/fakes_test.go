@@ -2,6 +2,7 @@ package tddloop
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -181,6 +182,7 @@ type recorder struct {
 	satisfied int
 	answered  int
 	amended   []string
+	commits   []string
 }
 
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
@@ -197,6 +199,7 @@ func (r *recorder) Answered(string, string)                  { r.answered++ }
 func (r *recorder) Gates(quality.Report)                     {}
 func (r *recorder) Accepted(ph tdd.Phase, _ tdd.ScenarioRef) { r.accepted = append(r.accepted, ph) }
 func (r *recorder) Satisfied(tdd.ScenarioRef)                { r.satisfied++ }
+func (r *recorder) Committed(_ tdd.ScenarioRef, sha string)  { r.commits = append(r.commits, sha) }
 func (r *recorder) Finished(*tdd.State)                      {}
 
 type harness struct {
@@ -252,3 +255,12 @@ func testFor(marker string) string {
 }
 
 func specSeal(body string) (string, string) { return spec.Seal(body) }
+
+func (h *harness) state(t *testing.T) *tdd.State {
+	t.Helper()
+	var st tdd.State
+	if err := json.Unmarshal([]byte(h.p.read(".specforge/state/0001-reset.json")), &st); err != nil {
+		t.Fatal(err)
+	}
+	return &st
+}

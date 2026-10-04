@@ -18,15 +18,6 @@ You are working on the specification **{{.SpecTitle}}** (`{{.SpecPath}}`) in a {
 4. If the scenario leaves a business rule undefined, ask (`needs_clarification`) instead of choosing for the developer.
 
 SpecForge will run `{{.TestCommand}}` and expects it to pass.
-{{if .Answer}}
-## Your question was answered
-You asked: {{.AnsweredQuestion}}
-The developer answered: **{{.Answer}}**
-It is recorded in the decisions log. Continue the task with it.
-{{end}}
-{{if .Feedback}}
-## Your previous attempt ({{.Attempt}} of {{.MaxAttempts}}) was rejected
-{{.Feedback}}
-{{end}}
+{{template "turn" .}}
 {{- template "context" .}}
 {{- template "contract" .}}

@@ -298,11 +298,62 @@ type Approval struct {
 // it records who approved it and when, and seals it. Approving an edited
 // specification again is how a developer accepts a change on purpose.
 func (s Service) Approve(e Entry, by string) (Approval, error) {
+	return s.approve(e.Path, e.Rel, by, func(content string) []spec.Issue {
+		return spec.Lint(content, spec.ParseOptions{Languages: []string{s.Language}})
+	})
+}
+
+// ErrNoPlan reports a specification without plan.md.
+var ErrNoPlan = errors.New("this specification has no plan yet: create it with `specforge plan <spec>`")
+
+// ErrPlanNeedsApprovedSpec: a plan is only drafted or approved against an
+// approved, unchanged specification.
+var ErrPlanNeedsApprovedSpec = errors.New("the plan follows the specification: approve the specification first")
+
+// ApprovePlan is the R1 review gate: the plan must place a test for every
+// scenario of the approved specification and leave no placeholder; then
+// it is recorded and sealed like the specification.
+func (s Service) ApprovePlan(e Entry, by string) (Approval, error) {
+	doc, err := s.Approved(e)
+	if err != nil {
+		return Approval{}, err
+	}
+	path := s.Layout.Plan(e.Path)
+	if !s.Files.Exists(path) {
+		return Approval{}, ErrNoPlan
+	}
+	return s.approve(path, s.Layout.Rel(path), by, func(content string) []spec.Issue {
+		return spec.LintPlan(content, Markers(e.ID, doc))
+	})
+}
+
+// Approved parses a specification that must be approved and unchanged.
+func (s Service) Approved(e Entry) (*spec.Document, error) {
+	data, err := s.Files.ReadFile(e.Path)
+	if err != nil {
+		return nil, err
+	}
+	if err := spec.Verify(string(data)); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrPlanNeedsApprovedSpec, err)
+	}
+	return spec.Parse(string(data), spec.ParseOptions{Languages: []string{s.Language}})
+}
+
+// Markers lists the scenario markers of a parsed specification.
+func Markers(specID string, doc *spec.Document) []string {
+	out := make([]string, len(doc.Scenarios))
+	for i, sc := range doc.Scenarios {
+		out[i] = spec.Marker(specID, sc.Index)
+	}
+	return out
+}
+
+func (s Service) approve(path, rel, by string, lint func(string) []spec.Issue) (Approval, error) {
 	by = strings.TrimSpace(by)
 	if by == "" {
 		return Approval{}, errors.New("an approval needs the approver's name")
 	}
-	data, err := s.Files.ReadFile(e.Path)
+	data, err := s.Files.ReadFile(path)
 	if err != nil {
 		return Approval{}, err
 	}
@@ -313,9 +364,9 @@ func (s Service) Approve(e Entry, by string) (Approval, error) {
 		return Approval{Hash: info.Hash, Already: true}, nil
 	}
 
-	issues := spec.Lint(content, spec.ParseOptions{Languages: []string{s.Language}})
+	issues := lint(content)
 	if blocking := spec.Blocking(issues); len(blocking) > 0 {
-		return Approval{}, &LintError{Path: e.Rel, Issues: blocking}
+		return Approval{}, &LintError{Path: rel, Issues: blocking}
 	}
 
 	content, err = spec.SetMeta(content, map[string]string{
@@ -327,7 +378,7 @@ func (s Service) Approve(e Entry, by string) (Approval, error) {
 		return Approval{}, err
 	}
 	sealed, hash := spec.Seal(content)
-	if err := s.Files.WriteFile(e.Path, []byte(sealed)); err != nil {
+	if err := s.Files.WriteFile(path, []byte(sealed)); err != nil {
 		return Approval{}, err
 	}
 	var tampered *spec.TamperedError

@@ -13,6 +13,9 @@ func gitInit(t *testing.T, dir string) {
 	t.Helper()
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main"},
+		{"config", "user.name", "Test"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "commit.gpgsign", "false"},
 		{"-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"},
 		{"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init"},
 	} {
@@ -22,6 +25,17 @@ func gitInit(t *testing.T, dir string) {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
+}
+
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	c := exec.Command("git", args...)
+	c.Dir = dir
+	out, err := c.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+	return string(out)
 }
 
 func done(files ...string) string {
@@ -54,9 +68,10 @@ func TestLoopRunsRedGreenRefactor(t *testing.T) {
 			"reset/reset.go": "package reset\n\nfunc Link(user string) string { return \"https://example.com/reset/\" + user }\n",
 		}, reply: done("reset/reset.go")},
 	}
-	h.expect(0, "loop")
-	if !strings.Contains(h.err.String(), "1 scenario(s) passed") {
-		t.Fatalf("stderr:\n%s", h.err)
+	// R2: without a terminal the review is a question in questions.md.
+	h.expect(5, "loop")
+	if !strings.Contains(h.read("specs/0001-reset/questions.md"), "Review scenario 1 (Request a link)") {
+		t.Fatalf("questions.md:\n%s", h.read("specs/0001-reset/questions.md"))
 	}
 	calls := len(h.agent.prompts)
 	if calls != 2 {
@@ -64,6 +79,23 @@ func TestLoopRunsRedGreenRefactor(t *testing.T) {
 	}
 	if got := h.read("reset/reset.go"); !strings.Contains(got, "https://example.com/reset/") {
 		t.Fatalf("implementation:\n%s", got)
+	}
+
+	// Accepting in the file and resuming records the scenario as a commit.
+	q := h.read("specs/0001-reset/questions.md")
+	h.write("specs/0001-reset/questions.md", strings.Replace(q, "_awaiting an answer_", "1", 1))
+	h.expect(0, "loop", "--resume")
+	if !strings.Contains(h.err.String(), "1 scenario(s) passed") || !strings.Contains(h.err.String(), "committed ") {
+		t.Fatalf("stderr:\n%s", h.err)
+	}
+	log := gitOut(t, h.root, "log", "-1", "--name-only", "--format=%s")
+	for _, want := range []string{"feat(SDD_0001_001): Request a link", "reset/reset.go", "reset/reset_test.go"} {
+		if !strings.Contains(log, want) {
+			t.Fatalf("last commit lacks %q:\n%s", want, log)
+		}
+	}
+	if len(h.agent.prompts) != calls {
+		t.Fatal("accepting a review must not call the agent")
 	}
 
 	// A finished, unchanged loop is reported, not redone.

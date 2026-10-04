@@ -20,6 +20,7 @@ loop against an approved specification, and verifies every step itself.
   specforge spec new "<title>"       start a specification from the template
   specforge spec interview 0001      complete it with the agent
   specforge spec approve 0001        lint, record the approver and seal it
+  specforge plan 0001                draft where the code goes; then plan approve
   specforge loop 0001                Red → Green → Refactor, scenario by scenario
   specforge audit                    adversarial security review of your branch
   specforge e2e 0001 --url <url>     verify the scenarios in a real browser
@@ -47,6 +48,7 @@ awaits your answer · 130 interrupted.`,
 		a.initCommand(),
 		a.setupCommand(),
 		a.specCommand(),
+		a.planCommand(),
 		a.loopCommand(),
 		a.auditCommand(),
 		a.e2eCommand(),

@@ -145,3 +145,35 @@ func TestNewStateWithoutScenariosIsDone(t *testing.T) {
 		t.Fatalf("state = %+v", s)
 	}
 }
+
+func TestSendBackAndJump(t *testing.T) {
+	now := time.Now()
+	s := NewState("s.md", "0001", "h", []ScenarioRef{{Index: 1}, {Index: 2}}, now)
+	s.Phase, s.TestHashes, s.LastFailure = PhaseRefactor, map[string]string{"a_test.go": "x"}, "boom"
+
+	s.SendBack(PhaseGreen, "use a struct", now)
+	if s.Phase != PhaseGreen || s.ReviewNote != "use a struct" || s.TestHashes == nil || s.LastFailure != "" {
+		t.Fatalf("send back to GREEN: %+v", s)
+	}
+	s.SendBack(PhaseRed, "wrong test", now)
+	if s.Phase != PhaseRed || s.TestHashes != nil {
+		t.Fatalf("send back to RED: %+v", s)
+	}
+
+	s.Scenarios[0].Done, s.Scenarios[1].Done, s.Scenarios[0].Commit = true, true, "abc"
+	s.Phase, s.Current = PhaseCompleted, 2
+	if err := s.Jump(1, PhaseGreen, now); err != nil {
+		t.Fatal(err)
+	}
+	if s.Done() || s.Current != 0 || s.Phase != PhaseGreen || s.Scenarios[0].Done || s.Scenarios[0].Commit != "" || !s.Scenarios[1].Done {
+		t.Fatalf("jump: %+v", s)
+	}
+	if s.Jump(3, PhaseRed, now) == nil || s.Jump(1, PhaseCompleted, now) == nil {
+		t.Fatal("invalid jumps must fail")
+	}
+	s.Advance(now) // GREEN → REFACTOR
+	s.Advance(now) // REFACTOR → done (scenario 2 is still done)
+	if !s.Done() {
+		t.Fatalf("after redoing scenario 1 the loop is done: %+v", s)
+	}
+}

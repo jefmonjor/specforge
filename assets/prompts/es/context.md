@@ -1,4 +1,8 @@
 {{define "context"}}
+{{- if .Plan}}
+## Plan técnico aprobado (síguelo; pregunta antes de apartarte de él)
+{{.Plan}}
+{{end}}
 {{- if .Glossary}}
 ## Lenguaje ubicuo (usa estos nombres en el código)
 {{.Glossary}}

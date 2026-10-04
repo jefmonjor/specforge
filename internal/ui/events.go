@@ -71,6 +71,20 @@ func (e *LoopEvents) Rejected(r tddloop.Rejection, detail string) {
 	e.C.Warn(e.C.T("loop.rejected", reason))
 }
 
+func (e *LoopEvents) Committed(_ tdd.ScenarioRef, sha string) {
+	if sha != "" {
+		e.halt()
+		e.C.OK(e.C.T("loop.committed", short(sha)))
+	}
+}
+
+func short(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
 func (e *LoopEvents) Answered(string, string) {
 	e.halt()
 	e.C.OK(e.C.T("loop.answered"))
@@ -169,5 +183,37 @@ func (e *E2EEvents) Result(r e2e.ScenarioResult) {
 		e.C.OK(line)
 	} else {
 		e.C.Bad(line + " — " + r.Reason)
+	}
+}
+
+// PlanEvents prints the drafting of a plan.
+type PlanEvents struct {
+	C     *Console
+	Agent string
+	stop  func()
+}
+
+func (e *PlanEvents) Working() {
+	e.Done()
+	if !e.C.Quiet {
+		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, "PLAN"))
+	}
+}
+
+func (e *PlanEvents) Rejected(reason string) {
+	e.Done()
+	e.C.Warn(e.C.T("loop.rejected", reason))
+}
+
+func (e *PlanEvents) Answered(string, string) {
+	e.Done()
+	e.C.OK(e.C.T("loop.answered"))
+}
+
+// Done stops the activity indicator.
+func (e *PlanEvents) Done() {
+	if e.stop != nil {
+		e.stop()
+		e.stop = nil
 	}
 }

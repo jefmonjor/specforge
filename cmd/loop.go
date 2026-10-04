@@ -3,16 +3,19 @@ package cmd
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
 	"specforge/internal/adapters/fsys"
 	"specforge/internal/adapters/gates"
 	"specforge/internal/adapters/testrun"
+	"specforge/internal/adapters/vcs"
 	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/config"
+	"specforge/internal/domain/tdd"
 	"specforge/internal/ui"
 )
 
@@ -20,6 +23,8 @@ func (a *App) loopCommand() *cobra.Command {
 	var (
 		o               config.Overrides
 		resume, restart bool
+		scenario        int
+		from            string
 	)
 	c := &cobra.Command{
 		Use:   "loop [spec]",
@@ -42,6 +47,10 @@ The state is saved after every step: --resume continues where it stopped.`,
 			ctx := cmd.Context()
 			if resume && restart {
 				return errors.New("--resume and --restart exclude each other")
+			}
+			phase := tdd.Phase(strings.ToUpper(from))
+			if from != "" && scenario == 0 {
+				return errors.New("--from needs --scenario")
 			}
 			p, err := a.openProject(o, true)
 			if err != nil {
@@ -74,6 +83,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Workspace: workspace.New(proc),
 				Files:     files,
 				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
+				VCS:       vcs.New(proc),
 				Events:    events,
 				Log:       a.log,
 				Now:       a.Now,
@@ -85,6 +95,10 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Language:     p.settings.Language,
 				Resume:       resume,
 				Restart:      restart,
+				Scenario:     scenario,
+				From:         phase,
+				Review:       p.settings.Review,
+				Commit:       p.settings.Commit,
 				MaxAttempts:  p.settings.MaxAttempts,
 				AgentTimeout: p.settings.AgentTimeout,
 				TestTimeout:  p.settings.TestTimeout,
@@ -101,6 +115,10 @@ The state is saved after every step: --resume continues where it stopped.`,
 	f.StringVar(&o.Model, "model", "", "model passed to the agent")
 	f.StringVar(&o.Stack, "stack", "", "go | maven | gradle | node | python (default: specforge.yaml or detected)")
 	f.BoolVar(&o.Strict, "strict", false, "a quality gate that cannot run blocks instead of warning")
+	f.IntVar(&scenario, "scenario", 0, "redo this scenario number (keeps the others)")
+	f.StringVar(&from, "from", "", "with --scenario: start at red | green | refactor (default red)")
+	f.StringVar(&o.Review, "review", "", "scenario: review each finished scenario | off (default: specforge.yaml, else scenario)")
+	f.BoolVar(&o.NoCommit, "no-commit", false, "do not record each finished scenario as a commit")
 	return c
 }
 

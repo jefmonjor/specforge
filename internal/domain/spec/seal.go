@@ -67,6 +67,15 @@ func Seal(content string) (sealed, hash string) {
 	return norm + "\n\n<!-- seal: " + SealV1 + ":" + hash + " -->\n", hash
 }
 
+// StripSeal returns content without its seal line, if it has one.
+func StripSeal(content string) string {
+	body, _, ok := splitSeal(content)
+	if !ok {
+		return content
+	}
+	return strings.TrimRight(body, " \t\r\n") + "\n"
+}
+
 // Verify checks that content matches its own seal. It returns ErrNotSealed
 // or a *TamperedError.
 func Verify(content string) error {

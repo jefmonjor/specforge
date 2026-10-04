@@ -50,9 +50,10 @@ type fakeVCS struct {
 	err   error
 }
 
-func (v fakeVCS) DefaultBase(context.Context, string) (string, error)  { return "main", nil }
-func (v fakeVCS) Diff(context.Context, string, string) (string, error) { return v.diff, v.err }
-func (v fakeVCS) Files(context.Context, string) ([]string, error)      { return v.files, v.err }
+func (v fakeVCS) DefaultBase(context.Context, string) (string, error)              { return "main", nil }
+func (v fakeVCS) Diff(context.Context, string, string) (string, error)             { return v.diff, v.err }
+func (v fakeVCS) Files(context.Context, string) ([]string, error)                  { return v.files, v.err }
+func (v fakeVCS) Commit(context.Context, string, string, []string) (string, error) { return "", nil }
 
 type prompter struct {
 	answer string

@@ -194,6 +194,8 @@ func ProjectConfig(lang string, p *stack.Profile) string {
 		stackLine,
 		"# agent: claude         # claude | gemini; usually each developer's choice (`specforge init`)",
 		"# max_attempts: 3       # GREEN attempts per scenario",
+		"# review: scenario      # scenario: you review each finished scenario | off",
+		"# commit: true          # one commit per finished scenario",
 		"# timeouts:",
 		"#   agent: 20m",
 		"#   tests: 10m",

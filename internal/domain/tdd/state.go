@@ -4,6 +4,7 @@
 package tdd
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -31,6 +32,10 @@ type ScenarioRef struct {
 	// Satisfied marks a scenario the developer accepted as already
 	// implemented when its test passed during RED.
 	Satisfied bool `json:"satisfied,omitempty"`
+	// Files and Commit trace a finished scenario: what changed for it and
+	// the commit that recorded it ("" when nothing was committed).
+	Files  []string `json:"files,omitempty"`
+	Commit string   `json:"commit,omitempty"`
 }
 
 // Checkpoint records one completed step for the audit trail.
@@ -53,6 +58,8 @@ const (
 	// PendingVerify: SpecForge asked while verifying the agent's work.
 	// The resumed step verifies again without calling the agent.
 	PendingVerify PendingKind = "verify"
+	// PendingReview: the developer's review of a finished scenario.
+	PendingReview PendingKind = "review"
 )
 
 // Pending is an interrupted step. The baselines are the files as they were
@@ -105,6 +112,9 @@ type State struct {
 	TestHashes map[string]string `json:"test_hashes,omitempty"`
 	// FilesWritten lists files changed while working on the current scenario.
 	FilesWritten []string `json:"files_written,omitempty"`
+	// ReviewNote is what the reviewer asked for when sending the scenario
+	// back; the next prompt carries it.
+	ReviewNote string `json:"review_note,omitempty"`
 	// Pending is the step a question interrupted when nobody could answer
 	// it. --resume answers it first and continues that same step.
 	Pending     *Pending     `json:"pending,omitempty"`
@@ -144,6 +154,8 @@ func (s *State) Carry(old *State, now time.Time) []string {
 		if prev, ok := done[s.Scenarios[i].Fingerprint]; ok {
 			s.Scenarios[i].Done = true
 			s.Scenarios[i].Satisfied = prev.Satisfied
+			s.Scenarios[i].Files = prev.Files
+			s.Scenarios[i].Commit = prev.Commit
 			continue
 		}
 		pending = append(pending, s.Scenarios[i].Title)
@@ -175,6 +187,7 @@ func (s *State) Scenario() (ScenarioRef, bool) {
 func (s *State) Advance(now time.Time) {
 	s.Attempts = 0
 	s.Pending = nil
+	s.ReviewNote = ""
 	switch s.Phase {
 	case PhaseRed:
 		s.Phase = PhaseGreen
@@ -200,6 +213,51 @@ func (s *State) MarkSatisfied(now time.Time) {
 	s.UpdatedAt = now
 }
 
+// SendBack returns the current scenario to RED or GREEN after a review, with
+// the reviewer's note for the next prompt. Going back to RED drops the test
+// fingerprints: the test itself is what has to change.
+func (s *State) SendBack(phase Phase, note string, now time.Time) {
+	s.Phase = phase
+	s.Attempts = 0
+	s.Pending = nil
+	s.ReviewNote = note
+	s.LastFailure = ""
+	if phase == PhaseRed {
+		s.TestHashes = nil
+	}
+	s.UpdatedAt = now
+}
+
+// Jump moves to scenario index (1-based) at phase, for a developer who
+// wants to redo part of the loop. The scenario is no longer done; the
+// others keep their state.
+func (s *State) Jump(index int, phase Phase, now time.Time) error {
+	if index < 1 || index > len(s.Scenarios) {
+		return fmt.Errorf("there is no scenario %d (the specification has %d)", index, len(s.Scenarios))
+	}
+	switch phase {
+	case PhaseRed, PhaseGreen, PhaseRefactor:
+	default:
+		return fmt.Errorf("cannot start a scenario at %q: use red, green or refactor", phase)
+	}
+	s.Current = index - 1
+	s.Scenarios[s.Current].Done = false
+	s.Scenarios[s.Current].Satisfied = false
+	s.Scenarios[s.Current].Commit = ""
+	s.Scenarios[s.Current].Files = nil
+	s.Phase = phase
+	s.Attempts = 0
+	s.Pending = nil
+	s.ReviewNote = ""
+	s.LastFailure = ""
+	s.FilesWritten = nil
+	if phase == PhaseRed {
+		s.TestHashes = nil
+	}
+	s.UpdatedAt = now
+	return nil
+}
+
 func (s *State) nextScenario() {
 	s.Scenarios[s.Current].Done = true
 	s.seek()
@@ -208,6 +266,7 @@ func (s *State) nextScenario() {
 // seek moves to RED of the first scenario not done yet, or to COMPLETED.
 func (s *State) seek() {
 	s.LastFailure = ""
+	s.ReviewNote = ""
 	s.TestHashes = nil
 	s.FilesWritten = nil
 	s.Attempts = 0

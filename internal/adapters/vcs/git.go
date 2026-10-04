@@ -75,6 +75,44 @@ func (g *Git) Files(ctx context.Context, root string) ([]string, error) {
 	return files, nil
 }
 
+// Commit implements ports.VCS. Paths are literal pathspecs after "--", so
+// a file name can be neither an option nor a glob.
+func (g *Git) Commit(ctx context.Context, root, message string, paths []string) (string, error) {
+	if len(paths) == 0 {
+		return "", nil
+	}
+	if res, err := g.git(ctx, root, "rev-parse", "--is-inside-work-tree"); err != nil {
+		return "", err
+	} else if !res.Success() {
+		return "", ports.ErrNotARepository
+	}
+	add := append([]string{"--literal-pathspecs", "add", "-A", "--"}, paths...)
+	if res, err := g.git(ctx, root, add...); err != nil {
+		return "", err
+	} else if !res.Success() {
+		return "", fmt.Errorf("git add: %s", res.Combined())
+	}
+	diff := append([]string{"--literal-pathspecs", "diff", "--cached", "--quiet", "--"}, paths...)
+	res, err := g.git(ctx, root, diff...)
+	if err != nil {
+		return "", err
+	}
+	if res.Success() {
+		return "", nil // nothing to record
+	}
+	commit := append([]string{"--literal-pathspecs", "commit", "--quiet", "-m", message, "--only", "--"}, paths...)
+	if res, err := g.git(ctx, root, commit...); err != nil {
+		return "", err
+	} else if !res.Success() {
+		return "", fmt.Errorf("git commit: %s", res.Combined())
+	}
+	head, err := g.git(ctx, root, "rev-parse", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(head.Stdout), nil
+}
+
 func (g *Git) isCommit(ctx context.Context, root, ref string) (bool, error) {
 	res, err := g.git(ctx, root, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
 	if err != nil {

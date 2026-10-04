@@ -14,9 +14,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/conversation"
 	"specforge/internal/app/layout"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/spec"
@@ -31,8 +33,13 @@ var (
 	ErrLoopInProgress = errors.New("a loop for this specification is in progress: continue it with --resume or start over with --restart")
 	// ErrNothingToResume: --resume without saved state.
 	ErrNothingToResume = errors.New("there is no saved loop for this specification to resume")
+	// ErrPlanNotApproved: plan.md exists but is a draft or changed since
+	// its approval. Without plan.md the loop runs from the specification.
+	ErrPlanNotApproved = errors.New("the plan is not approved: review specs/<spec>/plan.md and run `specforge plan approve <spec>`")
+	// ErrPlanOutdated: the approved plan does not place every scenario.
+	ErrPlanOutdated = errors.New("the plan does not place every scenario of the specification: update it with `specforge plan <spec>` and approve it again")
 	// ErrTooManyQuestions: the agent keeps asking within one phase.
-	ErrTooManyQuestions = errors.New("the agent asked too many questions in a single phase; the specification probably needs clarification")
+	ErrTooManyQuestions = conversation.ErrTooManyQuestions
 )
 
 // GatesError reports quality gates that still block after the agent's
@@ -58,9 +65,11 @@ type Deps struct {
 	Workspace ports.Workspace
 	Files     ports.Files
 	Asker     *clarify.Asker
-	Events    Events
-	Log       *slog.Logger
-	Now       func() time.Time
+	// VCS records each finished scenario as a commit; nil disables it.
+	VCS    ports.VCS
+	Events Events
+	Log    *slog.Logger
+	Now    func() time.Time
 }
 
 // Options select the specification and tune the loop.
@@ -73,6 +82,16 @@ type Options struct {
 
 	Resume  bool
 	Restart bool
+	// Scenario and From redo part of the loop: scenario Scenario (1-based)
+	// starting at phase From (RED when empty).
+	Scenario int
+	From     tdd.Phase
+
+	// Review "scenario" asks the developer to review every finished
+	// scenario (gate R2); "off" skips it.
+	Review string
+	// Commit records every finished scenario as one commit.
+	Commit bool
 
 	MaxAttempts       int
 	MaxClarifications int
@@ -128,6 +147,7 @@ type run struct {
 	doc    *spec.Document
 	md     string
 	specID string
+	plan   string
 	st     *tdd.State
 }
 
@@ -140,8 +160,17 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 	if err := s.loadSpec(r); err != nil {
 		return nil, err
 	}
+	if r.o.Scenario > 0 && !r.o.Restart {
+		// Redoing a scenario continues the saved loop when there is one.
+		r.o.Resume = s.d.Files.Exists(r.lay.State(r.o.SpecPath))
+	}
 	if err := s.loadState(r); err != nil {
 		return nil, err
+	}
+	if r.o.Scenario > 0 {
+		if err := s.jump(r); err != nil {
+			return nil, err
+		}
 	}
 	s.d.Events.Started(r.st, r.doc)
 
@@ -186,6 +215,32 @@ func (s *Service) loadSpec(r *run) error {
 		return err
 	}
 	r.doc = doc
+	return s.loadPlan(r)
+}
+
+// loadPlan reads plan.md when there is one. A plan must be approved and
+// must place every scenario: the developer reviewed it for a reason.
+func (s *Service) loadPlan(r *run) error {
+	path := r.lay.Plan(r.o.SpecPath)
+	if !s.d.Files.Exists(path) {
+		return nil
+	}
+	data, err := s.d.Files.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("reading the plan: %w", err)
+	}
+	content := string(data)
+	if err := spec.Verify(content); err != nil {
+		return fmt.Errorf("%w (%w)", ErrPlanNotApproved, err)
+	}
+	markers := make([]string, len(r.doc.Scenarios))
+	for i, sc := range r.doc.Scenarios {
+		markers[i] = spec.Marker(r.specID, sc.Index)
+	}
+	if issues := spec.Blocking(spec.LintPlan(content, markers)); len(issues) > 0 {
+		return fmt.Errorf("%w: %s", ErrPlanOutdated, issues[0].Message)
+	}
+	r.plan = strings.TrimSpace(spec.StripSeal(content))
 	return nil
 }
 
@@ -229,6 +284,27 @@ func (s *Service) loadState(r *run) error {
 		r.st = saved
 		return nil
 	}
+}
+
+// jump moves to the scenario and phase the developer asked for. Starting
+// after RED takes the current test files as the reviewed ones.
+func (s *Service) jump(r *run) error {
+	from := r.o.From
+	if from == "" {
+		from = tdd.PhaseRed
+	}
+	if err := r.st.Jump(r.o.Scenario, from, s.d.Now()); err != nil {
+		return err
+	}
+	if from != tdd.PhaseRed {
+		hashes, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
+		if err != nil {
+			return err
+		}
+		r.st.TestHashes = hashes
+	}
+	r.st.Record("jump", "requested", fmt.Sprintf("scenario %d from %s", r.o.Scenario, from), s.d.Now())
+	return s.save(r)
 }
 
 var errNoState = errors.New("no state")

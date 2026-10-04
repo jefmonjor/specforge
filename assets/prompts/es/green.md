@@ -18,15 +18,6 @@ Trabajas sobre la especificación **{{.SpecTitle}}** (`{{.SpecPath}}`) en un pro
 4. Si el escenario deja una regla de negocio sin definir, pregunta (`needs_clarification`) en lugar de decidir por el desarrollador.
 
 SpecForge ejecutará `{{.TestCommand}}` y espera que pase.
-{{if .Answer}}
-## Tu pregunta tiene respuesta
-Preguntaste: {{.AnsweredQuestion}}
-El desarrollador respondió: **{{.Answer}}**
-Queda en el registro de decisiones. Continúa la tarea con ella.
-{{end}}
-{{if .Feedback}}
-## Tu intento anterior ({{.Attempt}} de {{.MaxAttempts}}) fue rechazado
-{{.Feedback}}
-{{end}}
+{{template "turn" .}}
 {{- template "context" .}}
 {{- template "contract" .}}

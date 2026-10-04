@@ -14,16 +14,7 @@ Trabajas sobre la especificación **{{.SpecTitle}}** (`{{.SpecPath}}`) en un pro
 5. No modifiques ningún otro test.
 
 SpecForge ejecutará `{{.TestCommand}}` y espera que falle en tu aserción.
-{{if .Answer}}
-## Tu pregunta tiene respuesta
-Preguntaste: {{.AnsweredQuestion}}
-El desarrollador respondió: **{{.Answer}}**
-Queda en el registro de decisiones. Continúa la tarea con ella.
-{{end}}
-{{if .Feedback}}
-## Tu intento anterior ({{.Attempt}} de {{.MaxAttempts}}) fue rechazado
-{{.Feedback}}
-{{end}}
+{{template "turn" .}}
 {{- if .LastFailure}}
 ### Salida de la ejecución anterior
 ```

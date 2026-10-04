@@ -20,3 +20,16 @@ Si no puedes continuar por algo que debe arreglar el desarrollador (una herramie
 
 SpecForge comprueba `files_written` contra los ficheros que realmente cambiaron. Nunca incluyas un fichero que no hayas escrito.
 {{end}}
+
+{{define "turn"}}
+{{if .Answer}}
+## Tu pregunta tiene respuesta
+Preguntaste: {{.AnsweredQuestion}}
+El desarrollador respondió: **{{.Answer}}**
+Queda en el registro de decisiones. Continúa la tarea con ella.
+{{end}}
+{{if .Feedback}}
+## Tu intento anterior ({{.Attempt}} de {{.MaxAttempts}}) fue rechazado
+{{.Feedback}}
+{{end}}
+{{end}}

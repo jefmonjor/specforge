@@ -10,6 +10,7 @@ import (
 	"specforge/internal/app/audit"
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/e2erun"
+	"specforge/internal/app/planning"
 	"specforge/internal/app/protocol"
 	"specforge/internal/app/specs"
 	"specforge/internal/app/tddloop"
@@ -61,6 +62,8 @@ func Diagnose(lang string, err error) Diagnosis {
 		lint     *specs.LintError
 		ambig    *specs.AmbiguousError
 		notFound *specs.NotFoundError
+		scope    *planning.ScopeError
+		partial  *planning.IncompleteError
 	)
 	switch {
 	case errors.Is(err, context.Canceled):
@@ -91,6 +94,8 @@ func Diagnose(lang string, err error) Diagnosis {
 		set(ExitSpec, "nospec")
 	case errors.Is(err, spec.ErrNoScenarios):
 		set(ExitSpec, "noscenarios")
+	case errors.Is(err, tddloop.ErrPlanNotApproved), errors.Is(err, tddloop.ErrPlanOutdated), errors.Is(err, specs.ErrNoPlan), errors.Is(err, specs.ErrPlanNeedsApprovedSpec):
+		set(ExitSpec, "plan")
 	case errors.Is(err, tddloop.ErrLoopInProgress), errors.Is(err, tddloop.ErrNothingToResume), errors.Is(err, tdd.ErrStateMismatch):
 		set(ExitSpec, "state")
 	case errors.Is(err, tdd.ErrPrematureGreen):
@@ -112,6 +117,8 @@ func Diagnose(lang string, err error) Diagnosis {
 		}
 	case errors.Is(err, protocol.ErrNoContract), errors.Is(err, tddloop.ErrTooManyQuestions):
 		set(ExitGate, "contract")
+	case errors.As(err, &scope), errors.As(err, &partial):
+		set(ExitGate, "plandraft")
 	case errors.As(err, &secBlock):
 		set(ExitGate, "security")
 		var lines []string
@@ -165,6 +172,10 @@ func init() {
 			"diag.notsealed.action":     "review it and run `specforge spec approve <spec>`",
 			"diag.openquestions.title":  "The specification has open questions",
 			"diag.openquestions.action": "resolve every [NEEDS CLARIFICATION] and approve the specification again",
+			"diag.plandraft.title":      "The plan draft was not accepted",
+			"diag.plandraft.action":     "check the files listed above, then run `specforge plan <spec>` again",
+			"diag.plan.title":           "The plan needs attention",
+			"diag.plan.action":          "draft it with `specforge plan <spec>`, review it, then `specforge plan approve <spec>`",
 			"diag.lint.title":           "The specification is not ready for approval",
 			"diag.lint.action":          "fix each line above (`specforge spec lint` shows the advice too) and approve again",
 			"diag.ambiguous.title":      "Which specification?",
@@ -212,6 +223,10 @@ func init() {
 			"diag.notsealed.action":     "revísala y ejecuta `specforge spec approve <spec>`",
 			"diag.openquestions.title":  "La especificación tiene preguntas abiertas",
 			"diag.openquestions.action": "resuelve cada [NEEDS CLARIFICATION] y vuelve a aprobar la especificación",
+			"diag.plandraft.title":      "El borrador del plan no se aceptó",
+			"diag.plandraft.action":     "revisa los ficheros de arriba y vuelve a lanzar `specforge plan <spec>`",
+			"diag.plan.title":           "El plan necesita atención",
+			"diag.plan.action":          "redáctalo con `specforge plan <spec>`, revísalo y después `specforge plan approve <spec>`",
 			"diag.lint.title":           "La especificación no está lista para aprobarse",
 			"diag.lint.action":          "corrige cada línea de arriba (`specforge spec lint` muestra también los consejos) y vuelve a aprobar",
 			"diag.ambiguous.title":      "¿Qué especificación?",

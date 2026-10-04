@@ -23,6 +23,11 @@ func T(lang, key string, args ...any) string {
 
 var messages = map[string]map[string]string{
 	"en": {
+		"plan.title":             "SpecForge · plan · %s",
+		"plan.written":           "plan written: %s",
+		"plan.next":              "next: review it (edit it freely), then `specforge plan approve %s`",
+		"plan.approved":          "%s approved by %s · seal %s",
+		"plan.already":           "%s is already approved and unchanged · seal %s",
 		"init.ask.agent":         "Which coding agent do you use?",
 		"init.ask.language":      "Language for prompts, templates and messages?",
 		"init.saved":             "configuration saved in %s",
@@ -65,6 +70,9 @@ var messages = map[string]map[string]string{
 		"loop.rejected":          "attempt rejected: %s",
 		"gate.line":              "%s · %s · %s",
 		"reject.no-contract":     "the agent did not end with the JSON status",
+		"reject.review-change":   "you asked for a change: %s · back to GREEN",
+		"reject.review-red":      "you sent the scenario back to RED",
+		"loop.committed":         "committed %s",
 		"reject.false-claim":     "the agent listed files it did not change: %s",
 		"reject.no-test":         "no test file changed",
 		"reject.no-marker":       "no changed test carries the marker %s",
@@ -88,6 +96,11 @@ var messages = map[string]map[string]string{
 		"e2e.passed":             "pass rate %.0f%% · report in %s",
 	},
 	"es": {
+		"plan.title":             "SpecForge · plan · %s",
+		"plan.written":           "plan escrito: %s",
+		"plan.next":              "siguiente: revísalo (puedes editarlo) y después `specforge plan approve %s`",
+		"plan.approved":          "%s aprobado por %s · sello %s",
+		"plan.already":           "%s ya estaba aprobado y sin cambios · sello %s",
 		"init.ask.agent":         "¿Qué agente de programación usas?",
 		"init.ask.language":      "¿Idioma de prompts, plantillas y mensajes?",
 		"init.saved":             "configuración guardada en %s",
@@ -130,6 +143,9 @@ var messages = map[string]map[string]string{
 		"loop.rejected":          "intento rechazado: %s",
 		"gate.line":              "%s · %s · %s",
 		"reject.no-contract":     "el agente no terminó con el JSON de estado",
+		"reject.review-change":   "pediste un cambio: %s · vuelve a GREEN",
+		"reject.review-red":      "devolviste el escenario a RED",
+		"loop.committed":         "commit %s",
 		"reject.false-claim":     "el agente listó ficheros que no cambió: %s",
 		"reject.no-test":         "no cambió ningún fichero de test",
 		"reject.no-marker":       "ningún test cambiado lleva el marcador %s",
