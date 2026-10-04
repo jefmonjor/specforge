@@ -54,6 +54,10 @@ func (p *Prompter) Ask(ctx context.Context, q ports.Question) (string, error) {
 		if n, err := strconv.Atoi(line); err == nil && n >= 1 && n <= len(q.Options) {
 			return q.Options[n-1], nil
 		}
+		if q.Strict && !matchesOption(line, q.Options) {
+			fmt.Fprintf(p.Err, "    %s\n", T(p.Lang, "ask.choose", len(q.Options)))
+			continue
+		}
 		return line, nil
 	}
 }
@@ -84,3 +88,12 @@ func (p *Prompter) readLine(ctx context.Context) (string, error) {
 }
 
 func indent(s string) string { return strings.ReplaceAll(strings.TrimSpace(s), "\n", "\n    ") }
+
+func matchesOption(answer string, options []string) bool {
+	for _, o := range options {
+		if strings.EqualFold(strings.TrimSpace(answer), o) {
+			return true
+		}
+	}
+	return false
+}

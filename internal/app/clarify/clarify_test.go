@@ -120,3 +120,21 @@ func TestEnglishQuestionsFileIsReadToo(t *testing.T) {
 		t.Fatalf("Ask = %q, %v", got, err)
 	}
 }
+
+func TestStrictQuestionIgnoresAnInvalidWrittenAnswer(t *testing.T) {
+	dir := t.TempDir()
+	o := origin(dir)
+	q := ports.Question{Text: "Already implemented?", Options: []string{"Yes", "No"}, Strict: true}
+	ci := asker(&fakePrompter{err: ports.ErrNonInteractive})
+	ci.Ask(context.Background(), o, q)
+	data, _ := fsys.OS{}.ReadFile(o.QuestionsFile)
+	fsys.OS{}.WriteFile(o.QuestionsFile, []byte(strings.Replace(string(data), "_pendiente de respuesta_", "Accept", 1)))
+	var pq *PendingQuestionError
+	if _, err := ci.Ask(context.Background(), o, q); !errors.As(err, &pq) {
+		t.Fatalf("an invalid answer must leave the question pending, got %v", err)
+	}
+	data, _ = fsys.OS{}.ReadFile(o.QuestionsFile)
+	if strings.Count(string(data), "Already implemented?") != 1 {
+		t.Fatalf("questions.md:\n%s", data)
+	}
+}

@@ -74,14 +74,18 @@ Scenario 2/2 · RED · An unknown code is refused (INV-01)
 ```mermaid
 flowchart LR
     N["spec new<br/>interview"] --> A{{"spec approve<br/>lint · approver · seal"}}
-    A --> R["🔴 RED<br/>agent writes the test"]
+    A --> P{{"plan · plan approve<br/>one test per scenario"}}
+    P --> R["🔴 RED<br/>agent writes the test"]
     R --> RV{"compiles, runs,<br/>fails on an assertion?"}
     RV -- "passes already" --> Q1["❓ asks you"]
     RV -- yes --> G["🟢 GREEN<br/>minimum code"]
     G --> GV{"tests untouched,<br/>scenario test passes?"}
     GV -- "no (error fed back, max 3)" --> G
     GV -- yes --> F["🔵 REFACTOR<br/>full suite + gates"]
-    F --> NX["next scenario"]
+    F --> V{"👀 your review"}
+    V -- "change" --> G
+    V -- "accept" --> CM["commit<br/>feat(SDD_…)"]
+    CM --> NX["next scenario"]
     R -. "needs_clarification" .-> Q2["❓ asks you<br/>decisions.md"]
     G -. "needs_clarification" .-> Q2
 ```
@@ -89,10 +93,13 @@ flowchart LR
 | Stage | What the agent does | What SpecForge verifies itself |
 | :--- | :--- | :--- |
 | **Spec** | Helps you fill a 12-section template in a conversation (`spec interview`). | `spec approve` refuses a `TODO`, an open question or a scenario without `When`/`Then`; records who approved; seals the content with SHA-256. The loop runs only an approved, unchanged spec. |
+| **Plan** | Drafts `plan.md`: components, one test per scenario, interfaces, risks. | Only `plan.md` may change; every scenario marker must be placed; you approve it (sealed) before the loop uses it. |
 | **🔴 Red** | Writes one test named with the scenario marker (`SDD_0001_003`). | The files it lists really changed; a test with the marker exists; the filtered run compiles, runs it and **fails on an assertion**. A test that passes too early goes to you. |
 | **🟢 Green** | Writes the minimum code. | The test files are byte-for-byte as RED left them (*tampering* stops the loop); the scenario's tests pass. Failures are fed back, up to 3 attempts. |
 | **🔵 Refactor** | Fixes the suite or the findings, only when something blocks. | The whole suite passes and no quality gate blocks. A gate whose tool is missing shows ⚠ *skipped*, never ✓. |
+| **👀 Review** | — | You accept the scenario, type what should change (back to GREEN) or send it back to RED. Then its files become one commit: `feat(SDD_0001_003): <title>`. |
 | **❓ Questions** | Answers `needs_clarification` instead of guessing, at any phase. | You answer once, at the terminal or in `questions.md`; the answer lands in `decisions.md` and in every later prompt. |
+| **📚 Lessons** | After a rejected attempt, writes the one-sentence rule that would have avoided it. | Kept in `specs/LESSONS.md` per stack, deduplicated, at most 30, shown in later prompts. |
 | **↩ Resume** | — | State saved atomically after every step. `--resume` re-checks the seal; an amended spec redoes only the scenarios whose text changed. |
 
 Test results come from each runner's machine-readable report (`go test -json`, Surefire/JUnit XML, Vitest and Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "failed on an assertion" are told apart.
@@ -103,8 +110,9 @@ Test results come from each runner's machine-readable report (`go test -json`, S
 | :---: | :--- | :--- |
 | 🧭 | `init` | Picks your agent and language, once per machine. No API keys, no PATH edits. |
 | 🏗️ | `setup` | Writes `specforge.yaml`, a managed block of rules and your stack's standard in `CLAUDE.md`/`GEMINI.md` (the rest of the file stays yours) and `.specforge/` in `.gitignore`. Never touches your code. |
-| 📝 | `spec new · interview · lint · approve · list` | The specification lifecycle: a numbered file from the template, a conversation with your agent to complete it, the lint, and the approval gate that seals it. |
-| 🔁 | `loop` | The Red → Green → Refactor line described above, with `--resume` and `--restart`. |
+| 📝 | `spec new · interview · clarify · lint · approve · list` | The specification lifecycle: a numbered file from the template, a conversation with your agent to complete it, open questions answered one by one and written back as decisions, the lint, and the approval gate that seals it and records what changed since the last approval. |
+| 🗺️ | `plan · plan approve` | The agent drafts where the code goes, with one planned test per scenario, and may write nothing but the plan. You review and approve it before any code exists; the loop follows it. |
+| 🔁 | `loop` | The Red → Green → Refactor line described above, then your review of each scenario and one commit per scenario. `--resume`, `--restart`, `--scenario N --from green`. |
 | 🛡 | `audit` | Adversarial security review of your branch: reconnaissance, a red-team hunter and a blue-team validator. Every answer must match a JSON schema, or the audit fails closed. Doubtful findings are questions for you. |
 | 🌐 | `e2e` | Verifies each scenario in a real Chrome, Chromium or Edge through [chromedp](https://github.com/chromedp/chromedp). The agent picks typed actions; SpecForge validates each one (known element, same origin) and checks each `Then` against evidence itself. A screenshot per step. |
 
@@ -127,8 +135,9 @@ specforge init                              # once per machine: agent and langua
 cd my-project && specforge setup            # once per repository
 specforge spec new "Password reset"         # specs/0001-password-reset.md
 specforge spec interview 0001               # complete it with your agent (or edit it by hand)
-specforge spec approve 0001                 # review gate: lint, approver, seal
-specforge loop 0001                         # Red → Green → Refactor; --resume after any stop
+specforge spec approve 0001                 # review gate R0: lint, approver, seal
+specforge plan 0001                         # where the code goes; then: specforge plan approve 0001
+specforge loop 0001                         # Red → Green → Refactor → your review → one commit per scenario
 specforge audit                             # security review of your branch
 specforge e2e 0001 --url http://localhost:3000
 ```
@@ -184,8 +193,8 @@ SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**
 - [x] Verified loop: real test reports, file snapshots, test fingerprints, response contract, questions with resume
 - [x] Specification lifecycle with lint, approval and a line-ending-proof seal
 - [x] Fail-closed audit and per-scenario browser verification
-- [ ] Plan step and per-scenario review with a commit per scenario
-- [ ] `spec clarify` and `spec amend` with deltas
+- [x] Plan step (R1) and per-scenario review (R2) with a commit per scenario
+- [x] `spec clarify`, approval history with scenario deltas, curated lessons
 - [ ] `deliver`: a delivery report and PR body traced from scenario to test to commit
 - [ ] Turn-based interview owned by SpecForge
 

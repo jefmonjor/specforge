@@ -117,7 +117,17 @@ func (e *LoopEvents) Satisfied(sc tdd.ScenarioRef) {
 
 func (e *LoopEvents) Finished(st *tdd.State) {
 	e.halt()
-	e.C.Title(e.C.T("loop.finished", len(st.Scenarios)))
+	satisfied := 0
+	for _, sc := range st.Scenarios {
+		if sc.Satisfied {
+			satisfied++
+		}
+	}
+	if satisfied == 0 {
+		e.C.Title(e.C.T("loop.finished", len(st.Scenarios)))
+		return
+	}
+	e.C.Title(e.C.T("loop.finished.satisfied", len(st.Scenarios), len(st.Scenarios)-satisfied, satisfied))
 }
 
 // AuditEvents prints the audit.

@@ -112,3 +112,16 @@ func TestConsoleQuiet(t *testing.T) {
 		t.Fatalf("quiet console wrote %q / %q", errOut.String(), out.String())
 	}
 }
+
+func TestStrictQuestionAsksAgain(t *testing.T) {
+	var errOut bytes.Buffer
+	p := &Prompter{In: strings.NewReader("Accept\n7\nyes: it exists\n"), Err: &errOut, Lang: "en", Interactive: true}
+	q := ports.Question{Text: "Already implemented?", Options: []string{"Yes: it exists", "No"}, Strict: true}
+	got, err := p.Ask(context.Background(), q)
+	if err != nil || got != "yes: it exists" {
+		t.Fatalf("got %q %v", got, err)
+	}
+	if strings.Count(errOut.String(), "type a number from 1 to 2") != 2 {
+		t.Fatalf("output:\n%s", errOut.String())
+	}
+}

@@ -7,27 +7,29 @@ SpecForge drives a coding agent ([Claude Code](https://docs.anthropic.com/en/doc
 - [3. Configure once: `init`](#3-configure-once-init)
 - [4. Prepare a repository: `setup`](#4-prepare-a-repository-setup)
 - [5. Specifications: `spec`](#5-specifications-spec)
-- [6. The loop: `loop`](#6-the-loop-loop)
-- [7. Questions instead of guesses](#7-questions-instead-of-guesses)
-- [8. Quality gates](#8-quality-gates)
-- [9. Security audit: `audit`](#9-security-audit-audit)
-- [10. Browser verification: `e2e`](#10-browser-verification-e2e)
-- [11. Configuration reference](#11-configuration-reference)
-- [12. Files SpecForge writes](#12-files-specforge-writes)
-- [13. Exit codes](#13-exit-codes)
-- [14. Troubleshooting](#14-troubleshooting)
-- [15. Architecture](#15-architecture)
+- [6. The plan: `plan`](#6-the-plan-plan)
+- [7. The loop: `loop`](#7-the-loop-loop)
+- [8. Questions instead of guesses](#8-questions-instead-of-guesses)
+- [9. Quality gates](#9-quality-gates)
+- [10. Security audit: `audit`](#10-security-audit-audit)
+- [11. Browser verification: `e2e`](#11-browser-verification-e2e)
+- [12. Configuration reference](#12-configuration-reference)
+- [13. Files SpecForge writes](#13-files-specforge-writes)
+- [14. Exit codes](#14-exit-codes)
+- [15. Troubleshooting](#15-troubleshooting)
+- [16. Architecture](#16-architecture)
 
 ## 1. How it works
 
 ```text
-spec new ─► interview / edit ─► lint ─► approve (R0: sealed) ─► loop ─► audit ─► e2e
-                                                                │
-                              per scenario:  RED ─► GREEN ─► REFACTOR
+spec new ─► interview / edit ─► clarify ─► approve (R0) ─► plan ─► plan approve (R1) ─► loop ─► audit ─► e2e
+                                                                                       │
+                                  per scenario:  RED ─► GREEN ─► REFACTOR ─► review (R2) ─► commit
 ```
 
 - A **specification** (`specs/NNNN-slug.md`) says *what* to build and *why*, with the acceptance criteria as Gherkin scenarios.
 - **Approval** is a human gate: it refuses while a `TODO` or an open question is left, records who approved and when, and seals the content with a SHA-256 hash. The loop only runs an approved, unchanged specification.
+- The **plan** says where the code goes, with one planned test per scenario. You review and approve it before any code exists; the loop follows it.
 - The **loop** takes one scenario at a time. The agent writes code; SpecForge runs the tests, compares the files on disk before and after each turn, fingerprints the test files after RED and runs the quality gates. Whatever the agent claims, SpecForge checks.
 - When the agent lacks information it **asks** (`needs_clarification`) instead of guessing. You answer once; the answer is recorded and reused.
 
@@ -83,6 +85,7 @@ The stack is detected from `go.mod`, `pom.xml`, `build.gradle(.kts)`, `package.j
 ```bash
 specforge spec new "Password reset"   # specs/0001-password-reset.md from the template
 specforge spec interview 0001         # complete it in a conversation with your agent
+specforge spec clarify 0001           # answer the open questions, one at a time
 specforge spec lint 0001              # what blocks approval, and advice
 specforge spec approve 0001           # review gate R0: lint, approver, seal
 specforge spec list                   # number, state, title
@@ -109,6 +112,10 @@ Scenarios go in a fenced ```` ```gherkin ```` block and are parsed by the offici
 
 `spec interview` opens your agent in your terminal with instructions to complete the file one question at a time, write each answer into the right section and record what you cannot answer yet as an open question. It never approves or seals. It needs an interactive terminal.
 
+### Clarify
+
+`spec clarify` asks every `[NEEDS CLARIFICATION]` and writes each answer in place of its question, as `- **Decided:** question → answer (date, name)`, so the specification itself says what was decided. Answers also go to `specs/NNNN-slug/decisions.md`. Without a terminal the questions go to `questions.md` (exit 5); answer them there and run `clarify` again.
+
 ### Approve
 
 `spec approve` lints, then records the approver (`--by`, else `git config user.name`, else a question) and the UTC time in the front matter, and appends the seal:
@@ -117,14 +124,31 @@ Scenarios go in a fenced ```` ```gherkin ```` block and are parsed by the offici
 <!-- seal: sha256-v1:9394d6452b3a… -->
 ```
 
-The hash ignores line endings and trailing spaces, so a Windows checkout verifies the same. Editing an approved specification makes it `changed`: the loop refuses it until you revert the edit or approve the new version on purpose. Specifications sealed by SpecForge 3 (`sha256:`) still verify.
+The hash ignores line endings and trailing spaces, so a Windows checkout verifies the same. Specifications sealed by SpecForge 3 (`sha256:`) still verify.
 
-## 6. The loop: `loop`
+**Changing an approved specification** is an edit plus a new approval. The edit makes it `changed` and the loop refuses it until you revert the edit or approve the new version on purpose. Every approval is appended to `specs/NNNN-slug/approvals.md` with the date, the approver, the seal and each scenario marked `ADDED`, `MODIFIED`, `UNCHANGED` or `REMOVED` compared with the previous approval. `approve` prints the changes, and the loop redoes only the scenarios whose text changed.
+
+## 6. The plan: `plan`
 
 ```bash
-specforge loop 0001             # start
-specforge loop --resume         # continue after a stop, a question or Ctrl-C
-specforge loop 0001 --restart   # discard the saved state and start over
+specforge plan 0001            # the agent drafts specs/0001-password-reset/plan.md
+specforge plan approve 0001    # review gate R1: lint, approver, seal
+```
+
+`plan` asks your agent where the code goes before any code exists: the approach, one line per file to create or change, a table with **one planned test per scenario** (by marker), the interfaces the domain needs and the risks. It shows the agent the approved specification and the list of project files. The agent may only write `plan.md`: SpecForge rejects a draft that changes any other file, and sends it back (up to `max_attempts`) while a scenario has no planned test. When an architectural choice is not settled, the agent asks.
+
+Read the plan and edit it as you like, then approve it: approval checks that every scenario marker is there and no `TODO` is left, records you and seals the file. Running `plan` again revises the current draft instead of starting over.
+
+The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario (an amended specification with a new scenario needs the plan updated and approved again), and every prompt carries it.
+
+## 7. The loop: `loop`
+
+```bash
+specforge loop 0001                          # start
+specforge loop --resume                      # continue after a stop, a question or Ctrl-C
+specforge loop 0001 --restart                # discard the saved state and start over
+specforge loop 0001 --scenario 3 --from green  # redo one scenario from a phase
+specforge loop 0001 --review off --no-commit   # no per-scenario review, no commits
 ```
 
 For each scenario, in order:
@@ -134,12 +158,20 @@ For each scenario, in order:
 | **RED** | Writes the test for this scenario, named with its marker (`SDD_0001_003`), plus the stubs it needs to compile. | A test file carrying the marker changed; the files the agent lists really changed; the filtered test run compiles, runs at least one test and fails. A test that passes before any implementation is reported to you: either the behaviour exists already (mark the scenario satisfied) or the test is wrong. |
 | **GREEN** | Writes the minimum code. | The test files are byte-for-byte as RED left them (else the loop stops: *test tampering*); the marker's tests pass. Failures are fed back, up to `max_attempts` (default 3). |
 | **REFACTOR** | Only called when something blocks: fixes the full suite or the gate findings without touching tests. | The whole suite passes and no gate blocks. |
+| **REVIEW** (R2) | — | You review the finished scenario: the files it changed and the gates. **Accept**, type **what should change** (back to GREEN with your note; the tests stay) or send it **back to RED** (the test does not express the scenario). Without a terminal the review is a question in `questions.md` (exit 5). `review: off` skips it. |
+| **COMMIT** | — | The scenario's files, with the decisions log, are recorded as one commit, `feat(SDD_0001_003): <title>`, and nothing else you have staged is touched. Hooks and signing run as usual. Off with `commit: false` or `--no-commit`; skipped outside git. |
+
+When a test with the scenario's marker already exists (an earlier run stopped before RED was accepted, or you wrote it yourself), RED runs it before calling the agent: a test that compiles and fails is accepted as it is, a passing test goes to you as above, and one that does not compile goes to the agent with the output. A scenario you mark as already satisfied is committed as `test(SDD_…)` with its test.
+
+`--scenario N --from red|green|refactor` reopens one scenario and keeps the others as they are. Starting after RED takes the current test files as the reference for the tampering check.
+
+When a phase needed more than one attempt, the agent may add a one-sentence `lesson` to its answer: the rule that would have avoided the mistake. SpecForge keeps it in `specs/LESSONS.md`, tagged with the stack, without duplicates and at most 30, and every later prompt for that stack shows them. The file is yours to edit.
 
 The loop state is saved after every step in `.specforge/state/<spec>.json` (written atomically). `--resume` re-reads the specification and checks the seal first. If the specification was approved again with changes, the scenarios whose text did not change keep their progress and the rest are redone. A finished loop is reported, not redone; `--restart` runs it again on purpose.
 
 Test commands used for the marker filter: `go test -json -run`, Maven `-Dtest`, Gradle `--tests`, `vitest run -t`, `jest -t`, `pytest -k`. Results are read from the runner's machine-readable report (test2json, Surefire/JUnit XML, Vitest/Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "an assertion failed" are told apart. With plain `npm test` the filter is not exact and SpecForge asks you to confirm the RED.
 
-## 7. Questions instead of guesses
+## 8. Questions instead of guesses
 
 Every prompt ends with a response contract. The agent answers `done` (with the files it wrote), `needs_clarification` (a question, optional choices, context) or `blocked` (a reason and a suggested action). Prose without the contract gets one retry, then the step stops: prose never counts as success.
 
@@ -153,7 +185,7 @@ Every prompt ends with a response contract. The agent answers `done` (with the f
 
 The managed block in `CLAUDE.md`/`GEMINI.md` carries the same rule: if anything needed is not in the specification, the decisions log, the code or the prompt, do not assume it.
 
-## 8. Quality gates
+## 9. Quality gates
 
 REFACTOR runs the gates that apply to the stack. Each reads its tool's machine-readable report and compares a number with a threshold. A tool that is missing or crashes is **skipped**, shown with ⚠, never as a pass; with `quality.strict: true` (or `--strict`) a skipped gate blocks. Node tools run with `npx --no-install`: nothing is downloaded during the loop.
 
@@ -164,7 +196,7 @@ REFACTOR runs the gates that apply to the stack. Each reads its tool's machine-r
 | Dead code | — | Knip | — | — |
 | Mutation (`min_mutation_score`, default 80) | — | Stryker, when configured | — | — |
 
-## 9. Security audit: `audit`
+## 10. Security audit: `audit`
 
 ```bash
 specforge audit                    # your changes since origin/main, origin/master, main or master
@@ -176,7 +208,7 @@ Three passes run with your agent over each chunk of code: **reconnaissance**, a 
 
 The base ref is validated as a commit and passed after `--end-of-options`, so it can never be read as a git option. Reports go to `docs/security/` (`REPORT.md`, `report.json`) with owner-only permissions.
 
-## 10. Browser verification: `e2e`
+## 11. Browser verification: `e2e`
 
 ```bash
 specforge e2e 0001 --url http://localhost:3000
@@ -187,7 +219,7 @@ specforge e2e 0001 --url http://localhost:3000 --scenario 2 --headed
 
 Each step saves a screenshot. Results go to `docs/e2e/<spec>/` (`report.json`, `REPORT.md`, `scenario-NN/step-MM.png`). The command exits with code 2 when the pass rate is below `--min-pass-rate` (default 100). `--insecure` accepts invalid TLS certificates for local test servers; it is off by default. Only approved specifications run.
 
-## 11. Configuration reference
+## 12. Configuration reference
 
 Values resolve in this order: command-line flag, then `specforge.yaml`, then your user configuration, then the default.
 
@@ -197,7 +229,9 @@ language: en            # es | en
 stack: go               # go | maven | gradle | node | python (detected when unset)
 agent: claude           # usually each developer's choice
 model: ""               # passed to the agent; empty uses its default
-max_attempts: 3         # GREEN attempts per scenario
+max_attempts: 3         # attempts per phase
+review: scenario        # scenario: review every finished scenario (R2) | off
+commit: true            # one commit per finished scenario
 timeouts:
   agent: 20m
   tests: 10m
@@ -211,14 +245,17 @@ Unknown keys are an error, so a typo never silently leaves a default in place.
 
 Global flags: `--verbose` (progress details and the agent's live output), `--debug` (debug records in the log), `--trace-io` (every prompt and answer in the log), `--quiet` (only warnings, errors and data), `--non-interactive` (never ask: write questions to a file and exit 5).
 
-## 12. Files SpecForge writes
+## 13. Files SpecForge writes
 
 | Path | Committed | Content |
 | :--- | :---: | :--- |
 | `specforge.yaml` | yes | Project settings. |
 | `CLAUDE.md`, `GEMINI.md` | yes | Your content plus the managed block. |
 | `specs/NNNN-slug.md` | yes | The specification, its front matter and its seal. |
+| `specs/NNNN-slug/plan.md` | yes | The technical plan, its front matter and its seal. |
+| `specs/NNNN-slug/approvals.md` | yes | Every approval with its scenario changes. |
 | `specs/NNNN-slug/decisions.md` | yes | Every question the agent asked and your answer. |
+| `specs/LESSONS.md` | yes | Lessons the agent wrote after a rejected attempt. |
 | `specs/NNNN-slug/questions.md` | yes | Questions asked when nobody was at the terminal. |
 | `docs/security/` | your choice | Audit reports (owner-only permissions). |
 | `docs/e2e/<spec>/` | your choice | E2E reports and screenshots. |
@@ -226,7 +263,7 @@ Global flags: `--verbose` (progress details and the agent's live output), `--deb
 
 The log file lives in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux), rotated, with owner-only permissions.
 
-## 13. Exit codes
+## 14. Exit codes
 
 | Code | Meaning |
 | :---: | :--- |
@@ -240,7 +277,7 @@ The log file lives in your user cache directory (`~/.cache/specforge/logs/specfo
 
 Every failure prints what happened, why and what to do next.
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 - **What did the agent receive and answer?** Re-run with `--trace-io` and read the log file.
 - **The agent claims files it did not write.** The attempt is rejected and the agent is told which ones; that is the loop working. Repeated rejections exhaust `max_attempts` (exit 2).
@@ -248,7 +285,7 @@ Every failure prints what happened, why and what to do next.
 - **The loop says the specification changed.** Revert the edit, or review it and run `specforge spec approve` again; unchanged scenarios keep their progress.
 - **A gate shows ⚠ skipped.** Install the tool, or accept the warning; `--strict` makes it block.
 
-## 15. Architecture
+## 16. Architecture
 
 SpecForge follows the architecture it asks of your code: the domain is pure, use cases depend on small ports, adapters do the I/O and `cmd/` only wires them.
 
@@ -257,12 +294,15 @@ cmd/                      CLI and composition root (cobra); signals → context;
 internal/
   domain/                 pure: no I/O
     spec/                 Gherkin parsing (official parser), seal, lint, front matter, open questions
+    lessons/              the curated lessons list
     tdd/                  loop state, test outcomes, typed errors
     stack/                stack detection, test commands, test-file rules
     quality/ security/ e2e/
   app/                    use cases
-    tddloop/              Red → Green → Refactor with verification
-    specs/ setup/         specification lifecycle, repository setup
+    tddloop/              Red → Green → Refactor with verification, review and commit
+    specs/ planning/      specification lifecycle and approvals; drafting the plan
+    conversation/         one agent turn under the response contract
+    setup/                repository setup
     audit/ e2erun/        security audit, browser verification
     clarify/ protocol/    questions to the developer, the agent response contract
     prompts/ layout/      prompt templates, project paths

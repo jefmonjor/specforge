@@ -98,3 +98,21 @@ func TestJumpRedoesOneScenarioFromGreen(t *testing.T) {
 		t.Fatal("an unknown scenario must fail")
 	}
 }
+
+func TestASatisfiedScenarioCommitsItsTest(t *testing.T) {
+	h := newHarness(t, specBody)
+	vcs := reviewed(h)
+	h.agent.turns = []reply{writes(map[string]string{test1: testFor("SDD_0001_001")})}
+	h.tests.outcomes = []tdd.Outcome{green()}
+	h.prompter.answers = []string{"Yes: mark the scenario as already satisfied"}
+	_, err := h.run(func(o *Options) { o.Commit = true })
+	if err == nil || !strings.Contains(err.Error(), "unexpected agent call") {
+		t.Fatalf("want the script to end at scenario 2, got %v", err)
+	}
+	if len(vcs.commits) != 1 || !strings.HasPrefix(vcs.commits[0][0], "test(SDD_0001_001): Request a link") || vcs.commits[0][1] != test1 {
+		t.Fatalf("commits = %v", vcs.commits)
+	}
+	if st := h.state(t); !st.Scenarios[0].Satisfied || st.Scenarios[0].Commit == "" {
+		t.Fatalf("scenario %+v", st.Scenarios[0])
+	}
+}

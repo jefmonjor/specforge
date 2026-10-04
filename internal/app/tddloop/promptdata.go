@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"specforge/internal/app/prompts"
+	"specforge/internal/domain/lessons"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 )
@@ -48,7 +49,7 @@ func (s *Service) lessons(r *run) string {
 	if err != nil {
 		return ""
 	}
-	text := strings.TrimSpace(string(data))
+	text := lessons.For(string(data), string(r.o.Profile.Kind))
 	if len(text) > maxLessonsBytes {
 		text = text[len(text)-maxLessonsBytes:]
 	}

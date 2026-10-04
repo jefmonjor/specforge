@@ -43,7 +43,7 @@ func (s *Service) close(ctx context.Context, r *run, sc tdd.ScenarioRef, gates s
 	}
 
 	files := slices.Sorted(slices.Values(r.st.FilesWritten))
-	sha, err := s.commit(ctx, r, sc, files)
+	sha, err := s.commit(ctx, r, sc, files, "feat")
 	if err != nil {
 		return err
 	}
@@ -80,14 +80,24 @@ func (s *Service) review(ctx context.Context, r *run, sc tdd.ScenarioRef, gates 
 	return tdd.PhaseGreen, strings.TrimSpace(answer), nil
 }
 
-// commit records the scenario's files. Committing is skipped when it is
-// off or the project is not a git repository.
-func (s *Service) commit(ctx context.Context, r *run, sc tdd.ScenarioRef, files []string) (string, error) {
+// commit records the scenario's files: kind "feat" for a scenario that went
+// through the loop, "test" for one that was already satisfied. Committing
+// is skipped when it is off or the project is not a git repository.
+func (s *Service) commit(ctx context.Context, r *run, sc tdd.ScenarioRef, files []string, kind string) (string, error) {
 	if !r.o.Commit || s.d.VCS == nil || len(files) == 0 {
 		return "", nil
 	}
-	msg := fmt.Sprintf("feat(%s): %s\n\nScenario %d of %s, verified by SpecForge (RED → GREEN → REFACTOR).",
-		sc.Marker, sc.Title, sc.Index, r.lay.Rel(r.o.SpecPath))
+	// The decisions and questions taken for the scenario travel with it.
+	for _, doc := range []string{r.lay.Decisions(r.o.SpecPath), r.lay.Questions(r.o.SpecPath)} {
+		if rel := r.lay.Rel(doc); s.d.Files.Exists(doc) && !slices.Contains(files, rel) {
+			files = append(files, rel)
+		}
+	}
+	how := "verified by SpecForge (RED → GREEN → REFACTOR)"
+	if kind == "test" {
+		how = "already satisfied: the test passed before any change, as the developer confirmed"
+	}
+	msg := fmt.Sprintf("%s(%s): %s\n\nScenario %d of %s, %s.", kind, sc.Marker, sc.Title, sc.Index, r.lay.Rel(r.o.SpecPath), how)
 	sha, err := s.d.VCS.Commit(ctx, r.o.Root, msg, files)
 	if errors.Is(err, ports.ErrNotARepository) {
 		return "", nil

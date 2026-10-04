@@ -727,18 +727,21 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 - [x] Eliminado el código v3 (dominio con I/O, adaptadores duplicados, ADC/GCP, PATH, Tekton, Nexus, `consistency`, `build`, `doc`, `ingest`, scaffolds con dependencias de banco). *(Adelantado de la Fase 3.)*
 - **Hecho:** tests de aplicación con agente y runner falsos cubren los casos de §14, incluido "el agente pregunta en cada fase y el runtime pausa"; `cmd` 79 %, total 80 %; ejecución real completa con Claude Code (2 escenarios, RED → GREEN → REFACTOR, exit 0).
 
-### Fase 2 — Spec clara, plan y revisión (3 semanas) · P2, P7, P4
+### Fase 2 — Spec clara, plan y revisión ✅ (PR #4) · P2, P7, P4
 
-- [ ] `internal/app` + composition root; `runLoop` → `tddloop.Service`; dominio sin I/O; borrar `LoopState`/`StatePhase`/`BDDFeature`/`CalculateSHA256`/`MainframeConfigurator`.
-- [ ] Plantilla §6.4 y `spec lint`; `spec new` (NNNN); `spec approve` (R0); `interview` no sella; placeholders todos sustituidos; slug con acentos.
-- [ ] `plan` + R1; `PromptContext`; prompts como `text/template` en `{es,en}`; head+tail del error.
-- [ ] R2 por escenario con `--review`; commit por escenario; `--scenario k --from green`.
-- [ ] Sello unificado y normalizado (`sha256-v1:`), regex anclado; `--resume` revalida y diffea; `spec clarify`; `spec amend` con deltas.
-- [ ] Marcador en tests + ejecución filtrada; `trace`.
-- [ ] Lecciones escritas por el agente, dedupe, tope, scope; `lessons.md` versionado; glosario desde la spec; baselines por stack.
-- [ ] `DetectProject` con prioridad; `StackProfile` sustituye los 4 `switch`.
-- [ ] Errores centinela/tipados y `DiagnoseError` con `errors.Is`; sin `os.Exit` en `RunE`; `main` protegido; `main.go` sin reescritura de args.
-- **Hecho cuando:** el flujo `new → interview → clarify → lint → approve → plan → loop (R2) → amend → loop --resume` funciona en un repo Go de ejemplo, grabado. **Principios:** P2 (R0-R3 en el estado), P7 (lint verde, lecciones ≤ 30), P4 (`go list -deps ./internal/domain` sin `os`).
+- [x] `internal/app` + raíz de composición; dominio sin I/O; borrados `LoopState`/`StatePhase`/`BDDFeature`/`CalculateSHA256`/`MainframeConfigurator`. *(En PR #3.)*
+- [x] Plantilla §6.4 y `spec lint`; `spec new` (NNNN); `spec approve` (R0); `interview` no sella; slug con acentos. *(En PR #3.)*
+- [x] **`plan` + R1**: el agente solo puede escribir `plan.md` (cualquier otro fichero ⇒ rechazo); cada marcador de escenario debe tener test planificado; `plan approve` sella; el loop exige el plan aprobado si existe y lo inyecta en todos los prompts.
+- [x] Prompts `text/template` en `{es,en}` con bloques compartidos (`contract`, `context`, `turn`); error head+tail. Conversación con el agente extraída a `app/conversation` y compartida por loop y plan.
+- [x] **R2 por escenario** (`review: scenario | off`, `--review`): aceptar · escribir el cambio (vuelve a GREEN con la nota) · volver a RED. Sin terminal es una pregunta en `questions.md` (exit 5) que se responde ahí.
+- [x] **Commit por escenario** `feat(SDD_NNNN_KKK): título` solo con sus ficheros (pathspec literal, `--only`, respeta hooks y firma); `commit: false` / `--no-commit`; ficheros y commit quedan en el estado para la traza.
+- [x] `--scenario k --from red|green|refactor`.
+- [x] Sello unificado `sha256-v1` normalizado y anclado; `--resume` revalida y conserva los escenarios sin cambios. *(En PR #3.)*
+- [x] **`spec clarify`**: pregunta cada `[NEEDS CLARIFICATION]` y escribe `- **Decided:** pregunta → respuesta (fecha, quién)` en su lugar; también en `decisions.md`.
+- [x] **Enmiendas** = editar + `spec approve` de nuevo: `approvals.md` registra cada aprobación con su delta ADDED/MODIFIED/UNCHANGED/REMOVED y el loop rehace solo lo cambiado. *Decisión: sin comando `spec amend` aparte (P6, menos superficie).*
+- [x] **Lecciones** escritas por el agente (`lesson` en el contrato) solo tras un intento rechazado; `specs/LESSONS.md` versionado, por stack, sin duplicados, tope 30; se inyectan las del stack actual.
+- [x] Glosario e invariantes desde la propia spec. *(En PR #3.)*
+- **Hecho:** ejecución real con Claude Code de `plan` (plan mínimo, un test por escenario, riesgo de redondeo señalado en vez de inventado) y del loop con R2 en terminal y un commit por escenario; tests de aplicación y de CLI para cada rama (cambio, vuelta a RED, salto, lección, clarify, delta).
 
 ### Fase 3 — Entrega y recorte (2 semanas) · P8, P6
 
@@ -899,6 +902,7 @@ gofmt -l . → 71 ficheros (CRLF)   →   0 tras PR #2
 | [#1](https://github.com/jefmonjor/specforge/pull/1) | README rediseñado + este plan | — | Abierta |
 | [#2](https://github.com/jefmonjor/specforge/pull/2) | Higiene y red de seguridad | 0 | Abierta · fusionar **antes** que cualquier otra |
 | #3 | Núcleo verificable, CLI nueva y recorte del código v3 | 1 | Abierta, apilada sobre #2 |
+| #4 | Plan (R1), revisión (R2), commit por escenario, clarify, historial de aprobaciones, lecciones | 2 | Abierta, apilada sobre #3 |
 
 ---
 

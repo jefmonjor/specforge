@@ -1,6 +1,7 @@
 package specs
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,8 +10,10 @@ import (
 	"time"
 
 	"specforge/internal/adapters/fsys"
+	"specforge/internal/app/clarify"
 	"specforge/internal/app/layout"
 	"specforge/internal/domain/spec"
+	"specforge/internal/ports"
 )
 
 func newService(t *testing.T, lang string) (Service, string) {
@@ -177,5 +180,88 @@ func TestApproveRefusesBlockingIssues(t *testing.T) {
 	}
 	if _, err := s.Approve(e, " "); err == nil {
 		t.Fatal("an approval without a name must fail")
+	}
+}
+
+type answers []string
+
+func (a *answers) Ask(context.Context, ports.Question) (string, error) {
+	if len(*a) == 0 {
+		return "", ports.ErrNonInteractive
+	}
+	out := (*a)[0]
+	*a = (*a)[1:]
+	return out, nil
+}
+
+func TestClarifyWritesDecisionsInPlace(t *testing.T) {
+	s, root := newService(t, "en")
+	write(t, root, "specs/0001-reset.md", ready+"\n## 12. Open questions\n\n- [NEEDS CLARIFICATION]: Which channel?\n- [NEEDS CLARIFICATION]: How long is a link valid?\n")
+	e, _ := s.Resolve("1")
+	asker := &clarify.Asker{Prompter: &answers{"email"}, Files: fsys.OS{}, Lang: "en", Now: s.Now}
+
+	n, err := s.Clarify(context.Background(), e, asker, "Ana")
+	var pending *clarify.PendingQuestionError
+	if n != 1 || !errors.As(err, &pending) {
+		t.Fatalf("n=%d err=%v", n, err)
+	}
+	data, _ := os.ReadFile(e.Path)
+	if !strings.Contains(string(data), "- **Decided:** Which channel? → email (2026-10-04, Ana)") {
+		t.Fatalf("spec:\n%s", data)
+	}
+	if qs := spec.OpenQuestions(string(data)); len(qs) != 1 {
+		t.Fatalf("open: %v", qs)
+	}
+	if q, _ := os.ReadFile(filepath.Join(root, "specs/0001-reset/questions.md")); !strings.Contains(string(q), "How long is a link valid?") {
+		t.Fatalf("questions.md:\n%s", q)
+	}
+
+	// The second question is answered in questions.md.
+	qpath := filepath.Join(root, "specs/0001-reset/questions.md")
+	q, _ := os.ReadFile(qpath)
+	os.WriteFile(qpath, []byte(strings.Replace(string(q), "_awaiting an answer_", "30 minutes", 1)), 0o644)
+	if n, err := s.Clarify(context.Background(), e, asker, "Ana"); n != 1 || err != nil {
+		t.Fatalf("second run n=%d err=%v", n, err)
+	}
+	if _, err := s.Approve(e, "Ana"); err != nil {
+		t.Fatalf("a clarified spec approves: %v", err)
+	}
+}
+
+func TestApprovalHistoryRecordsTheDelta(t *testing.T) {
+	s, root := newService(t, "en")
+	write(t, root, "specs/0001-reset.md", ready)
+	e, _ := s.Resolve("1")
+	a, err := s.Approve(e, "Ana")
+	if err != nil || len(a.Delta) != 1 || a.Delta[0].Change != Added {
+		t.Fatalf("first approval %+v %v", a.Delta, err)
+	}
+
+	// Change the scenario's outcome and add one.
+	data, _ := os.ReadFile(e.Path)
+	edited := strings.Replace(string(data), "Then a link is sent", "Then a link is emailed\n\n  Scenario: Expired\n    When it is opened late\n    Then it fails", 1)
+	write(t, root, "specs/0001-reset.md", edited)
+	a, err = s.Approve(e, "Luis")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]Change{}
+	for _, c := range a.Delta {
+		got[c.Title] = c.Change
+	}
+	if got["Link"] != Modified || got["Expired"] != Added || len(got) != 2 {
+		t.Fatalf("delta %+v", a.Delta)
+	}
+	log, _ := os.ReadFile(filepath.Join(root, "specs/0001-reset/approvals.md"))
+	if strings.Count(string(log), "### ") != 2 || !strings.Contains(string(log), "· Luis · sha256-v1:") || !strings.Contains(string(log), "- MODIFIED · 1 · Link · `") {
+		t.Fatalf("approvals.md:\n%s", log)
+	}
+}
+
+func TestDeltaRemoved(t *testing.T) {
+	doc, _ := spec.Parse("```gherkin\nFeature: F\n  Scenario: B\n    When x\n    Then y\n```\n", spec.ParseOptions{})
+	d := Delta([]ScenarioChange{{Title: "A", Fingerprint: "000000000000"}}, doc)
+	if len(d) != 2 || d[0].Change != Added || d[1].Change != Removed || d[1].Title != "A" {
+		t.Fatalf("delta %+v", d)
 	}
 }

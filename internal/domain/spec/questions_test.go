@@ -2,6 +2,7 @@ package spec
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -34,5 +35,22 @@ La IA no avanzará mientras quede algún [NEEDS CLARIFICATION] abierto.
 func TestOpenQuestionsEmpty(t *testing.T) {
 	if got := OpenQuestions("# Spec\n\n## Cuestiones abiertas\n\nNinguna.\n"); len(got) != 0 {
 		t.Fatalf("want none, got %q", got)
+	}
+}
+
+func TestResolveQuestion(t *testing.T) {
+	md := "## 12. Open questions\n\n```\n- [NEEDS CLARIFICATION]: Which channel?\n```\n  - [NEEDS CLARIFICATION]: Which channel?\n- [NEEDS CLARIFICATION]: Expiry?\n"
+	out, ok := ResolveQuestion(md, "Which channel?", "email", "2026-10-04, Ana")
+	if !ok {
+		t.Fatal("not resolved")
+	}
+	if !strings.Contains(out, "  - **Decided:** Which channel? → email (2026-10-04, Ana)") || !strings.Contains(out, "```\n- [NEEDS CLARIFICATION]: Which channel?\n```") {
+		t.Fatalf("got:\n%s", out)
+	}
+	if qs := OpenQuestions(out); len(qs) != 1 || qs[0] != "Expiry?" {
+		t.Fatalf("open questions left: %v", qs)
+	}
+	if _, ok := ResolveQuestion(md, "Unknown?", "x", ""); ok {
+		t.Fatal("an unknown question must not resolve")
 	}
 }

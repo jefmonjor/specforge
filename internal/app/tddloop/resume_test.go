@@ -92,3 +92,30 @@ func TestAPrematureGreenWithoutTerminalIsDecidedOnResume(t *testing.T) {
 		t.Fatalf("agent calls = %d, want 3", len(h.agent.prompts))
 	}
 }
+
+func TestAnExistingTestIsCheckedBeforeCallingTheAgent(t *testing.T) {
+	t.Run("valid RED is accepted as it is", func(t *testing.T) {
+		h := newHarness(t, specBody)
+		h.p.write(test1, testFor("SDD_0001_001"))
+		h.agent.turns = []reply{writes(map[string]string{"reset.go": "package m\n"})}
+		h.tests.outcomes = []tdd.Outcome{red(1), green()}
+		_, err := h.run()
+		if err == nil || !strings.Contains(err.Error(), "unexpected test run") {
+			t.Fatalf("want the script to end in REFACTOR, got %v", err)
+		}
+		if !strings.Contains(h.agent.prompts[0], "# Task: GREEN") || h.events.accepted[0] != tdd.PhaseRed {
+			t.Fatalf("the first agent call must be GREEN: %v", h.events.accepted)
+		}
+	})
+	t.Run("passing test goes to the developer", func(t *testing.T) {
+		h := newHarness(t, specBody)
+		h.p.write(test1, testFor("SDD_0001_001"))
+		h.agent.turns = happyScenario("SDD_0001_002", test2, "expiry.go")
+		h.tests.outcomes = []tdd.Outcome{green(), red(1), green(), green()}
+		h.prompter.answers = []string{"Yes: mark the scenario as already satisfied"}
+		st, err := h.run()
+		if err != nil || !st.Scenarios[0].Satisfied || len(h.agent.prompts) != 2 {
+			t.Fatalf("err=%v state=%+v calls=%d", err, st, len(h.agent.prompts))
+		}
+	})
+}

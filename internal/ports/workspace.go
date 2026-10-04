@@ -46,8 +46,11 @@ type Question struct {
 	Text string
 	// Context explains where it comes from (phase, scenario).
 	Context string
-	// Options, when set, are numbered choices; free text is still accepted.
+	// Options, when set, are numbered choices; free text is still accepted
+	// unless Strict is set.
 	Options []string
+	// Strict accepts only one of Options: anything else is asked again.
+	Strict bool
 }
 
 // Prompter asks the developer a question and returns the answer.

@@ -35,6 +35,9 @@ type Response struct {
 	Status       Status   `json:"status"`
 	FilesWritten []string `json:"files_written,omitempty"`
 	Summary      string   `json:"summary,omitempty"`
+	// Lesson is the rule that would have avoided a rejected attempt, in
+	// one sentence. SpecForge keeps it in specs/LESSONS.md.
+	Lesson string `json:"lesson,omitempty"`
 
 	Question string   `json:"question,omitempty"`
 	Options  []string `json:"options,omitempty"`

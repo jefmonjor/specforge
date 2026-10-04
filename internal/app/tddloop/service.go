@@ -148,6 +148,8 @@ type run struct {
 	md     string
 	specID string
 	plan   string
+	// lesson is the latest lesson the agent offered in this phase.
+	lesson string
 	st     *tdd.State
 }
 

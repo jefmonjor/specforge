@@ -7,6 +7,7 @@ Cuando hayas terminado la tarea:
 ```json
 {"status": "done", "files_written": ["ruta/relativa/de/cada/fichero/que/cambiaste"], "summary": "una frase"}
 ```
+Si esta tarea necesitó más de un intento, añade `"lesson"`: una frase con la regla que habría evitado el error. Se guarda en `specs/LESSONS.md` y aparece en prompts posteriores, así que hazla general, no sobre este escenario.
 
 Si algo que necesitas no está en la especificación, en el registro de decisiones, en el código existente o en este prompt, **no lo supongas**. Una suposición errónea cuesta más que una pregunta. Responde en su lugar con:
 ```json

@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"specforge/internal/adapters/fsys"
+	"specforge/internal/app/clarify"
 	"specforge/internal/app/prompts"
 	"specforge/internal/app/specs"
 	"specforge/internal/config"
@@ -22,13 +24,17 @@ func (a *App) specCommand() *cobra.Command {
 		Long: `A specification lives in specs/NNNN-slug.md. It says what to build and why,
 with the acceptance criteria as Gherkin scenarios. Its lifecycle:
 
-  new → interview (or edit by hand) → lint → approve → loop
+  new → interview (or edit by hand) → clarify → lint → approve → loop
+
+To change an approved specification, edit it and approve it again: the
+approval history (specs/NNNN-slug/approvals.md) records which scenarios were
+added, modified or removed, and the loop redoes only those.
 
 approve is the review gate: it refuses while a TODO or an open question is
 left, records who approved it and seals the content. The loop only runs an
 approved, unchanged specification.`,
 	}
-	c.AddCommand(a.specNewCommand(), a.specListCommand(), a.specLintCommand(), a.specApproveCommand(), a.specInterviewCommand())
+	c.AddCommand(a.specNewCommand(), a.specListCommand(), a.specLintCommand(), a.specClarifyCommand(), a.specApproveCommand(), a.specInterviewCommand())
 	return c
 }
 
@@ -154,6 +160,13 @@ question. Approving an edited specification again accepts the change.`,
 					con.Warn(con.T("spec.resealed", e.Rel))
 				}
 				con.OK(con.T("spec.approved", e.Rel, approver, short(res.Hash)))
+				if res.Resealed {
+					for _, c := range res.Delta {
+						if c.Change != specs.Unchanged {
+							con.Detail(string(c.Change) + " · " + c.Title)
+						}
+					}
+				}
 				a.printAdvice(res.Advice)
 			}
 			con.Info(con.T("spec.next.approved", e.ID))
@@ -161,6 +174,49 @@ question. Approving an edited specification again accepts the change.`,
 		},
 	}
 	c.Flags().StringVar(&by, "by", "", "name of the approver (default: git user.name)")
+	return c
+}
+
+func (a *App) specClarifyCommand() *cobra.Command {
+	var by string
+	c := &cobra.Command{
+		Use:   "clarify [spec]",
+		Short: "Answer the open questions of a specification, one at a time",
+		Long: `clarify asks every [NEEDS CLARIFICATION] of the specification and writes each
+answer in place of its question ("- **Decided:** question → answer"), so the
+specification says what was decided. The answers also go to the decisions
+log. Without a terminal the questions go to questions.md (exit 5): answer
+them there and run clarify again.`,
+		Example: "  specforge spec clarify 0001",
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			p, err := a.openProject(config.Overrides{}, false)
+			if err != nil {
+				return err
+			}
+			e, err := a.resolveSpec(ctx, p, argOrEmpty(args))
+			if err != nil {
+				return err
+			}
+			who := strings.TrimSpace(by)
+			if who == "" {
+				who, _ = a.gitUser(ctx, p.root)
+			}
+			asker := &clarify.Asker{Prompter: a.prompter(), Files: fsys.OS{}, Now: a.Now, Lang: p.settings.Language}
+			n, err := p.specs(a).Clarify(ctx, e, asker, who)
+			con := a.console()
+			if n > 0 {
+				con.OK(con.T("spec.clarified", n, e.Rel))
+			}
+			if err != nil {
+				return err
+			}
+			con.Info(con.T("spec.next.clarified", e.ID))
+			return nil
+		},
+	}
+	c.Flags().StringVar(&by, "by", "", "name recorded with each decision (default: git user.name)")
 	return c
 }
 
@@ -226,14 +282,22 @@ func (a *App) approver(ctx context.Context, root, by string) (string, error) {
 	if by = strings.TrimSpace(by); by != "" {
 		return by, nil
 	}
-	res, err := a.NewProcess(a.log).Run(ctx, ports.Command{Name: "git", Args: []string{"config", "user.name"}, Dir: root})
-	if err == nil && res.Success() && strings.TrimSpace(res.Stdout) != "" {
-		return strings.TrimSpace(res.Stdout), nil
+	if name, ok := a.gitUser(ctx, root); ok {
+		return name, nil
 	}
 	if !a.canAsk() {
 		return "", errors.New("who approves? pass --by \"<name>\" or set git user.name")
 	}
 	return a.prompter().Ask(ctx, ports.Question{Text: a.console().T("ask.approver")})
+}
+
+// gitUser returns git's user.name for the project, if set.
+func (a *App) gitUser(ctx context.Context, root string) (string, bool) {
+	res, err := a.NewProcess(a.log).Run(ctx, ports.Command{Name: "git", Args: []string{"config", "user.name"}, Dir: root})
+	if err != nil || !res.Success() || strings.TrimSpace(res.Stdout) == "" {
+		return "", false
+	}
+	return strings.TrimSpace(res.Stdout), true
 }
 
 func (a *App) printAdvice(issues []spec.Issue) {

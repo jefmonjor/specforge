@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -103,10 +104,14 @@ func (a *Asker) lookup(o Origin, q ports.Question) (answer string, pending bool)
 			pending = true
 			continue
 		}
-		answer, pending = v, false
 		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= len(q.Options) {
-			answer = q.Options[n-1]
+			v = q.Options[n-1]
 		}
+		if q.Strict && !slices.ContainsFunc(q.Options, func(o string) bool { return strings.EqualFold(o, v) }) {
+			pending = true // not one of the options: still unanswered
+			continue
+		}
+		answer, pending = v, false
 	}
 	return answer, pending
 }

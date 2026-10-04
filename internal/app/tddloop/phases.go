@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/prompts"
+	"specforge/internal/domain/lessons"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/ports"
@@ -19,6 +21,13 @@ import (
 func (s *Service) red(ctx context.Context, r *run) error {
 	sc, _ := r.st.Scenario()
 	fb := ""
+	if r.st.PendingFor() == nil && r.st.ReviewNote == "" {
+		done, feedback, err := s.existingRed(ctx, r, sc)
+		if err != nil || done {
+			return err
+		}
+		fb = feedback
+	}
 	for {
 		if r.st.Attempts >= r.o.MaxAttempts {
 			return fmt.Errorf("%w (RED, scenario %d)", tdd.ErrAttemptsExhausted, sc.Index)
@@ -90,7 +99,7 @@ func (s *Service) red(ctx context.Context, r *run) error {
 			fb = s.reject(r, RejectNothingRan, sc.Marker, out.Output)
 			continue
 		case tdd.RedPremature:
-			accepted, stricter, err := s.decidePremature(ctx, r, sc)
+			accepted, stricter, err := s.decidePremature(ctx, r, sc, t.Changed)
 			if err != nil {
 				s.pendVerify(r, sc, t, testsBefore, err)
 				return err
@@ -116,6 +125,9 @@ func (s *Service) red(ctx context.Context, r *run) error {
 		r.st.TestHashes = testsAfter
 		r.st.AddFiles(t.Changed...)
 		r.st.LastFailure = out.Output
+		if err := s.learn(r); err != nil {
+			return err
+		}
 		r.st.Record("red", "accepted", fmt.Sprintf("%d failing test(s)", out.Failed), s.d.Now())
 		s.d.Events.Accepted(tdd.PhaseRed, sc)
 		r.st.Advance(s.d.Now())
@@ -174,6 +186,9 @@ func (s *Service) green(ctx context.Context, r *run) error {
 			fb = s.reject(r, reason, "", out.Output)
 			continue
 		}
+		if err := s.learn(r); err != nil {
+			return err
+		}
 		r.st.Record("green", "accepted", fmt.Sprintf("%d passing test(s)", out.Passed), s.d.Now())
 		s.d.Events.Accepted(tdd.PhaseGreen, sc)
 		r.st.Advance(s.d.Now())
@@ -210,6 +225,9 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 			suiteFailure = suite.Output
 		}
 		if suiteFailure == "" && report.OK(r.o.Strict) {
+			if err := s.learn(r); err != nil {
+				return err
+			}
 			r.st.Record("refactor", "accepted", gateSummary(report), s.d.Now())
 			s.d.Events.Accepted(tdd.PhaseRefactor, sc)
 			return s.close(ctx, r, sc, gateSummary(report))
@@ -291,6 +309,9 @@ func (s *Service) agentStep(ctx context.Context, r *run, name prompts.Name, data
 		return turn{}, err
 	}
 	r.st.Pending = nil
+	if resp.Lesson != "" {
+		r.lesson = resp.Lesson
+	}
 	after, err := s.d.Workspace.Snapshot(ctx, r.o.Root)
 	if err != nil {
 		return turn{}, err
@@ -316,6 +337,27 @@ func (s *Service) answerPending(ctx context.Context, r *run, sc tdd.ScenarioRef)
 	r.st.Record("question", "answered", p.Question+" → "+answer, s.d.Now())
 	s.d.Events.Answered(p.Question, answer)
 	return p, s.save(r)
+}
+
+// learn keeps the agent's lesson when the phase needed more than one
+// attempt: that is when there was a mistake worth not repeating.
+func (s *Service) learn(r *run) error {
+	lesson := r.lesson
+	r.lesson = ""
+	if lesson == "" || r.st.Attempts == 0 {
+		return nil
+	}
+	path := r.lay.Lessons()
+	current := ""
+	if data, err := s.d.Files.ReadFile(path); err == nil {
+		current = string(data)
+	}
+	next, added := lessons.Add(current, lessons.Lesson{Stack: string(r.o.Profile.Kind), Text: lesson})
+	if !added {
+		return nil
+	}
+	r.st.Record("lesson", "kept", lesson, s.d.Now())
+	return s.d.Files.WriteFile(path, []byte(next))
 }
 
 // withAnswer adds the answer to a pending question to the prompt, with the
@@ -412,18 +454,70 @@ func (s *Service) anyContains(r *run, paths []string, needle string) bool {
 	return false
 }
 
+// existingRed handles a scenario whose test already exists, typically
+// written by a run that stopped before RED was accepted. The test is run
+// before the agent is called: a valid RED is accepted as it is, a passing
+// test goes to the developer, and anything else becomes feedback for the
+// agent. done is true when the phase is settled.
+func (s *Service) existingRed(ctx context.Context, r *run, sc tdd.ScenarioRef) (done bool, feedback string, err error) {
+	hashes, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
+	if err != nil {
+		return false, "", err
+	}
+	var withMarker []string
+	for path := range hashes {
+		withMarker = append(withMarker, path)
+	}
+	withMarker = slices.DeleteFunc(withMarker, func(p string) bool { return !s.anyContains(r, []string{p}, sc.Marker) })
+	if len(withMarker) == 0 {
+		return false, "", nil
+	}
+	slices.Sort(withMarker)
+	out, err := s.runTests(ctx, r, sc.Marker)
+	if err != nil || !out.Exact {
+		return false, "", err
+	}
+	switch out.Red() {
+	case tdd.RedValid:
+		r.st.TestHashes = hashes
+		r.st.AddFiles(withMarker...)
+		r.st.LastFailure = out.Output
+		r.st.Record("red", "accepted", "existing test "+strings.Join(withMarker, ", "), s.d.Now())
+		s.d.Events.Accepted(tdd.PhaseRed, sc)
+		r.st.Advance(s.d.Now())
+		return true, "", s.save(r)
+	case tdd.RedPremature:
+		// Unanswered, the question waits in questions.md; the next run
+		// comes back here and finds the answer there.
+		return s.decidePremature(ctx, r, sc, withMarker)
+	}
+	// It does not compile or nothing ran: the agent fixes it.
+	r.st.LastFailure = out.Output
+	return false, "", nil
+}
+
 // decidePremature asks the developer what a test that passes before any
 // implementation means. accepted is true when the scenario was closed.
-func (s *Service) decidePremature(ctx context.Context, r *run, sc tdd.ScenarioRef) (accepted bool, stricterFeedback string, err error) {
+func (s *Service) decidePremature(ctx context.Context, r *run, sc tdd.ScenarioRef, written []string) (accepted bool, stricterFeedback string, err error) {
 	q := question(r.o.Language, "premature")
-	answer, err := s.d.Asker.Ask(ctx, s.origin(r, sc), ports.Question{Text: fmt.Sprintf(q.text, sc.Index), Options: q.options})
+	answer, err := s.d.Asker.Ask(ctx, s.origin(r, sc), ports.Question{Text: fmt.Sprintf(q.text, sc.Index), Options: q.options, Strict: true})
 	if err != nil {
 		return false, "", fmt.Errorf("%w: %w", tdd.ErrPrematureGreen, err)
 	}
 	switch pick(answer, q.options) {
 	case 0:
+		// The test still documents the behaviour: record it like any scenario.
+		r.st.AddFiles(written...)
+		files := slices.Sorted(slices.Values(r.st.FilesWritten))
+		sha, err := s.commit(ctx, r, sc, files, "test")
+		if err != nil {
+			return false, "", err
+		}
+		r.st.Scenarios[r.st.Current].Files = files
+		r.st.Scenarios[r.st.Current].Commit = sha
 		r.st.Record("red", "satisfied", "developer confirmed the behaviour already exists", s.d.Now())
 		s.d.Events.Satisfied(sc)
+		s.d.Events.Committed(sc, sha)
 		r.st.MarkSatisfied(s.d.Now())
 		return true, "", s.save(r)
 	case 1:

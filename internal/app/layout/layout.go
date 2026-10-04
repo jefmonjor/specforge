@@ -33,6 +33,11 @@ func (l Layout) Decisions(specPath string) string {
 	return filepath.Join(l.SpecDir(specPath), "decisions.md")
 }
 
+// Approvals is the history of a specification's approvals.
+func (l Layout) Approvals(specPath string) string {
+	return filepath.Join(l.SpecDir(specPath), "approvals.md")
+}
+
 // Plan is the technical plan of a specification.
 func (l Layout) Plan(specPath string) string {
 	return filepath.Join(l.SpecDir(specPath), "plan.md")

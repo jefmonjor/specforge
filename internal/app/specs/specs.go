@@ -292,15 +292,27 @@ type Approval struct {
 	Resealed bool
 	// Advice are the non-blocking lint issues.
 	Advice []spec.Issue
+	// Delta is how the scenarios changed since the previous approval
+	// (specifications only).
+	Delta []ScenarioChange
 }
 
 // Approve is the R0 review gate: the specification must lint clean, then
 // it records who approved it and when, and seals it. Approving an edited
 // specification again is how a developer accepts a change on purpose.
 func (s Service) Approve(e Entry, by string) (Approval, error) {
-	return s.approve(e.Path, e.Rel, by, func(content string) []spec.Issue {
+	a, err := s.approve(e.Path, e.Rel, by, func(content string) []spec.Issue {
 		return spec.Lint(content, spec.ParseOptions{Languages: []string{s.Language}})
 	})
+	if err != nil || a.Already {
+		return a, err
+	}
+	data, err := s.Files.ReadFile(e.Path)
+	if err != nil {
+		return a, err
+	}
+	a.Delta, err = s.recordApproval(e, string(data), strings.TrimSpace(by), a.Hash, s.Now())
+	return a, err
 }
 
 // ErrNoPlan reports a specification without plan.md.

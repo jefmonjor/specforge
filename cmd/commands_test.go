@@ -172,3 +172,22 @@ func TestAuditWithNoChanges(t *testing.T) {
 const readySpec = "# Password reset\n\n" +
 	"```gherkin\nFeature: Password reset\n\n" +
 	"  Scenario: Request a link\n    Given a registered user\n    When she asks for a reset\n    Then she gets a link\n```\n"
+
+func TestSpecClarifyThenApproveShowsTheDelta(t *testing.T) {
+	h := newHarness(t)
+	h.write("specs/0001-reset.md", readySpec+"\n- [NEEDS CLARIFICATION]: Which channel?\n")
+	h.expect(0, "init", "--agent", "claude", "--language", "en")
+	h.expect(5, "spec", "clarify", "--by", "Ana")
+	h.tty, h.stdin = true, "email\n"
+	h.expect(0, "spec", "clarify", "--by", "Ana")
+	if !strings.Contains(h.read("specs/0001-reset.md"), "**Decided:** Which channel? → email") {
+		t.Fatalf("spec:\n%s", h.read("specs/0001-reset.md"))
+	}
+	h.tty = false
+	h.expect(0, "spec", "approve", "--by", "Ana")
+	h.write("specs/0001-reset.md", strings.Replace(h.read("specs/0001-reset.md"), "she gets a link", "she gets an email", 1))
+	h.expect(0, "spec", "approve", "--by", "Ana")
+	if !strings.Contains(h.err.String(), "MODIFIED · Request a link") {
+		t.Fatalf("stderr:\n%s", h.err)
+	}
+}

@@ -7,6 +7,7 @@ When you finished the task:
 ```json
 {"status": "done", "files_written": ["relative/path/of/each/file/you/changed"], "summary": "one sentence"}
 ```
+If this task needed more than one attempt, add `"lesson"`: one sentence with the rule that would have avoided the mistake. It is kept in `specs/LESSONS.md` and shown in later prompts, so make it general, not about this scenario.
 
 If anything you need is not in the specification, the decisions log, the existing code or this prompt, **do not assume it**. A wrong guess costs more than a question. Reply instead with:
 ```json
