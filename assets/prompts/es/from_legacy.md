@@ -14,7 +14,8 @@ La especificación recoge el comportamiento **tal como es hoy**, para poder prob
    - la sección 8 enumera los errores con los mensajes que el código legacy muestra de verdad.
 3. Añade una última sección, `## 13. Fuentes legacy`, con una línea por regla o escenario y el código del que sale: `- INV-01: \`ruta/A.java:40-52\``. Las rutas son relativas a `{{.Legacy}}`. **SpecForge abre cada cita**: un fichero que no existe o una línea más allá de su final devuelve la especificación.
 4. Lo que el código hace y no sabes explicar, o que parece un error (una regla aplicada en un sitio y no en otro, un número mágico, código muerto), va a la sección 12 como `- [NEEDS CLARIFICATION]: <pregunta>` con su fuente. **No lo decidas tú nunca**: el desarrollador lo responde antes de aprobar, y puede decidir mantener o corregir el comportamiento.
-5. Deja fuera lo que es de la plataforma y no del negocio (fontanería de servlets, pools de conexiones, logging): de eso se encarga el plan de la reescritura.
+5. Quédate dentro de esta capacidad. Lo que el mapa de capacidades enumera como otra capacidad (la ejecución que llama a esta, el padrón que lee) queda fuera de alcance aunque lo toque el mismo código: nómbralo en la sección 10 y deja sus reglas, escenarios y preguntas a su propia especificación.
+6. Deja fuera lo que es de la plataforma y no del negocio (fontanería de servlets, pools de conexiones, logging): de eso se encarga el plan de la reescritura.
 
 No cambies ningún fichero aparte de `{{.SpecPath}}`.
 

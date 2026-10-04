@@ -13,6 +13,7 @@
 <p align="center">
   <a href="#-see-it-say-no">Demo</a> ·
   <a href="#-how-it-works">How it works</a> ·
+  <a href="#-rewriting-a-legacy-system">Legacy rewrites</a> ·
   <a href="#-quickstart">Quickstart</a> ·
   <a href="#-commands">Commands</a> ·
   <a href="USER_GUIDE.md">User guide</a>
@@ -104,12 +105,35 @@ flowchart LR
 
 Test results come from each runner's machine-readable report (`go test -json`, Surefire/JUnit XML, Vitest and Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "failed on an assertion" are told apart.
 
+## 🏛 Rewriting a legacy system
+
+Moving a Java 6 servlet application to Java 21 is where agents invent the most: they "modernise" rules nobody asked to change and cite code that does not exist. SpecForge treats the legacy repository as **read-only evidence**. The agent reads it (`--add-dir` for Claude Code, `--include-directories` for Gemini CLI); SpecForge hashes it before and after every turn and refuses any change.
+
+```bash
+mkdir payroll && cd payroll && git init
+specforge setup --new java --legacy ../legacy-payroll   # Java 21 + JUnit + ArchUnit + PMD, migration in specforge.yaml
+specforge legacy scan                                    # docs/legacy/INVENTORY.md, measured, no agent
+specforge legacy map                                     # docs/legacy/CAPABILITIES.md: business capabilities, each rule cited
+specforge spec from-legacy "Net pay calculation"         # the behaviour as it is today, with its sources
+specforge spec clarify 0001                              # you decide every oddity the agent found
+specforge spec approve 0001 && specforge plan 0001 && specforge loop 0001
+```
+
+| Step | What SpecForge checks itself |
+| :--- | :--- |
+| **Inventory** | Build (Maven, Gradle, Ant), declared Java release (lowest wins), frameworks found **from imports**: Servlet, JSP, Struts, EJB, JPA, Hibernate, Spring, JDBC, JAX-RPC/WS, JAXB, JMS, Log4j 1, JUnit 3/4, `Vector`/`Hashtable`, `Date`/`Calendar`; and what each one means for Java 21. |
+| **Capability map** | Every `` `path:line` `` the agent cites is opened: a file that does not exist or a line past its end sends the map back. |
+| **Specification from legacy** | The same citation check, a mandatory `13. Legacy sources` section, the template lint, and one capability per specification. Whatever the code does that nobody can explain (a dead branch, a magic number, floating-point money) becomes an open question for you, never a guess. |
+| **Plan and loop** | The agent reads the cited sources to reproduce the behaviour, and the legacy repository must stay byte-for-byte unchanged. |
+| **Migration gate** | The build must declare the target release, and no Java source may import a forbidden package: by default the `javax.*` that Jakarta renamed, Log4j 1, JUnit 3, `Vector` and `Hashtable`. ArchUnit enforces the layers on every test run. |
+
 ## 🧰 Commands
 
 | | Command | What it gives you |
 | :---: | :--- | :--- |
 | 🧭 | `init` | Picks your agent and language, once per machine. No API keys, no PATH edits. |
-| 🏗️ | `setup` | Writes `specforge.yaml`, a managed block of rules and your stack's standard in `CLAUDE.md`/`GEMINI.md` (the rest of the file stays yours) and `.specforge/` in `.gitignore`. Never touches your code. |
+| 🏗️ | `setup` | Writes `specforge.yaml`, a managed block of rules and your stack's standard in `CLAUDE.md`/`GEMINI.md` (the rest of the file stays yours) and `.specforge/` in `.gitignore`. Never touches your code. `--new java\|react\|python\|go` starts an empty project with the tooling already wired. |
+| 🏛 | `legacy scan · legacy map · spec from-legacy` | The inventory of a legacy codebase, its capability map and one specification per capability, every source citation checked against the legacy code. |
 | 📝 | `spec new · interview · clarify · lint · approve · list` | The specification lifecycle: a numbered file from the template, an interview run by SpecForge that asks one question per turn and writes each answer into the file, open questions answered one by one and written back as decisions, the lint, and the approval gate that seals it and records what changed since the last approval. |
 | 🗺️ | `plan · plan approve` | The agent drafts where the code goes, with one planned test per scenario, and may write nothing but the plan. You review and approve it before any code exists; the loop follows it. |
 | 🔁 | `loop` | The Red → Green → Refactor line described above, then your review of each scenario and one commit per scenario. `--resume`, `--restart`, `--scenario N --from green`. |
@@ -152,14 +176,27 @@ specforge deliver 0001                      # DELIVERY.md, trace.json, PR_BODY.m
 
 ## 🧱 Quality gates by stack
 
-| Gate | Go | Node | Java | Python |
+| Gate | Go | Node / React | Java | Python |
 | :--- | :---: | :---: | :---: | :---: |
-| Lint | `golangci-lint`, else `go vet` | `npm run lint` | — | Ruff |
+| Lint | `golangci-lint`, else `go vet` | `npm run lint` (ESLint + `tsc`) | PMD (`maven-pmd-plugin`) | Ruff (from `.venv` first) |
 | Duplicate code (threshold, default 0 %) | jscpd | jscpd | jscpd | jscpd |
 | Dead code | — | Knip | — | — |
 | Mutation score (threshold, default 80) | — | Stryker | — | — |
+| Migration (release and forbidden imports) | — | — | when `migration:` is set | — |
+| Architecture | — | — | ArchUnit, in the test suite | — |
 
-Node tools run with `npx --no-install`: nothing is downloaded during the loop. Thresholds and `strict` mode live in `specforge.yaml`.
+Node tools run with `npx --no-install`: nothing is downloaded during the loop. Python runs the `.venv`'s pytest and Ruff when there is one; Maven and Gradle prefer `mvnw`/`gradlew`. Thresholds and `strict` mode live in `specforge.yaml`.
+
+### Starting from scratch: `setup --new`
+
+Every scaffold was installed and run end to end before shipping, with the versions it pins:
+
+| Stack | What you get |
+| :--- | :--- |
+| `java` | Java 21 Maven: JUnit 6, AssertJ, ArchUnit rules for a hexagonal layout and against Java EE leftovers, PMD |
+| `react` | Vite 7, React 19, TypeScript strict, Vitest 4.0 + Testing Library, ESLint, Knip, jscpd, Stryker |
+| `python` | `pyproject.toml` with a `src/` layout, pytest, Ruff (pycodestyle, pyflakes, isort, bugbear, pyupgrade, naming) |
+| `go` | `go.mod` and a `golangci-lint` v2 configuration |
 
 ## 📏 The CLI contract
 
@@ -174,12 +211,12 @@ SpecForge applies to itself the architecture it asks of your code: a pure domain
 ```text
 cmd/                  CLI and composition root: signals → context, errors → exit codes
 internal/
-  domain/             pure: spec (official Gherkin parser, seal, lint), tdd, stack, quality, security, e2e
-  app/                use cases: tddloop, specs, setup, audit, e2erun, clarify, protocol, prompts
+  domain/             pure: spec (official Gherkin parser, seal, lint), tdd, stack, quality, legacy, security, e2e
+  app/                use cases: tddloop, specs, planning, interview, migrate, scaffold, setup, audit, e2erun, deliver
   ports/              the interfaces the use cases need
   adapters/           agent CLI, process runner, test runners, gates, git, browser, files, logging
   config/ ui/         settings resolution; terminal output and diagnoses
-assets/               embedded prompts, rules, standards, audit method and templates (en, es)
+assets/               embedded prompts, rules, standards, audit method, templates and scaffolds (en, es)
 ```
 
 ```bash
@@ -190,7 +227,7 @@ make build    # version, commit and date injected with -ldflags
 
 ## 📍 Status & roadmap
 
-SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**. CI runs `gofmt`, `go vet`, `golangci-lint`, `go mod tidy`, the race detector with a 70 % coverage floor and builds for Linux, macOS and Windows.
+SpecForge 5 keeps the v4 core and its one rule, **verify, don't trust**, and brings back what v3 did well: legacy migration and ready-made projects. CI runs `gofmt`, `go vet`, `golangci-lint`, `go mod tidy`, the race detector with a 70 % coverage floor and builds for Linux, macOS and Windows.
 
 - [x] Verified loop: real test reports, file snapshots, test fingerprints, response contract, questions with resume
 - [x] Specification lifecycle with lint, approval and a line-ending-proof seal
@@ -199,7 +236,9 @@ SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**
 - [x] `spec clarify`, approval history with scenario deltas, curated lessons
 - [x] `deliver`: a delivery report and PR body traced from scenario to test to commit
 - [x] Turn-based interview owned by SpecForge, with a transcript and a lint-checked end
-- [ ] A published v4.0.0 release
+- [x] Legacy rewrites: inventory, capability map and specifications with verified sources; read-only legacy; migration gate
+- [x] Scaffolds for Java 21, React, Python and Go; PMD lint for Java; virtual environments and build wrappers
+- [ ] A published v5.0.0 release
 
 A full session with Claude Code, from an empty specification to the pull request body, is in [docs/DEMO.md](docs/DEMO.md). The plan, with the reasoning behind each item, is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 

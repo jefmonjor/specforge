@@ -14,7 +14,8 @@ The specification records the behaviour **as it is today**, so the new code can 
    - section 8 lists the errors with the messages the legacy code really shows.
 3. Add a last section, `## 13. Legacy sources`, with one line per rule or scenario and the code it comes from: `- INV-01: \`path/To.java:40-52\``. Paths are relative to `{{.Legacy}}`. **SpecForge opens every citation**: a file that does not exist or a line past its end sends the specification back.
 4. Whatever the code does that you cannot explain, or that looks like a bug (a rule applied in one place but not another, a magic number, dead code), goes to section 12 as `- [NEEDS CLARIFICATION]: <question>` with its source. **Never decide it yourself**: the developer answers those before approval, and may decide to keep or fix the behaviour.
-5. Leave out what belongs to the platform rather than to the business (servlet plumbing, connection pools, logging): the plan of the rewrite handles it.
+5. Stay inside this one capability. What the capability map lists as another capability (the run that calls this one, the roster it reads) is out of scope even when the same code touches it: name it in section 10 and leave its rules, scenarios and questions to its own specification.
+6. Leave out what belongs to the platform rather than to the business (servlet plumbing, connection pools, logging): the plan of the rewrite handles it.
 
 Change no file other than `{{.SpecPath}}`.
 

@@ -120,8 +120,9 @@ func Create(files ports.Files, root, kind string, d Data) ([]Change, error) {
 
 // target maps a template path to the project path: __PKG__ becomes the
 // Java package directory, __MODULE__ the Python module, and a .tmpl suffix
-// goes (go.mod is stored as go.mod.tmpl: Go does not embed a directory
-// holding a go.mod, which marks another module).
+// goes: Go files are stored as .go.tmpl so they are not compiled into
+// SpecForge, and go.mod as go.mod.tmpl because Go does not embed a
+// directory holding a go.mod, which marks another module.
 func target(rel string, d Data) string {
 	rel = strings.TrimSuffix(rel, ".tmpl")
 	rel = strings.ReplaceAll(rel, "__PKG__", strings.ReplaceAll(d.Package, ".", "/"))
