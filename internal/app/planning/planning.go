@@ -14,36 +14,22 @@ import (
 
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/conversation"
+	"specforge/internal/app/docturn"
 	"specforge/internal/app/layout"
 	"specforge/internal/app/prompts"
-	"specforge/internal/app/protocol"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
-	"specforge/internal/domain/tdd"
 	"specforge/internal/ports"
 )
 
 // maxTreeFiles bounds the file list shown to the agent.
 const maxTreeFiles = 400
 
-// ScopeError reports files the agent changed besides the plan.
-type ScopeError struct{ Files []string }
-
-func (e *ScopeError) Error() string {
-	return "the plan step may only write plan.md, but these files changed too: " + strings.Join(e.Files, ", ")
-}
-
-// IncompleteError reports a plan that still fails its lint after every
-// attempt.
-type IncompleteError struct{ Issues []spec.Issue }
-
-func (e *IncompleteError) Error() string {
-	var lines []string
-	for _, i := range e.Issues {
-		lines = append(lines, i.String())
-	}
-	return "the plan is incomplete: " + strings.Join(lines, "; ")
-}
+// ScopeError and IncompleteError are the errors of a document turn.
+type (
+	ScopeError      = docturn.ScopeError
+	IncompleteError = docturn.IncompleteError
+)
 
 // Events reports progress.
 type Events interface {
@@ -73,6 +59,11 @@ type Options struct {
 	Language, Model        string
 	AgentTimeout           time.Duration
 	MaxAttempts            int
+	// Legacy, JavaRelease and ForbiddenImports describe a rewrite: the
+	// agent reads the legacy code (never changes it) to plan the new one.
+	Legacy           string
+	JavaRelease      int
+	ForbiddenImports []string
 }
 
 // Draft writes the plan and returns its path. An existing plan is the
@@ -106,72 +97,52 @@ func Draft(ctx context.Context, d Deps, o Options) (string, error) {
 		SpecTitle: o.Doc.Title, SpecPath: lay.Rel(o.SpecPath), Stack: stackName,
 		Spec: o.SpecText, Tree: strings.Join(tree, "\n"), PlanPath: planRel, Markers: markers,
 		MaxAttempts: o.MaxAttempts,
+		Legacy:      o.Legacy, JavaRelease: o.JavaRelease, ForbiddenImports: o.ForbiddenImports,
 	}
-	_, err = d.Files.ReadFile(planPath)
-	revising := err == nil
-
-	feedback := ""
-	for attempt := 1; ; attempt++ {
-		data.Feedback, data.Attempt = feedback, attempt-1
-		data.Draft = ""
-		if current, err := d.Files.ReadFile(planPath); err == nil {
-			data.Draft = spec.StripSeal(string(current))
-		}
-		data.Decisions = d.Asker.Decisions(origin)
-		before, err := d.Workspace.Snapshot(ctx, o.Root)
-		if err != nil {
-			return "", err
-		}
-		render := func(t conversation.Turn) (string, error) {
+	if o.Legacy != "" {
+		data.LegacySources = spec.Section(o.SpecText, spec.LegacySourcesTitle)
+	}
+	job := docturn.Job{
+		Step:    "plan",
+		Root:    o.Root,
+		Origin:  origin,
+		Request: ports.AgentRequest{Dir: o.Root, Model: o.Model, Timeout: o.AgentTimeout, ReadDirs: docturn.Outside(o.Root, o.Legacy)},
+		Allowed: func(rel string) bool { return rel == planRel },
+		Render: func(feedback string, t conversation.Turn) (string, error) {
 			dd := data
-			if t.Retry {
-				dd.Feedback = "Your answer did not end with the JSON status object. Do the task again and end with the contract."
+			dd.Feedback = feedback
+			dd.Decisions = d.Asker.Decisions(origin)
+			dd.Draft = ""
+			if current, err := d.Files.ReadFile(planPath); err == nil {
+				dd.Draft = spec.StripSeal(string(current))
 			}
-			if t.Answer != "" {
-				dd.Decisions = d.Asker.Decisions(origin)
-				dd.AnsweredQuestion, dd.Answer = t.Question, t.Answer
-			}
+			dd.AnsweredQuestion, dd.Answer = t.Question, t.Answer
 			return prompts.Render(o.Language, prompts.Plan, dd)
-		}
-		resp, err := conversation.Talk(ctx, d.Agent, d.Asker, origin, 0,
-			ports.AgentRequest{Dir: o.Root, Model: o.Model, Timeout: o.AgentTimeout}, render,
-			conversation.Hooks{Working: d.Events.Working, Answered: func(q, a string) error { d.Events.Answered(q, a); return nil }})
-		if err != nil {
-			return "", err
-		}
-		if resp.Status == protocol.Blocked {
-			return "", &tdd.AgentBlockedError{Phase: "PLAN", Reason: resp.Reason, SuggestedAction: resp.SuggestedAction}
-		}
-		after, err := d.Workspace.Snapshot(ctx, o.Root)
-		if err != nil {
-			return "", err
-		}
-		changed := before.Changed(after)
-		if outside := slices.DeleteFunc(slices.Clone(changed), func(p string) bool { return p == planRel }); len(outside) > 0 {
-			return "", &ScopeError{Files: outside}
-		}
-
-		content, err := d.Files.ReadFile(planPath)
-		var issues []spec.Issue
-		switch {
-		case err != nil || (!slices.Contains(changed, planRel) && !revising):
-			issues = []spec.Issue{{Rule: spec.RulePlanMarker, Message: planRel + " was not written", Blocking: true}}
-		default:
-			issues = spec.Blocking(spec.LintPlan(string(content), markers))
-		}
-		if len(issues) == 0 {
-			return planPath, ensureFrontMatter(d.Files, planPath, string(content), o.SpecID)
-		}
-		if attempt >= o.MaxAttempts {
-			return "", &IncompleteError{Issues: issues}
-		}
-		var lines []string
-		for _, i := range issues {
-			lines = append(lines, "- "+i.String())
-		}
-		feedback = "The plan is not complete yet:\n" + strings.Join(lines, "\n")
-		d.Events.Rejected(strings.Join(lines, "; "))
+		},
+		Check: func() ([]string, error) {
+			content, err := d.Files.ReadFile(planPath)
+			if err != nil {
+				return []string{planRel + " was not written"}, nil
+			}
+			var problems []string
+			for _, i := range spec.Blocking(spec.LintPlan(string(content), markers)) {
+				problems = append(problems, i.String())
+			}
+			return problems, nil
+		},
+		MaxAttempts: o.MaxAttempts,
+		Hooks:       conversation.Hooks{Working: d.Events.Working, Answered: func(q, a string) error { d.Events.Answered(q, a); return nil }},
+		Rejected:    func(p []string) { d.Events.Rejected(strings.Join(p, "; ")) },
 	}
+	deps := docturn.Deps{Agent: d.Agent, Workspace: d.Workspace, Asker: d.Asker}
+	if err := docturn.Run(ctx, deps, job); err != nil {
+		return "", err
+	}
+	content, err := d.Files.ReadFile(planPath)
+	if err != nil {
+		return "", err
+	}
+	return planPath, ensureFrontMatter(d.Files, planPath, string(content), o.SpecID)
 }
 
 // ensureFrontMatter gives the plan the same lifecycle fields as a

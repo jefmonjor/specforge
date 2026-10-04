@@ -1,4 +1,13 @@
 {{define "context"}}
+{{- if and .Legacy (not .Inventory)}}
+## Legacy code (read-only reference)
+This is a rewrite: the behaviour comes from the legacy code at `{{.Legacy}}`, and the specification's legacy sources say where. Read those sources to reproduce the behaviour exactly, never change a file there, and do not carry over its technology{{if .JavaRelease}}: the new code targets Java {{.JavaRelease}} and uses its idioms (records, `java.time`, `List.of`, try-with-resources, `var` where it reads better){{end}}.{{if .ForbiddenImports}} SpecForge rejects any import of {{range $i, $p := .ForbiddenImports}}{{if $i}}, {{end}}`{{$p}}`{{end}}.{{end}}
+{{- if .LegacySources}}
+
+### Where this behaviour comes from
+{{.LegacySources}}
+{{- end}}
+{{end}}
 {{- if .Plan}}
 ## Approved technical plan (follow it; ask before departing from it)
 {{.Plan}}

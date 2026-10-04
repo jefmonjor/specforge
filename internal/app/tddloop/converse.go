@@ -9,6 +9,7 @@ import (
 
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/conversation"
+	"specforge/internal/app/docturn"
 	"specforge/internal/app/prompts"
 	"specforge/internal/app/protocol"
 	"specforge/internal/domain/tdd"
@@ -20,7 +21,12 @@ import (
 func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data prompts.Data) (protocol.Response, error) {
 	sc, _ := r.st.Scenario()
 	origin := s.origin(r, sc)
-	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Model, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout}
+	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Model, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
+		ReadDirs: docturn.Outside(r.o.Root, r.o.Legacy)}
+	touched, err := docturn.Watch(s.d.Workspace, req.ReadDirs)
+	if err != nil {
+		return protocol.Response{}, err
+	}
 	render := func(t conversation.Turn) (string, error) {
 		d := data
 		if t.Retry {
@@ -42,6 +48,14 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 		},
 	}
 	resp, err := conversation.Talk(ctx, s.d.Agent, s.d.Asker, origin, r.o.MaxClarifications, req, render, hooks)
+	// The legacy code is the reference: a turn that changed it is refused
+	// whatever else it did.
+	if changed, werr := touched(); werr != nil || len(changed) > 0 {
+		if werr != nil {
+			return resp, werr
+		}
+		return resp, &docturn.ScopeError{Step: strings.ToLower(string(r.st.Phase)) + " (legacy code is read-only)", Files: changed}
+	}
 	var pending *clarify.PendingQuestionError
 	switch {
 	case errors.As(err, &pending):

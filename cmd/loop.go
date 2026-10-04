@@ -68,6 +68,10 @@ The state is saved after every step: --resume continues where it stopped.`,
 			if err != nil {
 				return err
 			}
+			legacyDir, err := a.rewriteLegacy(p)
+			if err != nil {
+				return err
+			}
 			proc := a.NewProcess(a.log)
 			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
 			if err != nil {
@@ -104,6 +108,10 @@ The state is saved after every step: --resume continues where it stopped.`,
 				TestTimeout:  p.settings.TestTimeout,
 				Model:        p.settings.Model,
 				Strict:       p.settings.Quality.Strict,
+
+				Legacy:           legacyDir,
+				JavaRelease:      p.settings.Migration.JavaRelease,
+				ForbiddenImports: p.settings.Migration.ForbiddenImports,
 			})
 			return err
 		},

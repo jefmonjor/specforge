@@ -55,6 +55,28 @@ type Project struct {
 		MaxDuplicationPercent *float64 `yaml:"max_duplication_percent,omitempty"`
 		MinMutationScore      *float64 `yaml:"min_mutation_score,omitempty"`
 	} `yaml:"quality,omitempty"`
+	Migration Migration `yaml:"migration,omitempty"`
+}
+
+// Migration describes a rewrite of a legacy system: where the legacy code
+// is (read-only for the agent) and what the new code must comply with.
+type Migration struct {
+	// Legacy is the legacy repository, relative to the project or absolute.
+	Legacy string `yaml:"legacy,omitempty"`
+	// JavaRelease is the release the build must declare (e.g. 21).
+	JavaRelease int `yaml:"java_release,omitempty"`
+	// ForbiddenImports are package prefixes the new code may not import.
+	ForbiddenImports []string `yaml:"forbidden_imports,omitempty"`
+}
+
+// DefaultForbiddenImports are the Java EE packages that Jakarta EE renamed
+// and the APIs a Java 21 codebase replaces; used when a Java migration
+// sets no list of its own.
+var DefaultForbiddenImports = []string{
+	"javax.servlet", "javax.persistence", "javax.validation", "javax.ejb",
+	"javax.jms", "javax.ws.rs", "javax.xml.bind", "javax.xml.rpc", "javax.annotation",
+	"javax.inject", "javax.faces", "javax.transaction",
+	"org.apache.log4j", "junit.framework",
 }
 
 // Overrides are command-line flags; empty values do not override.
@@ -79,6 +101,7 @@ type Settings struct {
 	AgentTimeout time.Duration
 	TestTimeout  time.Duration
 	Quality      quality.Thresholds
+	Migration    Migration
 }
 
 // Defaults applied when no layer sets a value.
@@ -104,6 +127,10 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		AgentTimeout: DefaultAgentTimeout,
 		TestTimeout:  DefaultTestTimeout,
 		Quality:      quality.DefaultThresholds(),
+		Migration:    p.Migration,
+	}
+	if s.Migration.JavaRelease > 0 && s.Migration.ForbiddenImports == nil {
+		s.Migration.ForbiddenImports = DefaultForbiddenImports
 	}
 	if p.MaxAttempts > 0 {
 		s.MaxAttempts = p.MaxAttempts
@@ -153,6 +180,9 @@ func (s Settings) validate(requireAgent bool) error {
 	}
 	if s.Quality.MinMutationScore < 0 || s.Quality.MinMutationScore > 100 {
 		errs = append(errs, fmt.Errorf("quality.min_mutation_score must be between 0 and 100"))
+	}
+	if r := s.Migration.JavaRelease; r != 0 && (r < 6 || r > 99) {
+		errs = append(errs, fmt.Errorf("migration.java_release must be a Java release such as 17 or 21, not %d", r))
 	}
 	return errors.Join(errs...)
 }

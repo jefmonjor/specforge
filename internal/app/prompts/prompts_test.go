@@ -45,3 +45,24 @@ func TestOptionalSectionsDisappearWhenEmpty(t *testing.T) {
 		}
 	}
 }
+
+func TestMigrationPrompts(t *testing.T) {
+	d := Data{Legacy: "/src/old", Inventory: "## Build\nmaven", Capability: "Pay an employee", SpecPath: "specs/0001-pay.md",
+		DocPath: "docs/legacy/CAPABILITIES.md", JavaRelease: 21, ForbiddenImports: []string{"javax.servlet"}, MaxAttempts: 3}
+	for _, lang := range Languages {
+		for _, name := range []Name{LegacyMap, FromLegacy} {
+			out, err := Render(lang, name, d)
+			if err != nil {
+				t.Fatalf("%s/%s: %v", lang, name, err)
+			}
+			if !strings.Contains(out, "/src/old") || strings.Contains(out, "<no value>") || strings.Count(out, "/src/old") > 3 {
+				t.Errorf("%s/%s:\n%s", lang, name, out)
+			}
+		}
+		// The loop's prompts carry the legacy code as a reference.
+		out, err := Render(lang, Green, Data{SpecTitle: "Pay", Marker: "SDD_0001_001", Legacy: "/src/old", LegacySources: "- INV-01: `Pay.java:3`", JavaRelease: 21, ForbiddenImports: []string{"javax.servlet", "org.apache.log4j"}})
+		if err != nil || !strings.Contains(out, "`javax.servlet`, `org.apache.log4j`") || !strings.Contains(out, "Java 21") || !strings.Contains(out, "`Pay.java:3`") {
+			t.Errorf("%s green: %v\n%s", lang, err, out)
+		}
+	}
+}

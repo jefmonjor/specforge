@@ -27,8 +27,9 @@ type Flavor struct {
 	Name   string
 	Binary string
 	// Headless returns the arguments for a non-interactive run that reads
-	// the prompt from stdin and may edit files without asking.
-	Headless func(model string) []string
+	// the prompt from stdin and may edit files without asking. dirs are
+	// extra directories the agent may read, such as a legacy repository.
+	Headless func(model string, dirs []string) []string
 	// Interactive returns the arguments for a terminal session seeded with
 	// seed.
 	Interactive func(seed, model string) []string
@@ -40,10 +41,13 @@ type Flavor struct {
 var Claude = Flavor{
 	Name:   "claude",
 	Binary: "claude",
-	Headless: func(model string) []string {
+	Headless: func(model string, dirs []string) []string {
 		args := []string{"-p", stdinInstruction, "--permission-mode", "acceptEdits", "--no-session-persistence"}
 		if model != "" {
 			args = append(args, "--model", model)
+		}
+		for _, d := range dirs {
+			args = append(args, "--add-dir", d)
 		}
 		return args
 	},
@@ -60,10 +64,13 @@ var Claude = Flavor{
 var Gemini = Flavor{
 	Name:   "gemini",
 	Binary: "gemini",
-	Headless: func(model string) []string {
+	Headless: func(model string, dirs []string) []string {
 		args := []string{"-p", stdinInstruction, "--approval-mode", "auto_edit"}
 		if model != "" {
 			args = append(args, "-m", model)
+		}
+		if len(dirs) > 0 {
+			args = append(args, "--include-directories", strings.Join(dirs, ","))
 		}
 		return args
 	},
@@ -123,7 +130,7 @@ func (c *CLI) Run(ctx context.Context, req ports.AgentRequest) (string, error) {
 
 	cmd := ports.Command{
 		Name:    c.flavor.Binary,
-		Args:    c.flavor.Headless(req.Model),
+		Args:    c.flavor.Headless(req.Model, req.ReadDirs),
 		Dir:     req.Dir,
 		Env:     req.Env,
 		Stdin:   strings.NewReader(req.Prompt),

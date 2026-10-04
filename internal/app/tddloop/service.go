@@ -100,6 +100,13 @@ type Options struct {
 	Model             string
 	AgentEnv          []string
 	Strict            bool
+
+	// Legacy is the legacy repository of a rewrite, absolute: the agent
+	// reads it as the reference of the behaviour and may never change it.
+	// JavaRelease and ForbiddenImports are the targets of the rewrite.
+	Legacy           string
+	JavaRelease      int
+	ForbiddenImports []string
 }
 
 func (o Options) withDefaults() Options {

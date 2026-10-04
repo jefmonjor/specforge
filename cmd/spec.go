@@ -37,7 +37,7 @@ approve is the review gate: it refuses while a TODO or an open question is
 left, records who approved it and seals the content. The loop only runs an
 approved, unchanged specification.`,
 	}
-	c.AddCommand(a.specNewCommand(), a.specListCommand(), a.specLintCommand(), a.specClarifyCommand(), a.specApproveCommand(), a.specInterviewCommand())
+	c.AddCommand(a.specNewCommand(), a.specListCommand(), a.specLintCommand(), a.specClarifyCommand(), a.specApproveCommand(), a.specInterviewCommand(), a.specFromLegacyCommand())
 	return c
 }
 
