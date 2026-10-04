@@ -10,6 +10,7 @@ import (
 	"specforge/internal/app/audit"
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/e2erun"
+	"specforge/internal/app/interview"
 	"specforge/internal/app/planning"
 	"specforge/internal/app/protocol"
 	"specforge/internal/app/specs"
@@ -128,8 +129,19 @@ func gateErrors(_ string, err error, d *Diagnosis) (int, string) {
 		secBlock *audit.BlockedError
 		stepErr  *audit.StepError
 		e2eBelow *e2erun.BelowThresholdError
+		iScope   *interview.ScopeError
+		iPartial *interview.IncompleteError
 	)
 	switch {
+	case errors.As(err, &iScope):
+		return ExitGate, "interview"
+	case errors.As(err, &iPartial):
+		lines := []string{err.Error()}
+		for _, i := range iPartial.Issues {
+			lines = append(lines, i.String())
+		}
+		d.Cause = strings.Join(lines, "\n")
+		return ExitGate, "interview"
 	case errors.Is(err, tdd.ErrPrematureGreen):
 		return ExitGate, "premature"
 	case errors.Is(err, tdd.ErrAttemptsExhausted):
@@ -197,7 +209,7 @@ func init() {
 			"diag.interrupted.title":    "Interrupted",
 			"diag.interrupted.action":   "the state was saved: continue with `specforge loop --resume`",
 			"diag.pending.title":        "A question needs your answer",
-			"diag.pending.action":       "write the answer in place of the placeholder in %s (or run the command again in a terminal), then `specforge loop --resume`",
+			"diag.pending.action":       "write the answer in place of the placeholder in %s and run the same command again (the loop with --resume), or run it in a terminal and answer there",
 			"diag.tampering.title":      "A test file was modified outside RED",
 			"diag.tampering.action":     "revert the test change (git checkout -- <file>) and continue with `specforge loop --resume`",
 			"diag.tampered.title":       "The specification changed after approval",
@@ -206,6 +218,8 @@ func init() {
 			"diag.notsealed.action":     "review it and run `specforge spec approve <spec>`",
 			"diag.openquestions.title":  "The specification has open questions",
 			"diag.openquestions.action": "resolve every [NEEDS CLARIFICATION] and approve the specification again",
+			"diag.interview.title":      "The interview did not finish",
+			"diag.interview.action":     "check the specification, then run `specforge spec interview <spec>` again (it continues where it stopped)",
 			"diag.plandraft.title":      "The plan draft was not accepted",
 			"diag.plandraft.action":     "check the files listed above, then run `specforge plan <spec>` again",
 			"diag.plan.title":           "The plan needs attention",
@@ -248,7 +262,7 @@ func init() {
 			"diag.interrupted.title":    "Interrumpido",
 			"diag.interrupted.action":   "el estado quedó guardado: continúa con `specforge loop --resume`",
 			"diag.pending.title":        "Una pregunta espera tu respuesta",
-			"diag.pending.action":       "escribe la respuesta en lugar del marcador en %s (o vuelve a lanzar el comando en una terminal) y después `specforge loop --resume`",
+			"diag.pending.action":       "escribe la respuesta en lugar del marcador en %s y vuelve a lanzar el mismo comando (el ciclo con --resume), o lánzalo en una terminal y responde allí",
 			"diag.tampering.title":      "Se modificó un fichero de test fuera de RED",
 			"diag.tampering.action":     "revierte el cambio del test (git checkout -- <fichero>) y continúa con `specforge loop --resume`",
 			"diag.tampered.title":       "La especificación cambió después de aprobarse",
@@ -257,6 +271,8 @@ func init() {
 			"diag.notsealed.action":     "revísala y ejecuta `specforge spec approve <spec>`",
 			"diag.openquestions.title":  "La especificación tiene preguntas abiertas",
 			"diag.openquestions.action": "resuelve cada [NEEDS CLARIFICATION] y vuelve a aprobar la especificación",
+			"diag.interview.title":      "La entrevista no terminó",
+			"diag.interview.action":     "revisa la especificación y vuelve a lanzar `specforge spec interview <spec>` (continúa donde se quedó)",
 			"diag.plandraft.title":      "El borrador del plan no se aceptó",
 			"diag.plandraft.action":     "revisa los ficheros de arriba y vuelve a lanzar `specforge plan <spec>`",
 			"diag.plan.title":           "El plan necesita atención",

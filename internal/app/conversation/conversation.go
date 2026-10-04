@@ -31,8 +31,10 @@ type Turn struct {
 
 // Hooks let the caller show progress and persist answers. All optional.
 type Hooks struct {
-	Working  func()
-	Retried  func()
+	Working func()
+	Retried func()
+	// Asked sees every question before the developer does.
+	Asked    func(resp protocol.Response) error
 	Answered func(question, answer string) error
 }
 
@@ -81,6 +83,11 @@ func Talk(ctx context.Context, agent ports.Agent, asker *clarify.Asker, origin c
 			questions++
 			if questions > maxQuestions {
 				return resp, ErrTooManyQuestions
+			}
+			if h.Asked != nil {
+				if err := h.Asked(resp); err != nil {
+					return resp, err
+				}
 			}
 			answer, err := asker.Ask(ctx, origin, ports.Question{Text: resp.Question, Context: resp.Context, Options: resp.Options})
 			if err != nil {

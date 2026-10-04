@@ -6,6 +6,8 @@
 >
 > **Severidad:** 🔴 bloqueante = rompe la promesa central · 🟠 mayor = brecha metodológica o de diseño · 🟡 menor = pulido.
 > **Estado:** ✅ hecho · 🔄 en PR · ⬜ pendiente.
+>
+> **Estado final (Fases 0-4 ejecutadas):** las cinco fases están implementadas en PRs apiladas #2 → #3 → #4 → #5 → #6, con CI en verde y verificadas con ejecuciones reales de Claude Code (`docs/DEMO.md`). Desviaciones del plan, cada una anotada en su fase: el código de banco se borró en lugar de moverse a `contrib/bank`; no hay `spec amend` (enmendar = editar + `spec approve`, con delta registrado); el E2E por escenario se adelantó a la Fase 1. Queda a decisión del mantenedor publicar v4.0.0. Las secciones 1-16 describen el estado de partida (v3) y se conservan como auditoría.
 
 ---
 
@@ -754,19 +756,39 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 - [x] Test que comprueba que toda clave de mensaje usada en el código existe en el catálogo.
 - **Hecho:** `deliver` sobre el proyecto real construido por Claude Code: 2/2 escenarios, cada fila con su test y su commit reales.
 
-### Fase 4 — Entrevista por turnos y E2E real (3-4 semanas) · P1, P2, P3
+### Fase 4 — Entrevista por turnos y E2E real ✅ (PR #6) · P1, P2, P3
 
-- [ ] `spec interview` con bucle propiedad de la herramienta, contrato por turno, `interview.jsonl`, libro de incógnitas, replay.
-- [ ] E2E por escenario con `then_index`, `evidence` verificada en Go, `report.json`, screenshots por paso, `--min-pass-rate`; selectores sin mutar el DOM; certificados opt-in; discovery con `CHROME_PATH`.
-- [ ] Demo grabada; v4.0.0.
-- **Hecho cuando:** un mantenedor de spec-kit podría leer el README y no encontrar una afirmación que no pueda reproducir.
+- [x] **`spec interview` propiedad de la herramienta**: cada turno es una llamada headless con contrato (`question`, `context` = por qué importa, `section`, `unknowns`); el agente escribe la respuesta anterior en la spec y devuelve la siguiente pregunta o `done`. Transcripción en `specs/NNNN/interview.jsonl` y respuestas en `decisions.md`. Solo puede cambiar la spec (otro fichero ⇒ error). Termina **solo** cuando el lint no encuentra `TODO` ni estructura ausente: un `done` prematuro se devuelve con los problemas (máx. 3 rondas). Lo que no se sabe queda como `[NEEDS CLARIFICATION]`, nunca inventado. Sin terminal: pregunta en `questions.md`, exit 5, y la siguiente ejecución continúa. `--chat` conserva la conversación libre con el agente.
+- [x] E2E por escenario con `then_index`, evidencia verificada en Go, `report.json`, capturas por paso, `--min-pass-rate`; selectores sin mutar el DOM; certificados opt-in; `CHROME_PATH`. *(Adelantado en PR #3.)*
+- [x] **Demo**: `docs/DEMO.md` con las sesiones reales con Claude Code (entrevista, plan, loop con revisión, entrega) y la tabla de defectos que destaparon.
+- [ ] **v4.0.0**: publicar la release es decisión del mantenedor (etiqueta + `goreleaser`); todo lo necesario está listo.
+- **Hecho:** entrevista real en modo CI: 4 preguntas ⇒ spec completa con 8 invariantes, cada una con su escenario de fallo, 12 escenarios, contratos, errores, fuera de alcance y supuestos con quién los confirmó; `spec approve` sin un solo aviso.
 
 ---
 
-## 18. Métricas hoy → v4
+## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)
 
-| Métrica | Hoy | v4 | Principio |
-| :--- | :---: | :---: | :---: |
+| Métrica | v3 | Objetivo | v4 medido | Principio |
+| :--- | :---: | :---: | :---: | :---: |
+| Fases en las que el agente puede preguntar | 1 de 7 | 7 de 7 | 7 de 7 (entrevista, plan, RED, GREEN, REFACTOR, E2E, audit) ✅ | P1 |
+| Puertas de revisión humana registradas | 0 | 5 (R0-R4) | 5: `spec approve`, `plan approve`, revisión por escenario, preguntas, `deliver` ✅ | P2 |
+| Puertas que aprueban sin ejecutarse | 5 | 0 | 0: una herramienta ausente es ⚠ *skipped*, y bloquea con `strict` ✅ | P3 |
+| Imports de `os`/`os/exec` en `domain` | 7 ficheros | 0 | 0 ✅ | P4 |
+| Funciones > 60 líneas | 12 | 0 | 8 (orquestadores de casos de uso y el catálogo de mensajes) 🔄 | P4, P5 |
+| `_ =` sobre escrituras | ~25 | 0 | 0 (solo limpiezas best effort comentadas) ✅ | P5 |
+| Cobertura total / `cmd` / ejecución de procesos | 35 / 27 / 0 % | ≥ 75 / 70 / 60 % | 77 / 81 / 90 % ✅ | P5 |
+| Avisos de `golangci-lint` | sin configurar | 0 | 0, en CI ✅ | P5 |
+| Ficheros CRLF / `gofmt -l` | 71 | 0 | 0 ✅ | P5 |
+| Parsers/matchers/loggers caseros con librería madura disponible | 6 | 0 | 0 (Gherkin oficial, jsonschema, slog + lumberjack, x/term, x/text) ✅ | P6 |
+| Comandos del CLI | 11 | 8 | 8 de trabajo + `version` ✅ | P6 |
+| Reglas de lint de spec | 0 | 12 secciones | 5 bloqueantes + 3 consejos (secciones, invariantes, varios `When`) ✅ | P7 |
+| Memoria inyectada | ilimitada | 30 lecciones + decisiones | 30 lecciones por stack + decisiones + plan ✅ | P7 |
+| Artefactos de entrega | 0 | 3 | 3 (`DELIVERY.md`, `trace.json`, `PR_BODY.md`) ✅ | P8 |
+| Referencias al banco en el core | ~40 % | 0 | 0 ✅ | P6 |
+| Afirmaciones del README/guía no reproducibles | 12 | 0 | 0: cada salida de la documentación procede de una ejecución real ✅ | P8 |
+| Código Go (producción / tests) | 5.628 / 1.242 | — | 12.685 / 5.601 | — |
+
+--- | :---: | :---: | :---: |
 | Fases en las que el agente puede preguntar | 1 de 7 | 7 de 7 | P1 |
 | Puertas de revisión humana registradas | 0 | 5 (R0-R4) | P2 |
 | Puertas que aprueban sin ejecutarse | 5 | 0 | P3 |
@@ -905,6 +927,7 @@ gofmt -l . → 71 ficheros (CRLF)   →   0 tras PR #2
 | #3 | Núcleo verificable, CLI nueva y recorte del código v3 | 1 | Abierta, apilada sobre #2 |
 | #4 | Plan (R1), revisión (R2), commit por escenario, clarify, historial de aprobaciones, lecciones | 2 | Abierta, apilada sobre #3 |
 | #5 | `deliver`, `--json`, golangci-lint | 3 | Abierta, apilada sobre #4 |
+| #6 | Entrevista por turnos, demo real y cierre del plan | 4 | Abierta, apilada sobre #5 |
 
 ---
 

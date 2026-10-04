@@ -22,6 +22,8 @@ const (
 	E2E       Name = "e2e"
 	Interview Name = "interview"
 	Plan      Name = "plan"
+	// InterviewTurn is one turn of the interview SpecForge runs.
+	InterviewTurn Name = "interview_turn"
 )
 
 // File is a file shown to the agent as context.
@@ -110,6 +112,11 @@ func RenderE2E(lang string, d E2EData) (string, error) { return renderStandalone
 // RenderInterview renders the prompt of an interactive interview.
 func RenderInterview(lang string, d InterviewData) (string, error) {
 	return renderStandalone(lang, Interview, d)
+}
+
+// RenderInterviewTurn renders one turn of the interview.
+func RenderInterviewTurn(lang string, d Data) (string, error) {
+	return renderStandalone(lang, InterviewTurn, d)
 }
 
 // renderStandalone renders a template that does not end with the response

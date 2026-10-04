@@ -92,7 +92,7 @@ flowchart LR
 
 | Stage | What the agent does | What SpecForge verifies itself |
 | :--- | :--- | :--- |
-| **Spec** | Helps you fill a 12-section template in a conversation (`spec interview`). | `spec approve` refuses a `TODO`, an open question or a scenario without `When`/`Then`; records who approved; seals the content with SHA-256. The loop runs only an approved, unchanged spec. |
+| **Spec** | Interviews you one question at a time (`spec interview`) and writes each answer into a 12-section template. | `spec approve` refuses a `TODO`, an open question or a scenario without `When`/`Then`; records who approved; seals the content with SHA-256. The loop runs only an approved, unchanged spec. |
 | **Plan** | Drafts `plan.md`: components, one test per scenario, interfaces, risks. | Only `plan.md` may change; every scenario marker must be placed; you approve it (sealed) before the loop uses it. |
 | **🔴 Red** | Writes one test named with the scenario marker (`SDD_0001_003`). | The files it lists really changed; a test with the marker exists; the filtered run compiles, runs it and **fails on an assertion**. A test that passes too early goes to you. |
 | **🟢 Green** | Writes the minimum code. | The test files are byte-for-byte as RED left them (*tampering* stops the loop); the scenario's tests pass. Failures are fed back, up to 3 attempts. |
@@ -110,7 +110,7 @@ Test results come from each runner's machine-readable report (`go test -json`, S
 | :---: | :--- | :--- |
 | 🧭 | `init` | Picks your agent and language, once per machine. No API keys, no PATH edits. |
 | 🏗️ | `setup` | Writes `specforge.yaml`, a managed block of rules and your stack's standard in `CLAUDE.md`/`GEMINI.md` (the rest of the file stays yours) and `.specforge/` in `.gitignore`. Never touches your code. |
-| 📝 | `spec new · interview · clarify · lint · approve · list` | The specification lifecycle: a numbered file from the template, a conversation with your agent to complete it, open questions answered one by one and written back as decisions, the lint, and the approval gate that seals it and records what changed since the last approval. |
+| 📝 | `spec new · interview · clarify · lint · approve · list` | The specification lifecycle: a numbered file from the template, an interview run by SpecForge that asks one question per turn and writes each answer into the file, open questions answered one by one and written back as decisions, the lint, and the approval gate that seals it and records what changed since the last approval. |
 | 🗺️ | `plan · plan approve` | The agent drafts where the code goes, with one planned test per scenario, and may write nothing but the plan. You review and approve it before any code exists; the loop follows it. |
 | 🔁 | `loop` | The Red → Green → Refactor line described above, then your review of each scenario and one commit per scenario. `--resume`, `--restart`, `--scenario N --from green`. |
 | 📦 | `deliver` | `DELIVERY.md`, `trace.json` and `PR_BODY.md`, built only from what SpecForge recorded: approvals, one row per scenario with its tests, commit and gates, the decisions, what is still open. It keeps your repository's PR template. |
@@ -135,7 +135,7 @@ On Windows, download `specforge-windows-amd64.exe`, rename it to `specforge.exe`
 specforge init                              # once per machine: agent and language
 cd my-project && specforge setup            # once per repository
 specforge spec new "Password reset"         # specs/0001-password-reset.md
-specforge spec interview 0001               # complete it with your agent (or edit it by hand)
+specforge spec interview 0001               # one question at a time; the answers go into the file
 specforge spec approve 0001                 # review gate R0: lint, approver, seal
 specforge plan 0001                         # where the code goes; then: specforge plan approve 0001
 specforge loop 0001                         # Red → Green → Refactor → your review → one commit per scenario
@@ -198,9 +198,10 @@ SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**
 - [x] Plan step (R1) and per-scenario review (R2) with a commit per scenario
 - [x] `spec clarify`, approval history with scenario deltas, curated lessons
 - [x] `deliver`: a delivery report and PR body traced from scenario to test to commit
-- [ ] Turn-based interview owned by SpecForge
+- [x] Turn-based interview owned by SpecForge, with a transcript and a lint-checked end
+- [ ] A published v4.0.0 release
 
-The full plan, with the reasoning behind each item, is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
+A full session with Claude Code, from an empty specification to the pull request body, is in [docs/DEMO.md](docs/DEMO.md). The plan, with the reasoning behind each item, is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 
 ## 🤝 Contributing & license
 

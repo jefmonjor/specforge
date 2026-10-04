@@ -111,7 +111,14 @@ Scenarios go in a fenced ```` ```gherkin ```` block and are parsed by the offici
 
 ### Interview
 
-`spec interview` opens your agent in your terminal with instructions to complete the file one question at a time, write each answer into the right section and record what you cannot answer yet as an open question. It never approves or seals. It needs an interactive terminal.
+`spec interview` completes the specification in a conversation SpecForge runs, one question at a time. Each turn is one call to your agent, which:
+
+1. writes your last answer into the right section, in testable wording (behaviour becomes Gherkin scenarios; every invariant gets a failure scenario);
+2. returns the single most important next question, why it matters, the section it completes and the list of what is still unknown, or reports that nothing is.
+
+SpecForge shows the progress (`section 4. Invariants · 6 unknown(s) left`), asks you, and records each question and answer in `specs/NNNN-slug/interview.jsonl` and in the decisions log. The agent may only change the specification: any other file is an error. The interview ends only when the lint finds no `TODO` and no missing structure; if the agent says it is done too early, it is sent back with the issues. What you cannot answer is written as an open question for `spec clarify`, never guessed. The interview never approves or seals.
+
+Without a terminal the question goes to `questions.md` (exit 5): write the answer there and run `spec interview` again; it continues where it stopped. `--chat` instead hands your terminal to the agent for a free conversation.
 
 ### Clarify
 
@@ -272,6 +279,7 @@ Global flags: `--verbose` (progress details and the agent's live output), `--deb
 | `specs/NNNN-slug.md` | yes | The specification, its front matter and its seal. |
 | `specs/NNNN-slug/plan.md` | yes | The technical plan, its front matter and its seal. |
 | `specs/NNNN-slug/approvals.md` | yes | Every approval with its scenario changes. |
+| `specs/NNNN-slug/interview.jsonl` | yes | The interview transcript: each question with its section and unknowns, and your answer. |
 | `specs/NNNN-slug/decisions.md` | yes | Every question the agent asked and your answer. |
 | `specs/LESSONS.md` | yes | Lessons the agent wrote after a rejected attempt. |
 | `specs/NNNN-slug/DELIVERY.md`, `trace.json`, `PR_BODY.md` | yes | The hand-over written by `deliver`. |
@@ -321,6 +329,7 @@ internal/
   app/                    use cases
     tddloop/              Red → Green → Refactor with verification, review and commit
     specs/ planning/      specification lifecycle and approvals; drafting the plan
+    interview/            the turn-based interview
     deliver/              the hand-over: DELIVERY.md, trace.json, PR_BODY.md
     conversation/         one agent turn under the response contract
     setup/                repository setup

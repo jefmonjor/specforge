@@ -227,3 +227,40 @@ func (e *PlanEvents) Done() {
 		e.stop = nil
 	}
 }
+
+// InterviewEvents prints the progress of an interview.
+type InterviewEvents struct {
+	C     *Console
+	Agent string
+	stop  func()
+}
+
+func (e *InterviewEvents) Working() {
+	e.Done()
+	if !e.C.Quiet {
+		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, "INTERVIEW"))
+	}
+}
+
+func (e *InterviewEvents) Asked(section string, unknowns int) {
+	e.Done()
+	if section == "" {
+		section = "—"
+	}
+	e.C.Info(e.C.T("interview.progress", section, unknowns))
+}
+
+func (e *InterviewEvents) Answered() { e.Done() }
+
+func (e *InterviewEvents) Rejected(reason string) {
+	e.Done()
+	e.C.Warn(e.C.T("interview.notdone", reason))
+}
+
+// Done stops the activity indicator.
+func (e *InterviewEvents) Done() {
+	if e.stop != nil {
+		e.stop()
+		e.stop = nil
+	}
+}

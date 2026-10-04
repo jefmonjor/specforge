@@ -9,12 +9,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"specforge/internal/adapters/fsys"
+	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/interview"
 	"specforge/internal/app/prompts"
 	"specforge/internal/app/specs"
 	"specforge/internal/config"
 	"specforge/internal/domain/spec"
 	"specforge/internal/ports"
+	"specforge/internal/ui"
 )
 
 func (a *App) specCommand() *cobra.Command {
@@ -234,15 +237,26 @@ them there and run clarify again.`,
 }
 
 func (a *App) specInterviewCommand() *cobra.Command {
-	var o config.Overrides
+	var (
+		o    config.Overrides
+		chat bool
+	)
 	c := &cobra.Command{
 		Use:   "interview [spec]",
-		Short: "Complete a specification in a conversation with your agent",
-		Long: `interview opens your coding agent with instructions to complete the
-specification one question at a time, writing each answer into the file and
-recording what you cannot answer yet as an open question. It never approves
-or seals: review the result and run spec approve.`,
-		Example: `  specforge spec new "Password reset" && specforge spec interview 0001`,
+		Short: "Complete a specification, one question at a time",
+		Long: `interview completes the specification in a conversation SpecForge runs.
+Each turn your agent writes your last answer into the file and returns the
+single most important next question, with why it matters and what is still
+unknown; SpecForge asks you, records the question and answer in
+specs/NNNN-slug/interview.jsonl and the decisions log, and rejects any change
+outside the specification. It ends when no TODO or missing structure is
+left; what you could not answer stays as an open question for spec clarify.
+It never approves or seals.
+
+Without a terminal the question goes to questions.md (exit 5): answer it
+there and run interview again. --chat instead hands your terminal to the
+agent for a free conversation.`,
+		Example: "  specforge spec new \"Password reset\" && specforge spec interview 0001\n  specforge spec interview 0001 --chat",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
@@ -250,44 +264,81 @@ or seals: review the result and run spec approve.`,
 			if err != nil {
 				return err
 			}
-			if !a.canAsk() {
-				return errors.New(a.console().T("interview.tty"))
-			}
 			e, err := a.resolveSpec(ctx, p, argOrEmpty(args))
 			if err != nil {
 				return err
 			}
-			all, err := p.specs(a).List()
+			proc := a.NewProcess(a.log)
+			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
 			if err != nil {
 				return err
 			}
-			var others []string
-			for _, s := range all {
-				if s.Rel != e.Rel {
-					others = append(others, "- "+s.Rel+" ("+s.Title+")")
-				}
-			}
-			prompt, err := prompts.RenderInterview(p.settings.Language, prompts.InterviewData{
-				ID: e.ID, Title: e.Title, SpecPath: e.Rel, Context: strings.Join(others, "\n"),
-			})
-			if err != nil {
-				return err
-			}
-			ag, err := a.NewAgent(p.settings.Agent, a.NewProcess(a.log), a.log)
-			if err != nil {
-				return err
-			}
-			if err := ag.Interactive(ctx, ports.AgentRequest{Prompt: prompt, Dir: p.root, Model: p.settings.Model}); err != nil {
-				return err
+			if chat {
+				return a.chatInterview(ctx, p, e, ag)
 			}
 			con := a.console()
+			con.Title(con.T("interview.title", e.Title))
+			events := &ui.InterviewEvents{C: con, Agent: ag.Name()}
+			defer events.Done()
+			files := fsys.OS{}
+			res, err := interview.Run(ctx, interview.Deps{
+				Agent:     ag,
+				Workspace: workspace.New(proc),
+				Files:     files,
+				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
+				Events:    events,
+				Log:       a.log,
+				Now:       a.Now,
+			}, interview.Options{
+				Root: p.root, SpecPath: e.Path, Language: p.settings.Language, Model: p.settings.Model,
+				AgentTimeout: p.settings.AgentTimeout,
+			})
+			events.Done()
+			if err != nil {
+				return err
+			}
 			con.OK(con.T("interview.done", e.Rel, e.ID))
+			if len(res.Open) > 0 {
+				con.Warn(con.T("interview.open", len(res.Open), e.ID))
+			}
+			a.printAdvice(res.Advice)
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&chat, "chat", false, "hand the terminal to the agent for a free conversation instead")
 	c.Flags().StringVar(&o.Agent, "agent", "", "claude | gemini (default: configured)")
 	c.Flags().StringVar(&o.Model, "model", "", "model passed to the agent")
 	return c
+}
+
+// chatInterview hands the terminal to the agent, seeded with instructions
+// to complete the specification.
+func (a *App) chatInterview(ctx context.Context, p project, e specs.Entry, ag ports.Agent) error {
+	if !a.canAsk() {
+		return errors.New(a.console().T("interview.tty"))
+	}
+	all, err := p.specs(a).List()
+	if err != nil {
+		return err
+	}
+	var others []string
+	for _, s := range all {
+		if s.Rel != e.Rel {
+			others = append(others, "- "+s.Rel+" ("+s.Title+")")
+		}
+	}
+	prompt, err := prompts.RenderInterview(p.settings.Language, prompts.InterviewData{
+		ID: e.ID, Title: e.Title, SpecPath: e.Rel, Context: strings.Join(others, "\n"),
+	})
+	if err != nil {
+		return err
+	}
+	if err := ag.Interactive(ctx, ports.AgentRequest{Prompt: prompt, Dir: p.root, Model: p.settings.Model}); err != nil {
+		return err
+	}
+	con := a.console()
+	con.OK(con.T("interview.done", e.Rel, e.ID))
+	return nil
 }
 
 // approver is --by, else git user.name, else the answer to a question.

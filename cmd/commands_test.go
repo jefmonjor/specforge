@@ -122,13 +122,39 @@ func TestSpecApproveAsksForTheApprover(t *testing.T) {
 	}
 }
 
-func TestSpecInterviewNeedsATerminal(t *testing.T) {
+func TestSpecInterviewTurnByTurn(t *testing.T) {
 	h := newHarness(t)
-	h.write("specs/0001-reset.md", readySpec)
 	h.expect(0, "init", "--agent", "claude", "--language", "en")
-	h.expect(1, "spec", "interview")
-	h.tty = true
+	h.expect(0, "spec", "new", "Password reset")
+	h.agent.rules = []rule{
+		{when: "Answer: **Any registered user**", files: map[string]string{"specs/0001-password-reset.md": readySpec},
+			reply: "```json\n{\"status\":\"done\",\"files_written\":[\"specs/0001-password-reset.md\"],\"unknowns\":[]}\n```"},
+		{when: "# Task: INTERVIEW", reply: "```json\n{\"status\":\"needs_clarification\",\"question\":\"Who can reset a password?\",\"section\":\"2. Actors\",\"unknowns\":[\"actors\"]}\n```"},
+	}
+	// No terminal: the question waits in questions.md.
+	h.expect(5, "spec", "interview")
+	if !strings.Contains(h.err.String(), "section 2. Actors · 1 unknown(s) left") {
+		t.Fatalf("stderr:\n%s", h.err)
+	}
+	if !strings.Contains(h.read("specs/0001-password-reset/questions.md"), "Who can reset a password?") {
+		t.Fatalf("questions.md:\n%s", h.read("specs/0001-password-reset/questions.md"))
+	}
+	// At a terminal the same run continues with the answer.
+	h.tty, h.stdin = true, "Any registered user\n"
 	h.expect(0, "spec", "interview")
+	if !strings.Contains(h.err.String(), "interview closed") {
+		t.Fatalf("stderr:\n%s", h.err)
+	}
+	if !strings.Contains(h.read("specs/0001-password-reset/interview.jsonl"), `"answer":"Any registered user"`) {
+		t.Fatalf("interview.jsonl:\n%s", h.read("specs/0001-password-reset/interview.jsonl"))
+	}
+	h.expect(0, "spec", "approve", "--by", "Ana")
+
+	// --chat hands the terminal over, so it needs one.
+	h.tty = false
+	h.expect(1, "spec", "interview", "--chat")
+	h.tty = true
+	h.expect(0, "spec", "interview", "--chat")
 }
 
 func TestE2EValidatesBeforeLaunchingABrowser(t *testing.T) {

@@ -42,6 +42,10 @@ type Response struct {
 	Question string   `json:"question,omitempty"`
 	Options  []string `json:"options,omitempty"`
 	Context  string   `json:"context,omitempty"`
+	// Section and Unknowns are used by the interview: the specification
+	// section the question completes, and what is still unknown.
+	Section  string   `json:"section,omitempty"`
+	Unknowns []string `json:"unknowns,omitempty"`
 
 	Reason          string `json:"reason,omitempty"`
 	SuggestedAction string `json:"suggested_action,omitempty"`
