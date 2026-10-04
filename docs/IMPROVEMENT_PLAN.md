@@ -922,7 +922,7 @@ gofmt -l . → 71 ficheros (CRLF)   →   0 tras PR #2
 
 | PR | Contenido | Fase | Estado |
 | :--- | :--- | :---: | :--- |
-| [#1](https://github.com/jefmonjor/specforge/pull/1) | README rediseñado + este plan | — | Abierta |
+| [#1](https://github.com/jefmonjor/specforge/pull/1) | README rediseñado + este plan | — | Fusionada |
 | [#2](https://github.com/jefmonjor/specforge/pull/2) | Higiene y red de seguridad | 0 | Abierta · fusionar **antes** que cualquier otra |
 | #3 | Núcleo verificable, CLI nueva y recorte del código v3 | 1 | Abierta, apilada sobre #2 |
 | #4 | Plan (R1), revisión (R2), commit por escenario, clarify, historial de aprobaciones, lecciones | 2 | Abierta, apilada sobre #3 |
