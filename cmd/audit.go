@@ -1,134 +1,101 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"strings"
-
 	"github.com/spf13/cobra"
-	"specforge/internal/adapters/agent"
-	"specforge/internal/adapters/security"
-	"specforge/internal/adapters/storage"
-	"specforge/internal/domain"
-	"specforge/internal/ports"
+
+	"specforge/internal/adapters/fsys"
+	"specforge/internal/adapters/vcs"
+	"specforge/internal/app/audit"
+	"specforge/internal/app/clarify"
+	"specforge/internal/config"
+	"specforge/internal/domain/security"
+	"specforge/internal/ui"
 )
 
-var (
-	flagAuditFull   bool
-	flagAuditDiff   bool
-	flagAuditTarget string
-	flagAuditFailOn string
-	flagAuditAgent  string
-)
+func (a *App) auditCommand() *cobra.Command {
+	var (
+		o      config.Overrides
+		full   bool
+		base   string
+		failOn string
+	)
+	c := &cobra.Command{
+		Use:   "audit",
+		Short: "Adversarial security review of your changes (or the whole project)",
+		Long: `audit runs three passes with your agent over each chunk of code:
+reconnaissance, a red-team hunter that proposes findings with evidence, and a
+blue-team validator that confirms or rejects each one. Every answer must
+match a JSON schema; anything else stops the audit with an error, never with
+an empty passing report (fail-closed).
 
-var auditCmd = &cobra.Command{
-	Use:   "audit",
-	Short: "Auditoría de seguridad adversarial basada en el arnés de Cloudflare",
-	Long: `Ejecuta una auditoría de seguridad adversarial en 6 fases:
-1. Reconnaissance: Mapeo de superficies de ataque y fronteras de confianza (coverage-ledger.json).
-2. Hunting (Red Team): Detección de vulnerabilidades según catálogo de ataques (ATTACK-CLASSES.md).
-3. Validation (Blue Team): Intento activo e independiente de refutar falsos positivos.
-4. Reporting: Generación de findings.json estricto y reporte legible en docs/security/REPORT.md.`,
-	RunE: runAudit,
-}
-
-func init() {
-	auditCmd.Flags().BoolVar(&flagAuditFull, "full", false, "escaneo completo del código del proyecto")
-	auditCmd.Flags().BoolVar(&flagAuditDiff, "diff", false, "escaneo incremental (solo cambios del git diff)")
-	auditCmd.Flags().StringVar(&flagAuditTarget, "target", "", "referencia git para el diff (por defecto HEAD~1)")
-	auditCmd.Flags().StringVar(&flagAuditFailOn, "fail-on", "confirmed", "umbral para bloquear con error ('confirmed', 'critical', 'high', 'medium')")
-	auditCmd.Flags().StringVar(&flagAuditAgent, "agent", "", "agente de desarrollo ('gemini' o 'claude')")
-
-	rootCmd.AddCommand(auditCmd)
-}
-
-func runAudit(cmd *cobra.Command, args []string) error {
-	logger := storage.GetLogger()
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("error obteniendo directorio actual: %w", err)
+Findings the validator cannot settle are questions for you. A confirmed
+finding at or above --fail-on fails the command with exit code 2. Reports go
+to docs/security/ with owner-only permissions.`,
+		Example: "  specforge audit                 # changes since the default branch\n  specforge audit --base v1.2.0\n  specforge audit --full --fail-on medium",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			threshold, err := security.ParseSeverity(failOn)
+			if err != nil {
+				return err
+			}
+			p, err := a.openProject(o, true)
+			if err != nil {
+				return err
+			}
+			proc := a.NewProcess(a.log)
+			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
+			if err != nil {
+				return err
+			}
+			con := a.console()
+			con.Title(con.T("audit.title"))
+			events := &ui.AuditEvents{C: con}
+			defer events.Done()
+			files := fsys.OS{}
+			svc := audit.New(audit.Deps{
+				Agent:  ag,
+				VCS:    vcs.New(proc),
+				Files:  files,
+				Lister: listFiles,
+				Asker:  &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
+				Events: events,
+				Log:    a.log,
+				Now:    a.Now,
+			})
+			scope := audit.ScopeDiff
+			if full {
+				scope = audit.ScopeFull
+			}
+			res, err := svc.Run(cmd.Context(), audit.Options{
+				Root:         p.root,
+				Scope:        scope,
+				Base:         base,
+				Threshold:    threshold,
+				Language:     p.settings.Language,
+				Model:        p.settings.Model,
+				AgentTimeout: p.settings.AgentTimeout,
+			})
+			events.Done()
+			if res.Dir != "" && !res.Empty {
+				con.Info(con.T("audit.report", p.layout.Rel(res.Dir)))
+			}
+			if err != nil {
+				return err
+			}
+			if res.Empty {
+				con.OK(con.T("audit.empty"))
+				return nil
+			}
+			r := res.Report
+			con.OK(con.T("audit.passed", threshold, r.TotalConfirmed, r.TotalNeedsValidation, r.TotalRejected))
+			return nil
+		},
 	}
-
-	store := storage.NewConfigStorage(cfgFile)
-	cfg, err := store.Load()
-	if err != nil {
-		cfg = domain.NewDefaultConfig()
-	}
-
-	agentName := cfg.Agent
-	if flagAuditAgent != "" {
-		agentName = strings.ToLower(flagAuditAgent)
-	}
-
-	isDiff := flagAuditDiff || !flagAuditFull
-
-	fmt.Println("==================================================================")
-	fmt.Println("🛡️ SDD-Free v3.0 — Auditoría Adversarial de Seguridad")
-	fmt.Println("==================================================================")
-	fmt.Printf("  ✓ Motor:        Arnés Adversarial de Cloudflare (Recon -> Hunter -> Verifier)\n")
-	fmt.Printf("  ✓ Agente:       %s\n", agentName)
-	if isDiff {
-		fmt.Printf("  ✓ Modo:         Incremental Diff (Gate Pre-Merge)\n")
-	} else {
-		fmt.Printf("  ✓ Modo:         Full Scan (Diagnóstico de Entrada)\n")
-	}
-	fmt.Printf("  ✓ Umbral Bloqueo: %s\n\n", flagAuditFailOn)
-
-	var runner ports.AgentRunner
-	if agentName == "claude" {
-		runner = agent.NewClaudeAgentRunner()
-	} else {
-		runner = agent.NewGeminiAgentRunner()
-	}
-
-	agentOpts := ports.AgentOptions{
-		Project:    cfg.Auth.Project,
-		Location:   cfg.Auth.Location,
-		WorkingDir: cwd,
-		Debug:      debug,
-	}
-
-	auditOpts := ports.SecurityAuditOptions{
-		FullScan:   flagAuditFull,
-		DiffScan:   isDiff,
-		DiffTarget: flagAuditTarget,
-		FailOn:     flagAuditFailOn,
-	}
-
-	auditor := security.NewCloudflareAdversarialAuditor()
-	report, err := auditor.Audit(context.Background(), cwd, auditOpts, runner, agentOpts)
-	if err != nil {
-		return fmt.Errorf("error ejecutando auditoría de seguridad: %w", err)
-	}
-
-	hasFailures, violating := report.HasFailures(flagAuditFailOn)
-
-	if hasFailures {
-		fmt.Println("")
-		fmt.Println("==================================================================")
-		fmt.Println("🚨 DIAGNÓSTICO DE SEGURIDAD AUTOMÁTICO (Cloudflare Adversarial)")
-		fmt.Println("==================================================================")
-		for _, f := range violating {
-			fmt.Printf("  • Vulnerabilidad:  [%s] %s (Status: %s, Severidad: %s)\n",
-				f.ID, f.Title, strings.ToUpper(string(f.Status)), strings.ToUpper(string(f.Severity)))
-			fmt.Printf("  • Archivo:         %s:%d (Clase: %s)\n", f.File, f.Line, f.AttackClass)
-			fmt.Println("  • Detalle:         Revisa docs/security/REPORT.md para remediación.")
-			fmt.Println("  ------------------------------------------------------------------")
-		}
-		fmt.Println("==================================================================")
-		logger.Error("Auditoría de seguridad bloqueada: %d vulnerabilidades detectadas", len(violating))
-		return fmt.Errorf("Security Gate Bloqueado: Se detectaron %d vulnerabilidades confirmadas que violan el umbral '%s'", len(violating), flagAuditFailOn)
-	}
-
-	fmt.Println("\n==================================================================")
-	fmt.Printf("✓ Auditoría de seguridad superada. Cero vulnerabilidades bajo el umbral '%s'.\n", flagAuditFailOn)
-	fmt.Printf("  ✓ Confirmadas:         %d\n", report.TotalConfirmed)
-	fmt.Printf("  ✓ Por Validar:         %d\n", report.TotalNeedsValidation)
-	fmt.Printf("  ✓ Falsos Positivos:    %d\n", report.TotalRejected)
-	fmt.Println("  ✓ Reporte detallado:   docs/security/REPORT.md")
-	fmt.Println("  ✓ Libro de cobertura:  docs/security/coverage-ledger.json")
-	fmt.Println("==================================================================")
-
-	return nil
+	f := c.Flags()
+	f.BoolVar(&full, "full", false, "audit the whole project instead of your changes")
+	f.StringVar(&base, "base", "", "compare with this ref (default: origin/main, origin/master, main or master)")
+	f.StringVar(&failOn, "fail-on", "high", "lowest severity that fails: critical | high | medium | low | info")
+	f.StringVar(&o.Agent, "agent", "", "claude | gemini (default: configured)")
+	f.StringVar(&o.Model, "model", "", "model passed to the agent")
+	return c
 }

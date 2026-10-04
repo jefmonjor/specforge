@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.acme.ResetTest" tests="3" failures="1" errors="1" skipped="0">
+  <testcase name="SDD_0001_001_sendsLink" classname="com.acme.ResetTest">
+    <failure message="expected:&lt;true&gt; but was:&lt;false&gt;">org.opentest4j.AssertionFailedError</failure>
+  </testcase>
+  <testcase name="SDD_0001_002_expires" classname="com.acme.ResetTest">
+    <error message="Not implemented yet">java.lang.UnsupportedOperationException</error>
+  </testcase>
+  <testcase name="other" classname="com.acme.ResetTest"/>
+</testsuite>

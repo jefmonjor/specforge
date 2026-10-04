@@ -16,14 +16,15 @@ Thank you for your interest in contributing to **SpecForge**! We welcome bug rep
    ```bash
    git checkout -b feature/my-new-feature
    ```
-2. Ensure Clean Architecture principles are respected:
-   - Pure business logic belongs in `internal/domain/`.
-   - External tools, CLI adapters, and filesystem belong in `internal/adapters/`.
-   - Interfaces belong in `internal/ports/`.
-3. Add automated unit tests for your changes.
-4. Run the test suite:
+2. Respect the architecture (see the [user guide](USER_GUIDE.md#17-architecture)):
+   - `internal/domain/` is pure: no I/O, no clock, no environment.
+   - Use cases live in `internal/app/` and depend only on the interfaces in `internal/ports/`.
+   - Processes, files, git, the browser and the agent CLIs belong in `internal/adapters/`.
+   - `cmd/` parses flags and wires adapters to use cases; it decides nothing.
+3. Add tests for your change. Fakes go behind the ports; tests that need a real tool (`go`, `git`, Chromium) skip cleanly when it is missing.
+4. Run what CI runs:
    ```bash
-   go test ./...
+   make lint test
    ```
 5. Commit your changes following Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`).
 6. Push to your fork and submit a Pull Request.

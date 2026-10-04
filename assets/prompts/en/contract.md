@@ -1,0 +1,36 @@
+{{define "contract"}}
+## Response contract (mandatory)
+
+End your answer with exactly one JSON object in a ```json block, and write nothing after it.
+
+When you finished the task:
+```json
+{"status": "done", "files_written": ["relative/path/of/each/file/you/changed"], "summary": "one sentence"}
+```
+If this task needed more than one attempt, add `"lesson"`: one sentence with the rule that would have avoided the mistake. It is kept in `specs/LESSONS.md` and shown in later prompts, so make it general, not about this scenario.
+
+If anything you need is not in the specification, the decisions log, the existing code or this prompt, **do not assume it**. A wrong guess costs more than a question. Reply instead with:
+```json
+{"status": "needs_clarification", "question": "the exact question for the developer", "options": ["option A", "option B"], "context": "why you need it"}
+```
+
+If you cannot continue for a reason the developer must fix (a missing tool, a broken build unrelated to this task), reply with:
+```json
+{"status": "blocked", "reason": "what is wrong", "suggested_action": "what the developer should do"}
+```
+
+SpecForge checks `files_written` against the files that really changed. Never list a file you did not write.
+{{end}}
+
+{{define "turn"}}
+{{if .Answer}}
+## Your question was answered
+You asked: {{.AnsweredQuestion}}
+The developer answered: **{{.Answer}}**
+It is recorded in the decisions log. Continue the task with it.
+{{end}}
+{{if .Feedback}}
+## Your previous attempt ({{.Attempt}} of {{.MaxAttempts}}) was rejected
+{{.Feedback}}
+{{end}}
+{{end}}

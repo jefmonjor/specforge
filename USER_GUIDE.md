@@ -1,306 +1,345 @@
-# 📖 SpecForge: Complete User & Architecture Guide
-
-> **Engine:** Pure Static Go (`specforge.exe` / `specforge`, ~8.9 MB)  
-> **Methodology:** Spec-Driven Development (SDD) & Resilient Test-Driven Development (TDD)  
-> **License:** Apache License, Version 2.0  
-
----
-
-## Table of Contents
-1. [Architecture Overview & Philosophy](#1-architecture-overview--philosophy)
-2. [Installation & Cross-Platform Binaries](#2-installation--cross-platform-binaries)
-3. [Workstation Setup (`specforge init`)](#3-workstation-setup-specforge-init)
-4. [Project Setup (`specforge setup`) — Greenfield vs. Brownfield](#4-project-setup-specforge-setup--greenfield-vs-brownfield)
-5. [The Contextual Memory Brain (6-File Explicit Context & Auto-Learning)](#5-the-contextual-memory-brain-6-file-explicit-context--auto-learning)
-6. [Document Ingestion with Microsoft MarkItDown (`specforge doc` & `ingest`)](#6-document-ingestion-with-microsoft-markitdown-specforge-doc--ingest)
-7. [Socratic BDD Interview & Legacy Migration (`specforge interview` & `--from-repo`)](#7-socratic-bdd-interview--legacy-migration-specforge-interview---from-repo)
-8. [The `[NEEDS CLARIFICATION]` Business Circuit Breaker](#8-the-needs-clarification-business-circuit-breaker)
-9. [The Resilient TDD Assembly Line (`specforge loop` & `--resume`)](#9-the-resilient-tdd-assembly-line-specforge-loop---resume)
-10. [Autonomous Visual E2E Testing (`specforge e2e` — TesterArmy Engine)](#10-autonomous-visual-e2e-testing-specforge-e2e--testerarmy-engine)
-11. [Adversarial Security Audit (`specforge audit`)](#11-adversarial-security-audit-specforge-audit)
-12. [Quality Guardrails Matrix](#12-quality-guardrails-matrix)
-13. [Complete Command Reference](#13-complete-command-reference)
-14. [Open Source & Apache 2.0 Compliance](#14-open-source--apache-20-compliance)
-
----
-
-## 1. Architecture Overview & Philosophy
-
-SpecForge enforces disciplined software craftsmanship on top of generative AI coding assistants. Instead of accepting unverified code generation, SpecForge acts as an autonomous engineering supervisor:
-
-```plaintext
-      ┌─────────────────────────────────────────────────────────────┐
-      │  SPECIFICATION (Gherkin BDD Sealed with SHA-256)            │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  RED PHASE: Test Stubs First (Fails without implementation)  │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  GREEN PHASE: Strict Minimal Implementation (KISS / YAGNI)   │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  REFACTOR PHASE: Quality Guardrails (jscpd, Knip, Stryker)  │
-      └──────────────────────────────┬──────────────────────────────┘
-                                     │
-                                     ▼
-      ┌─────────────────────────────────────────────────────────────┐
-      │  E2E VALIDATION: Autonomous Visual Testing (chromedp)       │
-      └─────────────────────────────────────────────────────────────┘
-```
-
-* **Zero Runtime Dependencies:** Single static binary in pure Go. Does not require Go, Node.js, Python, or Playwright installed to run the CLI or the E2E engine.
-* **Zero Keys:** Automatically inherits Google Cloud Application Default Credentials (ADC) or local session auth.
-* **Deterministic Verification:** Every transition is validated by compilers and linters with exit code enforcement.
-
----
-
-## 2. Installation & Cross-Platform Binaries
-
-### Download Precompiled Binaries
-Download the binary for your platform from GitHub Releases into your path:
-* **Windows x64:** `dist/specforge-windows-amd64.exe` (rename to `specforge.exe` or `sdd.exe`)
-* **macOS Apple Silicon (M1/M2/M3/M4):** `dist/specforge-darwin-arm64`
-* **macOS Intel:** `dist/specforge-darwin-amd64`
-* **Linux x64:** `dist/specforge-linux-amd64`
-
-> **macOS Gatekeeper:** Run `xattr -d com.apple.quarantine specforge-darwin-arm64` and `chmod +x specforge-darwin-arm64`.
-
-### Building from Source
-```bash
-git clone https://github.com/jefmonjor/specforge.git
-cd specforge
-
-# Compile for your current OS:
-go build -ldflags="-s -w" -trimpath -o specforge.exe .
-
-# Or cross-compile all 4 platforms at once:
-powershell -ExecutionPolicy Bypass -File .\build-all.ps1   # Windows
-./build-all.sh                                             # Linux / macOS
-```
-
----
-
-## 3. Workstation Setup (`specforge init`)
-
-Run once on a new developer workstation from any directory:
-
-```bash
-specforge init
-```
-
-* **Zero-Keys ADC Detection:** Automatically locates Google Cloud ADC (`gcloud auth application-default login`) and configures `~/.specforge/config.json`.
-* **Zero-Admin PATH Injection:** Modifies Windows User Registry (`HKCU:\Environment\Path`) or appends to `~/.zshrc` without requiring administrator or UAC rights.
-* **Non-Interactive Mode:** For automated scripts and CI/CD:
-  ```bash
-  specforge init --non-interactive --agent gemini --force
-  ```
-
----
-
-## 4. Project Setup (`specforge setup`) — Greenfield vs. Brownfield
-
-Run from the root of your project:
-
-### Scenario A: New Project (Greenfield)
-```bash
-mkdir my-new-service
-cd my-new-service
-git init
-
-# Initialize with a complete archetype:
-specforge setup --stack react    # React + Vite + TS + Vitest + Knip + Stryker
-specforge setup --stack java     # Java 21 + Spring Boot 3 + Maven + ArchUnit
-specforge setup --stack go       # Go + Clean Architecture
-specforge setup --stack python   # Python + FastAPI + pytest + ruff
-```
-1. Deploys full source code and build files (`package.json`, `pom.xml`, or `go.mod`), replacing placeholders with your directory name.
-2. Pre-configures quality guardrails (`knip.json`, `.jscpd.json`, `stryker.conf.json`).
-3. Deploys GitOps values template (`values/dev-app-values.yaml`).
-4. Extracts Contextual Memory Brain (`.sdd/agent/`).
-5. Updates `.gitignore` to exclude `.specify/`, `.sdd-cache/`, `.sdd/`, and `values/`.
-
-### Scenario B: Existing Project (Brownfield)
-```bash
-cd /path/to/existing-project
-git checkout -b feature/my-new-task
-specforge setup
-```
-1. **100% Code Preservation:** Detects your stack and does not overwrite or modify existing source or build files.
-2. Injects `.specify/` standards and `.sdd/agent/` without overwriting existing team lessons.
-
----
-
-## 5. The Contextual Memory Brain (6-File Explicit Context & Auto-Learning)
-
-SpecForge transforms generic AI assistants into senior software crafters specialized in your architecture using 6 explicit memory files deployed in `.sdd/agent/`:
-
-| Memory File | Role | Content |
-| :--- | :--- | :--- |
-| **`agente.md`** | **Core Constitution** | Strict TDD, KISS, YAGNI, Clean Architecture, Rich Domain, fail-fast. |
-| **`persona.md`** | **Tone & Style** | Direct, concise, technical. Semantic English names. Comments for the "why". |
-| **`ng-rules.md`** | **Never-Go Anti-Patterns** | No frameworks in domain, no `any`, no swallowed exceptions, 0% duplicate code, zero dead code. |
-| **`glossary.md`** | **Ubiquitous Language** | Definitions of SDD, TDD, YAGNI, GitOps, Probes, and domain concepts. |
-| **`references.md`** | **Golden Masters** | Reference implementations of Value Objects, Use Cases, and Health Probes. |
-| **`lessons.md`** | **Dynamic Self-Learning** | Dynamic ledger of errors solved on the project. |
-
-### Continuous Autonomous Learning:
-* In phase **GREEN**: When a compiler or test error is fixed after a retry, SpecForge automatically records:
-  ```text
-  - [2026-10-02 10:15:00] [Compilación / Test] Fallo: TypeError en cálculo. Solución: Tipado estricto. No repetir.
-  ```
-* In phase **REFACTOR**: When a Quality Gate violation is resolved, the rule is recorded in `lessons.md`.
-* **Immediate Feedback:** On all subsequent turns, `LoadAgentContext` injects `lessons.md` into `<system_instruction>`. The AI never makes the same architectural mistake twice.
-
----
-
-## 6. Document Ingestion with Microsoft MarkItDown (`specforge doc` & `ingest`)
-
-SpecForge integrates Microsoft MarkItDown to process heterogeneous documentation:
-
-```bash
-# Convert a single document (PDF, Word, or Excel spreadsheet):
-specforge doc docs/financial-reconciliation.xlsx
-
-# Or scan and ingest the entire project:
-specforge ingest
-```
-
-* Automatically detects `.pdf`, `.docx`, `.xlsx`, and `.pptx` files.
-* Converts them to clean Markdown tables and formulas.
-* Generates `docs/_context/context-pack.md` in ~20 ms, feeding the AI architect with complete ground truth.
-
----
-
-## 7. Socratic BDD Interview & Legacy Migration (`specforge interview` & `--from-repo`)
-
-```bash
-specforge interview --feature "Customer Loan Amortization"
-```
-
-The AI architect conducts a structured interview covering the **7 Canonical Sections**:
-1. Business Intent (The Why)
-2. Ubiquitous Language (Domain Glossary)
-3. Domain Invariants (INV-01, INV-02)
-4. User Stories (`As a... I want to... So that...`)
-5. Acceptance Criteria (Gherkin BDD: `Scenario`, `Scenario Outline` with `Examples:`)
-6. Boundaries & Out of Scope (Explicit KISS / YAGNI)
-7. Open Questions (`[NEEDS CLARIFICATION]`)
-
-The resulting specification is pre-seeded in `specs/0001-<slug>.md` and sealed with a cryptographic **SHA-256** hash:
-```markdown
-<!-- seal: sha256:78a274f4cc77316bb1e7ce2c6fca1ff43a290d76489737bbeb2141c626a88b41 -->
-```
-
-### Legacy Migration Mode (`--from-repo`):
-```bash
-specforge interview --from-repo /path/to/legacy-system --feature "Loan Calculation Module"
-```
-Reverse-engineers legacy codebases (COBOL, Java 6, PHP): extracts the pure business rules (the **WHAT**) and discards obsolete syntax (the **HOW**), creating sealed BDD specs in your new project.
-
----
-
-## 8. The `[NEEDS CLARIFICATION]` Business Circuit Breaker
-
-If a specification contains unresolved ambiguities or open questions marked with `[NEEDS CLARIFICATION]`:
-* **Immediate Hard Halt:** `specforge loop` halts before writing a single line of code or generating tests.
-* **Triage Box:** Displays the exact list of open questions pending resolution by the Product Owner.
-* **Integrity Guarantee:** Protects against AI hallucinations and ensures code is only built against validated requirements.
-
----
-
-## 9. The Resilient TDD Assembly Line (`specforge loop` & `--resume`)
-
-```bash
-specforge loop
-```
-
-### The 3 Phases:
-1. **RED:** Generates unit test stubs. Executes test suite. If tests pass without implementation, it aborts for **YAGNI Violation**.
-2. **GREEN:** Generates minimal production code. Retries up to 3 times with compiler error feedback.
-3. **REFACTOR:** Executes static quality gates. Requests clean refactoring if any gate is breached.
-
-### Fault Tolerance with `--resume`:
-State is persisted atomically in `.sdd-state.json`. If execution is interrupted by network failure or battery loss:
-```bash
-specforge loop --resume
-```
-Validates the SHA-256 spec seal and resumes at the exact micro-step without wasting tokens.
-
----
-
-## 10. Autonomous Visual E2E Testing (`specforge e2e` — TesterArmy Engine)
-
-Native Go browser automation built on `chromedp` (Chrome DevTools Protocol):
-
-```bash
-specforge e2e --url http://localhost:3000
-```
-
-* **No Node.js / Playwright:** Directly launches local Google Chrome or Microsoft Edge.
-* **Simplified UI Tree:** Extracts only visible interactive elements with deterministic selectors (`data-sdd-id`).
-* **Typed Action Loop (up to 15 steps):** AI emits JSON `VisualAction` (`click`, `type`, `assert`, `wait`).
-* **Automated Screenshot on Failure:** If an assertion fails or times out, it captures `docs/e2e/screenshot.png` and exits with code 1.
-
----
-
-## 11. Adversarial Security Audit (`specforge audit`)
-
-Inspired by Cloudflare's security evaluation harness:
-
-```bash
-specforge audit --diff      # Fast pre-merge scan on git diff lines
-specforge audit --full      # Comprehensive codebase security audit
-```
-
-* **Phase 1: Reconnaissance:** Maps attack surface and entry points.
-* **Phase 2: Red Team Hunting:** Identifies high-risk attack classes (Injection, SSRF, Deserialization).
-* **Phase 3: Blue Team Verification:** Validates findings, filters false positives, and generates `docs/security/findings.json`.
-
----
-
-## 12. Quality Guardrails Matrix
-
-| Guardrail | Tool | Command to Run Manually |
-| :--- | :--- | :--- |
-| **Linters** | ESLint / golangci-lint / Ruff | `npm run lint` / `go vet ./...` / `ruff check .` |
-| **DRY Enforcer** | `jscpd` (threshold 0%) | `npx jscpd ./src --threshold 0` |
-| **Dead Code** | `knip` | `npx knip` |
-| **Mutation Testing** | `stryker` (threshold >= 80%) | `npx stryker run` |
-| **Architecture** | `ArchUnit` | `mvn test -Dtest=ArchitectureTest` |
-
----
-
-## 13. Complete Command Reference
-
-| Command | Purpose | Key Options |
-| :--- | :--- | :--- |
-| `specforge init` | Workstation zero-keys setup | `--agent`, `--project`, `--non-interactive`, `--force` |
-| `specforge setup` | Deploy standards, archetypes, and memory | `--stack [react/java/go/python]`, `--force` |
-| `specforge ingest` | Ultra-fast project architecture scanner | `--output`, `--sync`, `--no-convert`, `--print` |
-| `specforge doc` | Convert PDF, Word, Excel to Markdown | `--recursive`, `--output` |
-| `specforge interview` | Socratic BDD interview & spec sealing | `--feature`, `--from-repo`, `--output`, `--agent` |
-| `specforge loop` | TDD assembly line (Red -> Green -> Refactor) | `--resume`, `--spec`, `--agent` |
-| `specforge e2e` | Autonomous Visual E2E test engine | `--url`, `--spec`, `--headless`, `--max-steps`, `--screenshot` |
-| `specforge audit` | Adversarial security audit | `--diff`, `--full`, `--fail-on [HIGH/MEDIUM]` |
-| `specforge consistency`| Deterministic consistency verification | `--FailOn` |
-| `specforge build` | Build validation | `--dry-run` |
-| `specforge version` | Platform & telemetry info | — |
-
----
-
-## 14. Open Source & Apache 2.0 Compliance
-
-SpecForge is licensed under the **Apache License, Version 2.0**.
-* **Permissive Distribution:** Free for personal, open source, and commercial proprietary integration.
-* **Patent Protection (Section 3):** Broad contributor patent grant with automatic defensive termination against patent trolls.
-* **Attribution Notice:** See [NOTICE](NOTICE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+# SpecForge user guide
+
+SpecForge drives a coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli)) through a test-first loop against a specification you approved, and checks every step itself instead of trusting the agent's word. This guide covers every command, every file SpecForge writes and every exit code.
+
+- [1. How it works](#1-how-it-works)
+- [2. Install](#2-install)
+- [3. Configure once: `init`](#3-configure-once-init)
+- [4. Prepare a repository: `setup`](#4-prepare-a-repository-setup)
+- [5. Specifications: `spec`](#5-specifications-spec)
+- [6. The plan: `plan`](#6-the-plan-plan)
+- [7. The loop: `loop`](#7-the-loop-loop)
+- [8. Questions instead of guesses](#8-questions-instead-of-guesses)
+- [9. Quality gates](#9-quality-gates)
+- [10. Security audit: `audit`](#10-security-audit-audit)
+- [11. Browser verification: `e2e`](#11-browser-verification-e2e)
+- [12. Hand-over: `deliver`](#12-hand-over-deliver)
+- [13. Configuration reference](#13-configuration-reference)
+- [14. Files SpecForge writes](#14-files-specforge-writes)
+- [15. Exit codes](#15-exit-codes)
+- [16. Troubleshooting](#16-troubleshooting)
+- [17. Architecture](#17-architecture)
+
+## 1. How it works
 
 ```text
-Copyright 2026 SpecForge Contributors | jefmonjor.dev
+spec new ─► interview / edit ─► clarify ─► approve (R0) ─► plan ─► plan approve (R1) ─► loop ─► audit ─► e2e ─► deliver (R4)
+                                                                                       │
+                                  per scenario:  RED ─► GREEN ─► REFACTOR ─► review (R2) ─► commit
 ```
+
+- A **specification** (`specs/NNNN-slug.md`) says *what* to build and *why*, with the acceptance criteria as Gherkin scenarios.
+- **Approval** is a human gate: it refuses while a `TODO` or an open question is left, records who approved and when, and seals the content with a SHA-256 hash. The loop only runs an approved, unchanged specification.
+- The **plan** says where the code goes, with one planned test per scenario. You review and approve it before any code exists; the loop follows it.
+- The **loop** takes one scenario at a time. The agent writes code; SpecForge runs the tests, compares the files on disk before and after each turn, fingerprints the test files after RED and runs the quality gates. Whatever the agent claims, SpecForge checks.
+- When the agent lacks information it **asks** (`needs_clarification`) instead of guessing. You answer once; the answer is recorded and reused.
+
+## 2. Install
+
+Download the binary for your platform from the [latest release](https://github.com/jefmonjor/specforge/releases/latest) (`specforge-<os>-<arch>`, plus `checksums.txt`), make it executable and put it on your `PATH`:
+
+```bash
+curl -L -o specforge https://github.com/jefmonjor/specforge/releases/latest/download/specforge-darwin-arm64
+chmod +x specforge && sudo mv specforge /usr/local/bin/
+```
+
+On Windows, download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and place it in a folder on your `PATH`. SpecForge never edits your `PATH` or registry.
+
+From source (Go version from [`go.mod`](go.mod)):
+
+```bash
+git clone https://github.com/jefmonjor/specforge.git && cd specforge
+make test build        # or: go build -o specforge .
+```
+
+You also need the agent CLI you choose, installed and signed in. SpecForge drives the agent you already use and never asks for an API key.
+
+## 3. Configure once: `init`
+
+```bash
+specforge init                              # asks
+specforge init --agent claude --language es # no questions
+```
+
+`init` saves your agent (`claude` or `gemini`), the language of prompts, templates and messages (`en` or `es`) and, optionally, `--model`. Nothing else. The file lives in your user configuration directory (`~/.config/specforge/config.yaml` on Linux, `~/Library/Application Support/specforge/` on macOS, `%AppData%\specforge\` on Windows), with owner-only permissions. Set `SPECFORGE_HOME` to keep it elsewhere.
+
+## 4. Prepare a repository: `setup`
+
+```bash
+cd my-project
+specforge setup                       # your configured agent, detected stack
+specforge setup --agents claude,gemini --stack node
+```
+
+`setup` writes three things and never touches your code:
+
+| File | What | On a second run |
+| :--- | :--- | :--- |
+| `specforge.yaml` | Project settings shared by the team, every default commented. | Kept as is. |
+| `CLAUDE.md` / `GEMINI.md` | A block between `<!-- specforge:begin … -->` and `<!-- specforge:end -->` with the working rules (ask, don't invent; tests are the contract; craft) and the coding standard of your stack. Both agents load these files at every session. | The block is refreshed; the rest of the file is yours and stays untouched. |
+| `.gitignore` | Adds `.specforge/`, the local loop state. | Unchanged. |
+
+The stack is detected from `go.mod`, `pom.xml`, `build.gradle(.kts)`, `package.json` (Vitest, Jest or `npm test`) or `pyproject.toml`/`requirements.txt`/`setup.py`. With several, SpecForge asks which one to drive, or fails in CI until you set `stack:`.
+
+## 5. Specifications: `spec`
+
+```bash
+specforge spec new "Password reset"   # specs/0001-password-reset.md from the template
+specforge spec interview 0001         # complete it in a conversation with your agent
+specforge spec clarify 0001           # answer the open questions, one at a time
+specforge spec lint 0001              # what blocks approval, and advice
+specforge spec approve 0001           # review gate R0: lint, approver, seal
+specforge spec list                   # number, state, title
+```
+
+A specification is named by its number (`1`, `0001`), a file-name prefix (`0001-pass`) or its path. With one specification the argument is optional; with several, SpecForge asks (or fails in CI) instead of picking one.
+
+### The template
+
+`spec new` numbers the file after the highest existing one and fills a YAML front matter (`id`, `title`, `status`, `created`, `approved_by`, `approved_at`). The body has twelve sections: intent, actors, ubiquitous language, invariants (`INV-NN`), user stories, scenarios (Gherkin), data contracts, errors, non-functional requirements, out of scope, assumptions and open questions. Every placeholder is a `TODO`.
+
+Scenarios go in a fenced ```` ```gherkin ```` block and are parsed by the official [Cucumber Gherkin parser](https://github.com/cucumber/gherkin): every Gherkin language (`# language: es`), `And`/`But`, `Background`, `Rule` and `Scenario Outline` with `Examples` (one scenario per row).
+
+### Lint
+
+| Blocks approval | Advice only |
+| :--- | :--- |
+| A `TODO` outside an HTML comment | A numbered template section is missing |
+| An open question: `- [NEEDS CLARIFICATION]: …` | An invariant `INV-NN` that nothing else mentions |
+| No Gherkin scenario, or Gherkin that does not parse | A scenario with more than one `When` |
+| A scenario without `When` or without `Then` | |
+
+### Interview
+
+`spec interview` completes the specification in a conversation SpecForge runs, one question at a time. Each turn is one call to your agent, which:
+
+1. writes your last answer into the right section, in testable wording (behaviour becomes Gherkin scenarios; every invariant gets a failure scenario);
+2. returns the single most important next question, why it matters, the section it completes and the list of what is still unknown, or reports that nothing is.
+
+SpecForge shows the progress (`section 4. Invariants · 6 unknown(s) left`), asks you, and records each question and answer in `specs/NNNN-slug/interview.jsonl` and in the decisions log. The agent may only change the specification: any other file is an error. The interview ends only when the lint finds no `TODO` and no missing structure; if the agent says it is done too early, it is sent back with the issues. What you cannot answer is written as an open question for `spec clarify`, never guessed. The interview never approves or seals.
+
+Without a terminal the question goes to `questions.md` (exit 5): write the answer there and run `spec interview` again; it continues where it stopped. `--chat` instead hands your terminal to the agent for a free conversation.
+
+### Clarify
+
+`spec clarify` asks every `[NEEDS CLARIFICATION]` and writes each answer in place of its question, as `- **Decided:** question → answer (date, name)`, so the specification itself says what was decided. Answers also go to `specs/NNNN-slug/decisions.md`. Without a terminal the questions go to `questions.md` (exit 5); answer them there and run `clarify` again.
+
+### Approve
+
+`spec approve` lints, then records the approver (`--by`, else `git config user.name`, else a question) and the UTC time in the front matter, and appends the seal:
+
+```markdown
+<!-- seal: sha256-v1:9394d6452b3a… -->
+```
+
+The hash ignores line endings and trailing spaces, so a Windows checkout verifies the same. Specifications sealed by SpecForge 3 (`sha256:`) still verify.
+
+**Changing an approved specification** is an edit plus a new approval. The edit makes it `changed` and the loop refuses it until you revert the edit or approve the new version on purpose. Every approval is appended to `specs/NNNN-slug/approvals.md` with the date, the approver, the seal and each scenario marked `ADDED`, `MODIFIED`, `UNCHANGED` or `REMOVED` compared with the previous approval. `approve` prints the changes, and the loop redoes only the scenarios whose text changed.
+
+## 6. The plan: `plan`
+
+```bash
+specforge plan 0001            # the agent drafts specs/0001-password-reset/plan.md
+specforge plan approve 0001    # review gate R1: lint, approver, seal
+```
+
+`plan` asks your agent where the code goes before any code exists: the approach, one line per file to create or change, a table with **one planned test per scenario** (by marker), the interfaces the domain needs and the risks. It shows the agent the approved specification and the list of project files. The agent may only write `plan.md`: SpecForge rejects a draft that changes any other file, and sends it back (up to `max_attempts`) while a scenario has no planned test. When an architectural choice is not settled, the agent asks.
+
+Read the plan and edit it as you like, then approve it: approval checks that every scenario marker is there and no `TODO` is left, records you and seals the file. Running `plan` again revises the current draft instead of starting over.
+
+The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario (an amended specification with a new scenario needs the plan updated and approved again), and every prompt carries it.
+
+## 7. The loop: `loop`
+
+```bash
+specforge loop 0001                          # start
+specforge loop --resume                      # continue after a stop, a question or Ctrl-C
+specforge loop 0001 --restart                # discard the saved state and start over
+specforge loop 0001 --scenario 3 --from green  # redo one scenario from a phase
+specforge loop 0001 --review off --no-commit   # no per-scenario review, no commits
+```
+
+For each scenario, in order:
+
+| Phase | The agent | SpecForge accepts it only when |
+| :--- | :--- | :--- |
+| **RED** | Writes the test for this scenario, named with its marker (`SDD_0001_003`), plus the stubs it needs to compile. | A test file carrying the marker changed; the files the agent lists really changed; the filtered test run compiles, runs at least one test and fails. A test that passes before any implementation is reported to you: either the behaviour exists already (mark the scenario satisfied) or the test is wrong. |
+| **GREEN** | Writes the minimum code. | The test files are byte-for-byte as RED left them (else the loop stops: *test tampering*); the marker's tests pass. Failures are fed back, up to `max_attempts` (default 3). |
+| **REFACTOR** | Only called when something blocks: fixes the full suite or the gate findings without touching tests. | The whole suite passes and no gate blocks. |
+| **REVIEW** (R2) | — | You review the finished scenario: the files it changed and the gates. **Accept**, type **what should change** (back to GREEN with your note; the tests stay) or send it **back to RED** (the test does not express the scenario). Without a terminal the review is a question in `questions.md` (exit 5). `review: off` skips it. |
+| **COMMIT** | — | The scenario's files, with the decisions log, are recorded as one commit, `feat(SDD_0001_003): <title>`, and nothing else you have staged is touched. Hooks and signing run as usual. Off with `commit: false` or `--no-commit`; skipped outside git. |
+
+When a test with the scenario's marker already exists (an earlier run stopped before RED was accepted, or you wrote it yourself), RED runs it before calling the agent: a test that compiles and fails is accepted as it is, a passing test goes to you as above, and one that does not compile goes to the agent with the output. A scenario you mark as already satisfied is committed as `test(SDD_…)` with its test.
+
+`--scenario N --from red|green|refactor` reopens one scenario and keeps the others as they are. Starting after RED takes the current test files as the reference for the tampering check.
+
+When a phase needed more than one attempt, the agent may add a one-sentence `lesson` to its answer: the rule that would have avoided the mistake. SpecForge keeps it in `specs/LESSONS.md`, tagged with the stack, without duplicates and at most 30, and every later prompt for that stack shows them. The file is yours to edit.
+
+The loop state is saved after every step in `.specforge/state/<spec>.json` (written atomically). `--resume` re-reads the specification and checks the seal first. If the specification was approved again with changes, the scenarios whose text did not change keep their progress and the rest are redone. A finished loop is reported, not redone; `--restart` runs it again on purpose.
+
+Test commands used for the marker filter: `go test -json -run`, Maven `-Dtest`, Gradle `--tests`, `vitest run -t`, `jest -t`, `pytest -k`. Results are read from the runner's machine-readable report (test2json, Surefire/JUnit XML, Vitest/Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "an assertion failed" are told apart. With plain `npm test` the filter is not exact and SpecForge asks you to confirm the RED.
+
+## 8. Questions instead of guesses
+
+Every prompt ends with a response contract. The agent answers `done` (with the files it wrote), `needs_clarification` (a question, optional choices, context) or `blocked` (a reason and a suggested action). Prose without the contract gets one retry, then the step stops: prose never counts as success.
+
+- **At a terminal**, the question is shown with numbered options; your answer is appended to `specs/NNNN-slug/decisions.md` (date, phase, scenario) and sent back to the agent. The decisions log is part of every later prompt, so nothing is asked twice.
+- **Without a terminal** (CI, `--non-interactive`), the question is written to `specs/NNNN-slug/questions.md` and the command exits with code **5**. Answer it in either of two ways:
+  - write the answer (or an option number) in place of `_awaiting an answer_` in `questions.md`, then run `specforge loop --resume` anywhere, CI included;
+  - or run `specforge loop --resume` at a terminal and answer there.
+
+  The resumed step starts with the answer and does not start over: the files the agent had already written before asking still count as written in that turn. While the question has no answer, `--resume` exits with code 5 again without calling the agent.
+- **Blocked** stops with exit code 2 and the agent's suggested action.
+
+The managed block in `CLAUDE.md`/`GEMINI.md` carries the same rule: if anything needed is not in the specification, the decisions log, the code or the prompt, do not assume it.
+
+## 9. Quality gates
+
+REFACTOR runs the gates that apply to the stack. Each reads its tool's machine-readable report and compares a number with a threshold. A tool that is missing or crashes is **skipped**, shown with ⚠, never as a pass; with `quality.strict: true` (or `--strict`) a skipped gate blocks. Node tools run with `npx --no-install`: nothing is downloaded during the loop.
+
+| Gate | Go | Node | Java | Python |
+| :--- | :--- | :--- | :--- | :--- |
+| Lint | `golangci-lint` (falls back to `go vet` when absent) | `npm run lint` | — | `ruff check` |
+| Duplication (`max_duplication_percent`, default 0) | jscpd | jscpd | jscpd | jscpd |
+| Dead code | — | Knip | — | — |
+| Mutation (`min_mutation_score`, default 80) | — | Stryker, when configured | — | — |
+
+## 10. Security audit: `audit`
+
+```bash
+specforge audit                    # your changes since origin/main, origin/master, main or master
+specforge audit --base v1.2.0
+specforge audit --full --fail-on medium
+```
+
+Three passes run with your agent over each chunk of code: **reconnaissance**, a red-team **hunter** that proposes findings with file, line and evidence, and a blue-team **validator** that confirms or rejects each one. Every answer must match the embedded JSON schema; an invalid answer gets one retry and then the audit stops with an error, never with an empty passing report (*fail-closed*). Findings the validator cannot settle at or above the threshold are questions for you. A confirmed finding at or above `--fail-on` (default `high`) exits with code 2.
+
+The base ref is validated as a commit and passed after `--end-of-options`, so it can never be read as a git option. Reports go to `docs/security/` (`REPORT.md`, `findings.json`, `coverage-ledger.json`) with owner-only permissions.
+
+## 11. Browser verification: `e2e`
+
+```bash
+specforge e2e 0001 --url http://localhost:3000
+specforge e2e 0001 --url http://localhost:3000 --scenario 2 --headed
+```
+
+`e2e` drives Chrome, Chromium or Edge (found on your system, or `CHROME_PATH`) through [chromedp](https://github.com/chromedp/chromedp), scenario by scenario. The agent sees a compact view of the page (URL, title, interactive elements with unique selectors, visible text) and answers with one typed action at a time: `navigate`, `click`, `type`, `select`, `press`, `scroll`, `wait`, `assert` or `fail`. Before running an action SpecForge checks that the selector exists on the page and that navigation stays on the same origin. An `assert` names a `Then` and the evidence (text, selector or URL); SpecForge verifies the evidence itself. The page is untrusted input: its text never becomes an instruction.
+
+Each step saves a screenshot. Results go to `docs/e2e/<spec>/` (`report.json`, `REPORT.md`, `scenario-NN/step-MM.png`). The command exits with code 2 when the pass rate is below `--min-pass-rate` (default 100). `--insecure` accepts invalid TLS certificates for local test servers; it is off by default. Only approved specifications run.
+
+## 12. Hand-over: `deliver`
+
+```bash
+specforge deliver 0001
+gh pr create --body-file specs/0001-password-reset/PR_BODY.md
+```
+
+`deliver` writes three files next to the specification, built only from what SpecForge recorded, never from the agent's word:
+
+| File | For | Content |
+| :--- | :--- | :--- |
+| `DELIVERY.md` | people | Who approved the specification and the plan, and when. One row per scenario: its tests (file and test names carrying the marker), its commit, its gates (✓ passed · ⚠ skipped · ✗ failed) and notes (already satisfied, changes requested in review, rejected attempts). The decisions taken, the questions still open, the lessons, the audit and E2E results, and what is out of scope. |
+| `trace.json` | tools | The same data, machine-readable. |
+| `PR_BODY.md` | the pull request | A summary, the scenario table, the decisions, the checks and what is not done. When the repository has a pull request template (`.github/pull_request_template.md` and the other places GitHub looks), its headings are kept and the summary goes under the first one. |
+
+A delivery is honest about gaps: unfinished scenarios, open questions and checks that did not run are listed, and an incomplete delivery says so in its first line. Reviews and SpecForge's own verification questions are shown per scenario, not mixed with your product decisions. The loop state lives in `.specforge/`, so run `deliver` where the loop ran; `trace.json` keeps the trace once committed.
+
+## 13. Configuration reference
+
+Values resolve in this order: command-line flag, then `specforge.yaml`, then your user configuration, then the default.
+
+```yaml
+# specforge.yaml
+language: en            # es | en
+stack: go               # go | maven | gradle | node | python (detected when unset)
+agent: claude           # usually each developer's choice
+model: ""               # passed to the agent; empty uses its default
+max_attempts: 3         # attempts per phase
+review: scenario        # scenario: review every finished scenario (R2) | off
+commit: true            # one commit per finished scenario
+timeouts:
+  agent: 20m
+  tests: 10m
+quality:
+  strict: false
+  max_duplication_percent: 0
+  min_mutation_score: 80
+```
+
+Unknown keys are an error, so a typo never silently leaves a default in place.
+
+Global flags: `--verbose` (progress details and the agent's live output), `--debug` (debug records in the log), `--trace-io` (every prompt and answer in the log), `--quiet` (only warnings, errors and data), `--non-interactive` (never ask: write questions to a file and exit 5), `--json` (data from `version`, `spec list` and `deliver` as JSON on stdout, and errors as `{"exit", "title", "cause", "action"}` on stderr).
+
+## 14. Files SpecForge writes
+
+| Path | Committed | Content |
+| :--- | :---: | :--- |
+| `specforge.yaml` | yes | Project settings. |
+| `CLAUDE.md`, `GEMINI.md` | yes | Your content plus the managed block. |
+| `specs/NNNN-slug.md` | yes | The specification, its front matter and its seal. |
+| `specs/NNNN-slug/plan.md` | yes | The technical plan, its front matter and its seal. |
+| `specs/NNNN-slug/approvals.md` | yes | Every approval with its scenario changes. |
+| `specs/NNNN-slug/interview.jsonl` | yes | The interview transcript: each question with its section and unknowns, and your answer. |
+| `specs/NNNN-slug/decisions.md` | yes | Every question the agent asked and your answer. |
+| `specs/LESSONS.md` | yes | Lessons the agent wrote after a rejected attempt. |
+| `specs/NNNN-slug/DELIVERY.md`, `trace.json`, `PR_BODY.md` | yes | The hand-over written by `deliver`. |
+| `specs/NNNN-slug/questions.md` | yes | Questions asked when nobody was at the terminal. |
+| `docs/security/` | your choice | Audit reports (owner-only permissions). |
+| `docs/e2e/<spec>/` | your choice | E2E reports and screenshots. |
+| `.specforge/state/<spec>.json` | no | Loop state for `--resume`. |
+
+The log file lives in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux), rotated, with owner-only permissions.
+
+## 15. Exit codes
+
+| Code | Meaning |
+| :---: | :--- |
+| 0 | Done. |
+| 1 | Unexpected error or bad usage. |
+| 2 | A gate said no: tests, quality, security findings, E2E pass rate, or the agent is blocked. |
+| 3 | The specification or the loop state needs attention: not approved, changed after approval, lint issues, ambiguous or missing, test tampering, a loop in progress. |
+| 4 | A tool, browser or setting is missing: agent CLI, test runner, configuration. |
+| 5 | A question awaits your answer (no terminal). |
+| 130 | Interrupted with Ctrl-C; the state saved so far is valid. |
+
+Every failure prints what happened, why and what to do next.
+
+## 16. Troubleshooting
+
+- **What did the agent receive and answer?** Re-run with `--trace-io` and read the log file.
+- **The agent claims files it did not write.** The attempt is rejected and the agent is told which ones; that is the loop working. Repeated rejections exhaust `max_attempts` (exit 2).
+- **"Several stacks detected".** Set `stack:` in `specforge.yaml` or pass `--stack`.
+- **The loop says the specification changed.** Revert the edit, or review it and run `specforge spec approve` again; unchanged scenarios keep their progress.
+- **A gate shows ⚠ skipped.** Install the tool, or accept the warning; `--strict` makes it block.
+
+## 17. Architecture
+
+SpecForge follows the architecture it asks of your code: the domain is pure, use cases depend on small ports, adapters do the I/O and `cmd/` only wires them.
+
+```text
+cmd/                      CLI and composition root (cobra); signals → context; exit codes
+internal/
+  domain/                 pure: no I/O
+    spec/                 Gherkin parsing (official parser), seal, lint, front matter, open questions
+    lessons/              the curated lessons list
+    delivery/             the delivery trace and its rendering
+    tdd/                  loop state, test outcomes, typed errors
+    stack/                stack detection, test commands, test-file rules
+    quality/ security/ e2e/
+  app/                    use cases
+    tddloop/              Red → Green → Refactor with verification, review and commit
+    specs/ planning/      specification lifecycle and approvals; drafting the plan
+    interview/            the turn-based interview
+    deliver/              the hand-over: DELIVERY.md, trace.json, PR_BODY.md
+    conversation/         one agent turn under the response contract
+    setup/                repository setup
+    audit/ e2erun/        security audit, browser verification
+    clarify/ protocol/    questions to the developer, the agent response contract
+    prompts/ layout/      prompt templates, project paths
+  ports/                  interfaces the use cases depend on
+  adapters/               agent CLI, process runner, test runners, gates, git, browser, files, logging
+  config/ ui/             settings resolution; terminal output and diagnoses
+assets/                   embedded prompts, rules, standards, audit method, templates (es/en)
+```
+
+Tests run the real CLI against scripted agents and real `go test`, `git` and Chromium where available: `make test`.

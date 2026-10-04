@@ -1,25 +1,17 @@
-# Binarios y distribución
-sdd
-sdd.exe
-*.exe
-*.dll
-*.so
-*.dylib
+# Build output
+/specforge
+/specforge.exe
 dist/
 
-# Test & coverage artifacts
+# Test and coverage artifacts
 *.test
 *.out
 coverage.html
 
-# Runtime state & cache
-.sdd-state.json
-.sdd-cache/
-.specify/
-.gemini/
-values/
+# SpecForge's own working state when run on this repository
+.specforge/
 
-# IDE & OS
+# IDE and OS
 .vscode/
 .idea/
 .DS_Store

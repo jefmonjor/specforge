@@ -2,94 +2,192 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
+	"os/exec"
 	"strings"
 	"testing"
 
-	"specforge/internal/domain"
+	"specforge/internal/domain/spec"
 )
 
-func TestLoopIntegrityValidationOnResume(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "sdd-loop-test-*")
-	if err != nil {
-		t.Fatalf("error creando temp: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	oldWd, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(oldWd)
-		flagLoopResume = false
-	}()
-	_ = os.Chdir(tmpDir)
-
-	// Crear especificación inicial sellada
-	specContent := "# Feature: Test Resiliencia\n\nScenario: Escenario 1\nGiven precondicion\nWhen accion\nThen resultado"
-	cleanHash := domain.CalculateCleanSpecHash(specContent)
-	sealedContent := specContent + "\n\n<!-- seal: sha256:" + cleanHash + " -->\n"
-
-	specPath := filepath.Join(tmpDir, "spec.md")
-	_ = os.WriteFile(specPath, []byte(sealedContent), 0644)
-
-	// Crear estado guardado
-	scenarios, _ := domain.ParseScenarios(specContent)
-	state := domain.NewTDDState(tmpDir, specPath, cleanHash, scenarios)
-	state.CurrentPhase = domain.TDDPhaseGreen
-	_ = state.Save(tmpDir)
-
-	// 1. Modificar spec.md manualmente sin generar nuevo sello (tampering)
-	tamperedContent := sealedContent + "\nModificación manual maliciosa o accidental"
-	_ = os.WriteFile(specPath, []byte(tamperedContent), 0644)
-
-	// 2. Ejecutar sdd loop --resume -> DEBE FALLAR FATALMENTE
-	cmd := rootCmd
-	cmd.SetArgs([]string{"loop", "--resume"})
-	err = cmd.Execute()
-	if err == nil {
-		t.Errorf("se esperaba fallo fatal por alteración de la especificación")
-	} else if !strings.Contains(strings.ToLower(err.Error()), "la especificación ha sido modificada manualmente") {
-		t.Errorf("error inesperado al verificar integridad: %v", err)
+func gitInit(t *testing.T, dir string) {
+	t.Helper()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"config", "user.name", "Test"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "commit.gpgsign", "false"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init"},
+	} {
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
 	}
 }
 
-func TestLoopAbortsOnNeedsClarification(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "sdd-clarification-test-*")
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	c := exec.Command("git", args...)
+	c.Dir = dir
+	out, err := c.CombinedOutput()
 	if err != nil {
-		t.Fatalf("error creando temp: %v", err)
+		t.Fatalf("git %v: %v\n%s", args, err, out)
 	}
-	defer os.RemoveAll(tmpDir)
+	return string(out)
+}
 
-	oldWd, _ := os.Getwd()
-	defer func() {
-		_ = os.Chdir(oldWd)
-		flagLoopResume = false
-	}()
-	_ = os.Chdir(tmpDir)
+func done(files ...string) string {
+	return "```json\n{\"status\":\"done\",\"files_written\":[\"" + strings.Join(files, `","`) + "\"]}\n```"
+}
 
-	flagLoopResume = false
+// loopProject is a Go module with an approved single-scenario spec.
+func loopProject(t *testing.T) *harness {
+	t.Helper()
+	requireTool(t, "go")
+	requireTool(t, "git")
+	h := newHarness(t)
+	h.write("go.mod", "module example.com/reset\n\ngo 1.22\n")
+	h.write("specs/0001-reset.md", readySpec)
+	h.expect(0, "init", "--agent", "claude", "--language", "en")
+	h.expect(0, "setup")
+	h.expect(0, "spec", "approve", "--by", "Ana")
+	gitInit(t, h.root)
+	return h
+}
 
-	// Crear especificación con [NEEDS CLARIFICATION]
-	rawSpec := `# Feature: Test Con Dudas
-Scenario: Escenario 1
-Given estado
-When accion
-Then resultado
+func TestLoopRunsRedGreenRefactor(t *testing.T) {
+	h := loopProject(t)
+	h.agent.rules = []rule{
+		{when: "# Task: RED", files: map[string]string{
+			"reset/reset_test.go": "package reset\n\nimport \"testing\"\n\nfunc TestSDD_0001_001(t *testing.T) {\n\tif Link(\"ana\") == \"\" {\n\t\tt.Fatal(\"no link\")\n\t}\n}\n",
+			"reset/reset.go":      "package reset\n\nfunc Link(user string) string { return \"\" }\n",
+		}, reply: done("reset/reset_test.go", "reset/reset.go")},
+		{when: "# Task: GREEN", files: map[string]string{
+			"reset/reset.go": "package reset\n\nfunc Link(user string) string { return \"https://example.com/reset/\" + user }\n",
+		}, reply: done("reset/reset.go")},
+	}
+	// R2: without a terminal the review is a question in questions.md.
+	h.expect(5, "loop")
+	if !strings.Contains(h.read("specs/0001-reset/questions.md"), "Review scenario 1 (Request a link)") {
+		t.Fatalf("questions.md:\n%s", h.read("specs/0001-reset/questions.md"))
+	}
+	calls := len(h.agent.prompts)
+	if calls != 2 {
+		t.Fatalf("want one RED and one GREEN call, got %d", calls)
+	}
+	if got := h.read("reset/reset.go"); !strings.Contains(got, "https://example.com/reset/") {
+		t.Fatalf("implementation:\n%s", got)
+	}
 
-## Cuestiones Abiertas
-- [NEEDS CLARIFICATION]: ¿El tiempo de cortesía de 15 minutos aplica también en Nochevieja?
-`
-	cleanHash := domain.CalculateCleanSpecHash(rawSpec)
-	sealedSpec := rawSpec + "\n\n<!-- seal: sha256:" + cleanHash + " -->\n"
+	// Accepting in the file and resuming records the scenario as a commit.
+	q := h.read("specs/0001-reset/questions.md")
+	h.write("specs/0001-reset/questions.md", strings.Replace(q, "_awaiting an answer_", "1", 1))
+	h.expect(0, "loop", "--resume")
+	if !strings.Contains(h.err.String(), "1 scenario(s) passed") || !strings.Contains(h.err.String(), "committed ") {
+		t.Fatalf("stderr:\n%s", h.err)
+	}
+	log := gitOut(t, h.root, "log", "-1", "--name-only", "--format=%s")
+	for _, want := range []string{"feat(SDD_0001_001): Request a link", "reset/reset.go", "reset/reset_test.go"} {
+		if !strings.Contains(log, want) {
+			t.Fatalf("last commit lacks %q:\n%s", want, log)
+		}
+	}
+	if len(h.agent.prompts) != calls {
+		t.Fatal("accepting a review must not call the agent")
+	}
 
-	specPath := filepath.Join(tmpDir, "spec.md")
-	_ = os.WriteFile(specPath, []byte(sealedSpec), 0644)
+	// A finished, unchanged loop is reported, not redone.
+	h.expect(0, "loop")
+	if len(h.agent.prompts) != calls {
+		t.Fatal("a finished loop must not call the agent again")
+	}
+}
 
-	cmd := rootCmd
-	cmd.SetArgs([]string{"loop", "--spec", specPath})
-	err = cmd.Execute()
-	if err == nil {
-		t.Errorf("se esperaba bloqueo duro por [NEEDS CLARIFICATION]")
-	} else if !strings.Contains(err.Error(), "[NEEDS CLARIFICATION]") {
-		t.Errorf("mensaje de error inesperado: %v", err)
+func TestLoopRefusesAnEditedSpecification(t *testing.T) {
+	h := loopProject(t)
+	h.write("specs/0001-reset.md", strings.Replace(h.read("specs/0001-reset.md"), "gets a link", "gets two links", 1))
+	h.expect(3, "loop")
+	if len(h.agent.prompts) != 0 {
+		t.Fatal("no agent call may happen on a tampered specification")
+	}
+}
+
+func TestLoopQuestionWithoutTerminalExitsFive(t *testing.T) {
+	h := loopProject(t)
+	h.agent.rules = []rule{{when: "# Task: RED", reply: "```json\n{\"status\":\"needs_clarification\",\"question\":\"Which channel sends the link?\",\"options\":[\"email\",\"sms\"]}\n```"}}
+	h.expect(5, "loop")
+	q := h.read("specs/0001-reset/questions.md")
+	if !strings.Contains(q, "Which channel sends the link?") {
+		t.Fatalf("questions.md:\n%s", q)
+	}
+	// The answer is given at a terminal on resume and recorded.
+	h.tty, h.stdin = true, "1\n"
+	h.agent.rules = []rule{{when: "# Task: RED", reply: "```json\n{\"status\":\"blocked\",\"reason\":\"stop here\"}\n```"}}
+	h.expect(2, "loop", "--resume")
+	if _, err := os.Stat(h.root + "/.specforge/state/0001-reset.json"); err != nil {
+		t.Fatalf("state not saved: %v", err)
+	}
+}
+
+func TestLoopFlagsExcludeEachOther(t *testing.T) {
+	h := newHarness(t)
+	h.expect(1, "loop", "--resume", "--restart")
+}
+
+func TestApprovedSpecStillVerifies(t *testing.T) {
+	h := loopProject(t)
+	if err := spec.Verify(h.read("specs/0001-reset.md")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDeliverTracesTheFinishedLoop(t *testing.T) {
+	h := loopProject(t)
+	h.expect(3, "deliver", "9")
+
+	// Before the loop: every scenario is pending and the delivery says so.
+	h.expect(0, "deliver")
+	if !strings.Contains(h.err.String(), "incomplete") || !strings.Contains(h.read("specs/0001-reset/DELIVERY.md"), "⏳ not finished") {
+		t.Fatalf("stderr:\n%s\nDELIVERY.md:\n%s", h.err, h.read("specs/0001-reset/DELIVERY.md"))
+	}
+
+	h.agent.rules = []rule{
+		{when: "# Task: RED", files: map[string]string{
+			"reset/reset_test.go": "package reset\n\nimport \"testing\"\n\nfunc TestSDD_0001_001_SendsALink(t *testing.T) {\n\tif Link(\"ana\") == \"\" {\n\t\tt.Fatal(\"no link\")\n\t}\n}\n",
+			"reset/reset.go":      "package reset\n\nfunc Link(user string) string { return \"\" }\n",
+		}, reply: done("reset/reset_test.go", "reset/reset.go")},
+		{when: "# Task: GREEN", files: map[string]string{
+			"reset/reset.go": "package reset\n\nfunc Link(user string) string { return \"https://example.com/reset/\" + user }\n",
+		}, reply: done("reset/reset.go")},
+	}
+	h.tty, h.stdin = true, "Accept\n"
+	h.expect(0, "loop")
+	h.tty = false
+	h.write(".github/pull_request_template.md", "## Why\n\n## Checklist\n- [ ] reviewed\n")
+	h.expect(0, "deliver")
+	if strings.TrimSpace(h.out.String()) != "specs/0001-reset/DELIVERY.md\nspecs/0001-reset/trace.json\nspecs/0001-reset/PR_BODY.md" {
+		t.Fatalf("stdout:\n%s", h.out)
+	}
+	sha := strings.TrimSpace(gitOut(t, h.root, "rev-parse", "--short=7", "HEAD"))
+	md := h.read("specs/0001-reset/DELIVERY.md")
+	for _, want := range []string{
+		"# Delivery · 0001 Password reset",
+		"approved by Ana on 2026-10-04",
+		"1/1 finished · 1 through RED → GREEN → REFACTOR",
+		"| 1 | Request a link | `reset/reset_test.go` · `TestSDD_0001_001_SendsALink` | `" + sha + "` |",
+		"## Decisions taken during development\n\n- none",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("DELIVERY.md lacks %q:\n%s", want, md)
+		}
+	}
+	body := h.read("specs/0001-reset/PR_BODY.md")
+	if !strings.HasPrefix(body, "## Why\n\nImplements specification 0001") || !strings.Contains(body, "- [ ] reviewed") {
+		t.Fatalf("PR_BODY.md:\n%s", body)
+	}
+	if !strings.Contains(h.read("specs/0001-reset/trace.json"), `"marker": "SDD_0001_001"`) {
+		t.Fatalf("trace.json:\n%s", h.read("specs/0001-reset/trace.json"))
 	}
 }
