@@ -4,8 +4,11 @@ go 1.26.0
 
 require (
 	github.com/chromedp/chromedp v0.16.0
+	github.com/cucumber/gherkin/go/v40 v40.0.0
+	github.com/cucumber/messages/go/v33 v33.0.2
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/oauth2 v0.37.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (
@@ -16,6 +19,7 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	golang.org/x/sys v0.47.0 // indirect

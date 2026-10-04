@@ -1,0 +1,5 @@
+{"numTotalTests":4,"testResults":[{"name":"/repo/src/a.test.js","status":"failed","message":"","assertionResults":[
+ {"fullName":"reset SDD_0001_001 sends a link","status":"failed","failureMessages":["Expected: true\nReceived: false"]},
+ {"fullName":"reset other","status":"passed","failureMessages":[]},
+ {"fullName":"reset todo","status":"pending","failureMessages":[]}]},
+ {"name":"/repo/src/b.test.js","status":"passed","message":"","assertionResults":[{"fullName":"b","status":"passed","failureMessages":[]}]}]}

@@ -1,0 +1,1 @@
+{"statistics":{"total":{"percentage":4.2,"clones":2}},"duplicates":[{"firstFile":{"name":"src/a.ts"},"secondFile":{"name":"src/b.ts"},"lines":12}]}

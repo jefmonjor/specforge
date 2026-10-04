@@ -1,0 +1,5 @@
+{"schemaVersion":"2","thresholds":{"high":80,"low":60},"files":{"src/reset.ts":{"language":"typescript","source":"","mutants":[
+{"id":"1","mutatorName":"EqualityOperator","status":"Killed","location":{"start":{"line":3,"column":1},"end":{"line":3,"column":2}}},
+{"id":"2","mutatorName":"BooleanLiteral","status":"Survived","location":{"start":{"line":5,"column":1},"end":{"line":5,"column":2}}},
+{"id":"3","mutatorName":"ArithmeticOperator","status":"Killed","location":{"start":{"line":7,"column":1},"end":{"line":7,"column":2}}},
+{"id":"4","mutatorName":"StringLiteral","status":"NoCoverage","location":{"start":{"line":9,"column":1},"end":{"line":9,"column":2}}}]}}}

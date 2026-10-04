@@ -1,0 +1,1 @@
+{"files":["src/unused.ts"],"issues":[{"file":"package.json","owners":[],"dependencies":[{"name":"lodash"}],"devDependencies":[],"exports":[],"enumMembers":{}},{"file":"src/a.ts","exports":[{"name":"helper"},{"name":"other"}],"types":[]}]}
