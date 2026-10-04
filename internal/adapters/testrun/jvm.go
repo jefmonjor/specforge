@@ -23,7 +23,7 @@ func (r *Runner) maven(ctx context.Context, req ports.TestRequest) (tdd.Outcome,
 		args = append(args, "-Dtest=*"+req.Filter+"*,*#*"+req.Filter+"*")
 	}
 	start := r.now()
-	res, err := r.run(ctx, req, "mvn", args...)
+	res, err := r.run(ctx, req, wrapperOr(req.Root, "mvnw", "mvn"), args...)
 	if err != nil {
 		return tdd.Outcome{}, err
 	}
@@ -31,14 +31,7 @@ func (r *Runner) maven(ctx context.Context, req ports.TestRequest) (tdd.Outcome,
 }
 
 func (r *Runner) gradle(ctx context.Context, req ports.TestRequest) (tdd.Outcome, error) {
-	bin := "gradle"
-	wrapper := "gradlew"
-	if runtime.GOOS == "windows" {
-		wrapper = "gradlew.bat"
-	}
-	if _, err := os.Stat(filepath.Join(req.Root, wrapper)); err == nil {
-		bin = filepath.Join(req.Root, wrapper)
-	}
+	bin := wrapperOr(req.Root, "gradlew", "gradle")
 	args := []string{"test", "--console=plain"}
 	if req.Filter != "" {
 		args = append(args, "--tests", "*"+req.Filter+"*")
@@ -49,6 +42,19 @@ func (r *Runner) gradle(ctx context.Context, req ports.TestRequest) (tdd.Outcome
 		return tdd.Outcome{}, err
 	}
 	return jvmOutcome(res, gradleCompileErrors, newerThan(req.Root, "test-results", ".xml", start)), nil
+}
+
+// wrapperOr prefers the project's build wrapper (mvnw, gradlew), which
+// pins the build tool's version, over the one on PATH.
+func wrapperOr(root, wrapper, tool string) string {
+	name := wrapper
+	if runtime.GOOS == "windows" {
+		name += map[string]string{"mvnw": ".cmd", "gradlew": ".bat"}[wrapper]
+	}
+	if _, err := os.Stat(filepath.Join(root, name)); err == nil {
+		return filepath.Join(root, name)
+	}
+	return tool
 }
 
 func jvmOutcome(res ports.CommandResult, compileMarkers []string, reports []string) tdd.Outcome {

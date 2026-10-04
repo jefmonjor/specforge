@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -119,4 +120,21 @@ func Resolve(name string) (string, error) {
 func Available(name string) bool {
 	_, err := Resolve(name)
 	return err == nil
+}
+
+// VenvBin returns the executable name from the project's virtual
+// environment (.venv or venv at root), so a Python project runs the pytest
+// and ruff it pins instead of whatever is on PATH.
+func VenvBin(root, name string) (string, bool) {
+	dir, exe := "bin", name
+	if runtime.GOOS == "windows" {
+		dir, exe = "Scripts", name+".exe"
+	}
+	for _, venv := range []string{".venv", "venv"} {
+		p := filepath.Join(root, venv, dir, exe)
+		if info, err := os.Stat(p); err == nil && !info.IsDir() {
+			return p, true
+		}
+	}
+	return "", false
 }

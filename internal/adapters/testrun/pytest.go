@@ -18,7 +18,7 @@ const (
 )
 
 func (r *Runner) pytest(ctx context.Context, req ports.TestRequest) (tdd.Outcome, error) {
-	launchers := pythonCandidates()
+	launchers := pythonCandidates(req.Root)
 	if len(launchers) == 0 {
 		return tdd.Outcome{}, fmt.Errorf("%w: pytest (or python3 -m pytest)", ports.ErrToolNotFound)
 	}

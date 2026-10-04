@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"specforge/internal/adapters/process"
 	"specforge/internal/domain/quality"
@@ -30,6 +31,8 @@ func (l *Lint) Check(ctx context.Context, root string, p stack.Profile) (quality
 		return l.node(ctx, root)
 	case stack.Python:
 		return l.python(ctx, root)
+	case stack.Maven:
+		return l.maven(ctx, root)
 	default:
 		return skipped(l.Name(), "no linter configured for "+string(p.Kind)+" (add Checkstyle or PMD to the build)"), nil
 	}
@@ -80,7 +83,11 @@ func (l *Lint) node(ctx context.Context, root string) (quality.Result, error) {
 
 // ruff exits 1 with violations and 2 when it cannot run.
 func (l *Lint) python(ctx context.Context, root string) (quality.Result, error) {
-	res, err := l.proc.Run(ctx, ports.Command{Name: "ruff", Args: []string{"check", "."}, Dir: root})
+	ruff := "ruff"
+	if bin, ok := process.VenvBin(root, "ruff"); ok {
+		ruff = bin
+	}
+	res, err := l.proc.Run(ctx, ports.Command{Name: ruff, Args: []string{"check", "."}, Dir: root})
 	if err != nil {
 		return toolError(ctx, l.Name(), err)
 	}
@@ -91,6 +98,32 @@ func (l *Lint) python(ctx context.Context, root string) (quality.Result, error) 
 		return quality.Result{Gate: l.Name(), Status: quality.Failed, Summary: "ruff found issues", Details: res.Combined()}, nil
 	default:
 		return skipped(l.Name(), "ruff could not run: "+res.Combined()), nil
+	}
+}
+
+// maven runs PMD when the build declares it (the SpecForge Java scaffold
+// does): pmd:check fails the build on any violation of its rule set.
+func (l *Lint) maven(ctx context.Context, root string) (quality.Result, error) {
+	pom, err := os.ReadFile(filepath.Join(root, "pom.xml"))
+	if err != nil || !strings.Contains(string(pom), "maven-pmd-plugin") {
+		return skipped(l.Name(), "no linter configured for maven (add maven-pmd-plugin to the build)"), nil
+	}
+	mvn := "mvn"
+	if _, err := os.Stat(filepath.Join(root, "mvnw")); err == nil {
+		mvn = filepath.Join(root, "mvnw")
+	}
+	res, err := l.proc.Run(ctx, ports.Command{Name: mvn, Args: []string{"-B", "-q", "test-compile", "pmd:check"}, Dir: root})
+	if err != nil {
+		return toolError(ctx, l.Name(), err)
+	}
+	out := res.Combined()
+	switch {
+	case res.Success():
+		return quality.Result{Gate: l.Name(), Status: quality.Passed, Summary: "PMD: no violations"}, nil
+	case strings.Contains(out, "PMD Failure") || strings.Contains(out, "PMD violation"):
+		return quality.Result{Gate: l.Name(), Status: quality.Failed, Summary: "PMD found violations", Details: out}, nil
+	default:
+		return skipped(l.Name(), "PMD could not run: "+firstLine(out)), nil
 	}
 }
 
