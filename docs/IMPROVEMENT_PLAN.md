@@ -389,7 +389,7 @@ Cobertura: **38,4 %** · `cmd` 26 % · `domain` 60 % · `agent`/`auth`/`security
 | Sev | Problema | Mejora |
 | :---: | :--- | :--- |
 | 🔴 | **71/71 ficheros CRLF**; `gofmt -l` lista todos. | `.gitattributes`; `gofmt -w`; CI. |
-| 🟠 | `chromedp` `// indirect` siendo directo; `go 1.26` sin usar nada de 1.26. | `go mod tidy`; `go 1.24`. |
+| 🟠 | `chromedp` `// indirect` siendo directo. (`go 1.26` **es** necesario: lo exigen `chromedp v0.16`, `cdproto` y `x/oauth2`; el README debe leerlo de `go.mod`, no fijar "1.24+".) | `go mod tidy`; CI con `tidy -diff`. |
 | 🟠 | `--FailOn`/`--DryRun`; `flagConsistencyFailOn` nunca leído; stdout mezcla datos y banners; sin `--json`/`--quiet`; exit codes sin contrato. | Kebab-case; stderr/stdout; `--output json`; códigos: 0 ok · 1 uso · 2 gate · 3 integridad · 4 toolchain · **5 pregunta pendiente**. |
 | 🟠 | Cinco nombres (`specforge`/`sdd`/`forge`/`SDD-Free`/`SDDFramework`), dos rutas de config, una guía referenciada que no existe. | Uno de cada. |
 | 🟡 | `setup` lee stdin sin TTY check (CI se cuelga); `--location` default anula la detección; `--recursive` solo se apaga con `=false`. | `term.IsTerminal` + `--non-interactive`; `Changed`; `--no-recursive`. |
@@ -470,11 +470,12 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 
 ### Fase 0 — Higiene y red de seguridad (1 semana) · P5, P6
 
-- [ ] LF + `.gitattributes`; `gofmt -w`; `go mod tidy`; `go 1.24`.
-- [ ] CI: `gofmt -l`, `go vet`, `golangci-lint` (errcheck, funlen, gocyclo, goconst, revive), `tidy -diff`, `go test -race -cover` con umbral 38 % (no bajar), build cross-platform.
-- [ ] Tests con herramientas externas → `t.Skip` o `-tags integration`.
-- [ ] `internal/buildinfo` con `-X`; `goreleaser.yaml`; borrar los `3.0.0` hardcodeados y los 4 build scripts.
-- [ ] Corregir las ~12 afirmaciones falsas de README/USER_GUIDE.
+- [x] LF + `.gitattributes`; `gofmt -w`; `go mod tidy` (`go 1.26` se mantiene: lo exigen las dependencias). → PR #2
+- [x] CI: `gofmt -l`, `go vet`, `tidy -diff`, `go test -race -cover` con umbral 35 % (el real sin tests de integración; no bajar), build cross-platform. → PR #2
+- [ ] `golangci-lint` en CI (errcheck, funlen, gocyclo, goconst, revive) con `.golangci.yml`.
+- [x] Tests con herramientas externas → `-tags integration`; los que no asertaban ahora asertan. → PR #2
+- [x] `internal/buildinfo` con `-X`; `Makefile` + `.goreleaser.yaml`; borrados los `3.0.0` hardcodeados y los 4 build scripts. → PR #2
+- [x] Corregidas las afirmaciones falsas de USER_GUIDE y la referencia a `GUIA_DE_USO_V3.md`. → PR #2 (el README ya se corrigió en PR #1)
 - **Hecho cuando:** CI verde en Linux/macOS/Windows en un clon limpio. **Principios:** P5 medible (lint en verde), P6 (goreleaser en vez de 4 scripts).
 
 ### Fase 1 — Que las puertas se nieguen y la IA pregunte (3 semanas) · P1, P3, P5
