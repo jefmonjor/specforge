@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="300" viewBox="0 0 960 300" role="img" aria-labelledby="title desc">
+  <title id="title">SpecForge</title>
+  <desc id="desc">Spec, Red, Green, Refactor, Ship: each stage is a gate the AI has to pass.</desc>
+  <style>
+    .bg { fill: #fbfaf8; }
+    .frame { fill: none; stroke: #e6e2dc; }
+    .ink { fill: #15130f; }
+    .muted { fill: #6b655c; }
+    .rail { stroke: #d8d2c8; }
+    .node { fill: #ffffff; stroke: #d8d2c8; }
+    .brand { fill: #c2551a; }
+    .red { fill: #d23c3c; }
+    .green { fill: #2f9e5b; }
+    .blue { fill: #2f6fd2; }
+    .gold { fill: #b8860b; }
+    text { font-family: ui-sans-serif, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0f0e0c; }
+      .frame { stroke: #2a2723; }
+      .ink { fill: #f3f0ea; }
+      .muted { fill: #a39c90; }
+      .rail { stroke: #3a3631; }
+      .node { fill: #191714; stroke: #3a3631; }
+      .brand { fill: #ef7a3a; }
+    }
+  </style>
+
+  <rect class="bg" width="960" height="300" rx="16"/>
+  <rect class="frame" x="0.5" y="0.5" width="959" height="299" rx="16"/>
+
+  <!-- wordmark -->
+  <rect class="brand" x="56" y="58" width="12" height="12" rx="2"/>
+  <text class="ink" x="80" y="72" font-size="30" font-weight="700" letter-spacing="-0.5">SpecForge</text>
+  <text class="muted mono" x="244" y="71" font-size="13">v3 · Go · Apache-2.0</text>
+  <text class="ink" x="56" y="112" font-size="20" font-weight="500">Your AI coding agent writes the code. SpecForge decides if it ships.</text>
+  <text class="muted" x="56" y="138" font-size="15">Sealed specs, a test-first loop and quality gates around Claude Code or Gemini CLI.</text>
+
+  <!-- pipeline -->
+  <line class="rail" x1="120" y1="214" x2="840" y2="214" stroke-width="2" stroke-dasharray="4 6"/>
+
+  <g>
+    <rect class="node" x="56" y="186" width="148" height="56" rx="10"/>
+    <circle class="gold" cx="78" cy="214" r="6"/>
+    <text class="ink" x="94" y="210" font-size="14" font-weight="600">SPEC</text>
+    <text class="muted mono" x="94" y="228" font-size="11">sha-256 sealed</text>
+  </g>
+  <g>
+    <rect class="node" x="231" y="186" width="148" height="56" rx="10"/>
+    <circle class="red" cx="253" cy="214" r="6"/>
+    <text class="ink" x="269" y="210" font-size="14" font-weight="600">RED</text>
+    <text class="muted mono" x="269" y="228" font-size="11">test must fail</text>
+  </g>
+  <g>
+    <rect class="node" x="406" y="186" width="148" height="56" rx="10"/>
+    <circle class="green" cx="428" cy="214" r="6"/>
+    <text class="ink" x="444" y="210" font-size="14" font-weight="600">GREEN</text>
+    <text class="muted mono" x="444" y="228" font-size="11">3 retries max</text>
+  </g>
+  <g>
+    <rect class="node" x="581" y="186" width="148" height="56" rx="10"/>
+    <circle class="blue" cx="603" cy="214" r="6"/>
+    <text class="ink" x="619" y="210" font-size="14" font-weight="600">REFACTOR</text>
+    <text class="muted mono" x="619" y="228" font-size="11">quality gates</text>
+  </g>
+  <g>
+    <rect class="node" x="756" y="186" width="148" height="56" rx="10"/>
+    <circle class="brand" cx="778" cy="214" r="6"/>
+    <text class="ink" x="794" y="210" font-size="14" font-weight="600">SHIP</text>
+    <text class="muted mono" x="794" y="228" font-size="11">audit · e2e</text>
+  </g>
+
+  <text class="muted mono" x="56" y="272" font-size="11">state saved after every step  →  specforge loop --resume</text>
+</svg>
