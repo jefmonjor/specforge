@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"specforge/internal/domain/legacy"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/stack"
 	"specforge/internal/ports"
@@ -151,5 +152,25 @@ func TestCancelledContextStopsTheGates(t *testing.T) {
 	proc := &fakeProc{errs: map[string]error{"ruff": context.Canceled}}
 	if _, err := Run(ctx, []ports.Gate{&Lint{proc: proc}}, t.TempDir(), stack.Profile{Kind: stack.Python}); err == nil {
 		t.Fatal("cancellation must surface as an error")
+	}
+}
+
+func TestMigrationGate(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "pom.xml"), []byte("<maven.compiler.release>21</maven.compiler.release>"), 0o644)
+	os.MkdirAll(filepath.Join(root, "src/main/java/a"), 0o755)
+	g := &Migration{Target: legacy.Target{JavaRelease: 21, ForbiddenImports: []string{"javax.servlet"}}}
+	maven := stack.Profile{Kind: stack.Maven}
+	if !g.Applies(maven) || g.Applies(stack.Profile{Kind: stack.Go}) || (&Migration{}).Applies(maven) {
+		t.Fatal("applies")
+	}
+	res, err := g.Check(context.Background(), root, maven)
+	if err != nil || res.Status != quality.Passed {
+		t.Fatalf("%+v %v", res, err)
+	}
+	os.WriteFile(filepath.Join(root, "src/main/java/a/W.java"), []byte("package a;\nimport javax.servlet.Filter;\n"), 0o644)
+	res, _ = g.Check(context.Background(), root, maven)
+	if res.Status != quality.Failed || !strings.Contains(res.Details, "src/main/java/a/W.java:2") {
+		t.Fatalf("%+v", res)
 	}
 }

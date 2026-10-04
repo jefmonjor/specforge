@@ -239,7 +239,13 @@ var releasePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?:sourceCompatibility|targetCompatibility)\s*=\s*['"]?(?:JavaVersion\.VERSION_)?([\d._]+)`),
 	regexp.MustCompile(`<javac[^>]*\b(?:source|target)\s*=\s*"([\d.]+)"`),
 	regexp.MustCompile(`name="(?:javac\.source|ant\.build\.javac\.source|java\.version)"\s+value="([\d.]+)"`),
+	regexp.MustCompile(`JavaLanguageVersion\.of\(\s*(\d+)\s*\)`),
+	regexp.MustCompile(`\brelease(?:\.set\(\s*|\s*=\s*)(\d+)`),
 }
+
+// DeclaredRelease is the Java release the build at the root of fsys
+// declares ("1.6", "21"), or "" when it declares none.
+func DeclaredRelease(fsys fs.FS) string { return javaRelease(fsys) }
 
 // javaRelease reads the release the build declares; the lowest wins, since
 // that is what the code must still compile for.

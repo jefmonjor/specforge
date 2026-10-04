@@ -15,6 +15,7 @@ import (
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/config"
+	"specforge/internal/domain/legacy"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/ui"
 )
@@ -81,9 +82,10 @@ The state is saved after every step: --resume continues where it stopped.`,
 			files := fsys.OS{}
 			events := &ui.LoopEvents{C: con, Agent: ag.Name(), Stack: profile.Name()}
 			svc := tddloop.New(tddloop.Deps{
-				Agent:     ag,
-				Tests:     testrun.New(proc),
-				Gates:     gates.ForProfile(profile, proc, p.settings.Quality),
+				Agent: ag,
+				Tests: testrun.New(proc),
+				Gates: append(gates.ForProfile(profile, proc, p.settings.Quality),
+					&gates.Migration{Target: legacy.Target{JavaRelease: p.settings.Migration.JavaRelease, ForbiddenImports: p.settings.Migration.ForbiddenImports}}),
 				Workspace: workspace.New(proc),
 				Files:     files,
 				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},

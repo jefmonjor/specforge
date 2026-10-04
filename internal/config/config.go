@@ -76,7 +76,7 @@ var DefaultForbiddenImports = []string{
 	"javax.servlet", "javax.persistence", "javax.validation", "javax.ejb",
 	"javax.jms", "javax.ws.rs", "javax.xml.bind", "javax.xml.rpc", "javax.annotation",
 	"javax.inject", "javax.faces", "javax.transaction",
-	"org.apache.log4j", "junit.framework",
+	"org.apache.log4j", "junit.framework", "java.util.Vector", "java.util.Hashtable",
 }
 
 // Overrides are command-line flags; empty values do not override.
