@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"specforge/internal/buildinfo"
 	"time"
 )
 
@@ -12,18 +13,18 @@ import (
 type StatePhase string
 
 const (
-	PhaseIdle        StatePhase = "IDLE"
-	PhaseSpecify     StatePhase = "SPECIFY"
-	PhasePlan        StatePhase = "PLAN"
-	PhaseGate1       StatePhase = "GATE_1_BUSINESS_APPROVAL"
-	PhaseGate2       StatePhase = "GATE_2_TECH_PLAN_APPROVAL"
-	PhaseRedTest     StatePhase = "TDD_RED_FAILING_TESTS"
-	PhaseGreenCode   StatePhase = "TDD_GREEN_IMPLEMENTATION"
-	PhaseRefactor    StatePhase = "TDD_REFACTOR_CLEAN_CODE"
-	PhaseSonarGate   StatePhase = "GATE_SONARQUBE"
-	PhaseGate3       StatePhase = "GATE_3_FINAL_APPROVAL"
-	PhaseCompleted   StatePhase = "COMPLETED"
-	PhaseFailed      StatePhase = "FAILED"
+	PhaseIdle      StatePhase = "IDLE"
+	PhaseSpecify   StatePhase = "SPECIFY"
+	PhasePlan      StatePhase = "PLAN"
+	PhaseGate1     StatePhase = "GATE_1_BUSINESS_APPROVAL"
+	PhaseGate2     StatePhase = "GATE_2_TECH_PLAN_APPROVAL"
+	PhaseRedTest   StatePhase = "TDD_RED_FAILING_TESTS"
+	PhaseGreenCode StatePhase = "TDD_GREEN_IMPLEMENTATION"
+	PhaseRefactor  StatePhase = "TDD_REFACTOR_CLEAN_CODE"
+	PhaseSonarGate StatePhase = "GATE_SONARQUBE"
+	PhaseGate3     StatePhase = "GATE_3_FINAL_APPROVAL"
+	PhaseCompleted StatePhase = "COMPLETED"
+	PhaseFailed    StatePhase = "FAILED"
 )
 
 // TDDPhase define el estado estricto dentro del ciclo Red-Green-Refactor
@@ -77,7 +78,7 @@ type TDDState struct {
 // NewTDDState inicializa una nueva máquina de estados TDD
 func NewTDDState(projectRoot, specPath, specHash string, scenarios []Scenario) *TDDState {
 	return &TDDState{
-		Version:         "3.0.0",
+		Version:         buildinfo.Version,
 		UpdatedAt:       time.Now().UTC(),
 		ProjectRoot:     projectRoot,
 		SpecPath:        specPath,
@@ -160,7 +161,7 @@ func (s *TDDState) AdvanceToNextPhase() {
 // NewLoopState inicializa una nueva máquina de estados general (compatibilidad)
 func NewLoopState(projectRoot, intent string) *LoopState {
 	return &LoopState{
-		Version:      "3.0.0",
+		Version:      buildinfo.Version,
 		UpdatedAt:    time.Now().UTC(),
 		ProjectRoot:  projectRoot,
 		CurrentPhase: PhaseIdle,

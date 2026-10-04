@@ -1,8 +1,12 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
 
-// SDDConfig representa la configuración global de SDDFramework almacenada en ~/.sdd/config.json
+	"specforge/internal/buildinfo"
+)
+
+// SDDConfig representa la configuración global de SpecForge almacenada en ~/.specforge/config.json
 type SDDConfig struct {
 	Version     string            `json:"version"`
 	Agent       string            `json:"agent"` // "gemini" o "claude"
@@ -14,11 +18,11 @@ type SDDConfig struct {
 
 // AuthConfig define los parámetros de autenticación y proveedor LLM
 type AuthConfig struct {
-	Provider    string `json:"provider"`      // "gcp_adc", "api_key", etc.
-	Project     string `json:"project"`       // Proyecto GCP (e.g. my-cloud-project)
-	Location    string `json:"location"`      // Región GCP (e.g. europe-west1)
-	UseVertexAI bool   `json:"use_vertex_ai"` // Flag corporativo para Vertex AI
-	HasADC      bool   `json:"has_adc"`       // Si se detectaron Application Default Credentials
+	Provider    string `json:"provider"`          // "gcp_adc", "api_key", etc.
+	Project     string `json:"project"`           // Proyecto GCP (e.g. my-cloud-project)
+	Location    string `json:"location"`          // Región GCP (e.g. europe-west1)
+	UseVertexAI bool   `json:"use_vertex_ai"`     // Flag corporativo para Vertex AI
+	HasADC      bool   `json:"has_adc"`           // Si se detectaron Application Default Credentials
 	Account     string `json:"account,omitempty"` // Cuenta activa detectada
 }
 
@@ -38,7 +42,7 @@ type SonarConfig struct {
 // NewDefaultConfig crea una configuración inicial por defecto con valores recomendados
 func NewDefaultConfig() *SDDConfig {
 	return &SDDConfig{
-		Version: "3.0.0",
+		Version: buildinfo.Version,
 		Agent:   "gemini",
 		Auth: AuthConfig{
 			Provider:    "gcp_adc",

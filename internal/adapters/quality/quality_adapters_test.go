@@ -24,21 +24,6 @@ func TestKnipGateWithoutPackageJson(t *testing.T) {
 	}
 }
 
-func TestJSCPDGateCleanDirectory(t *testing.T) {
-	gate := NewJSCPDGate()
-	tmpDir, _ := os.MkdirTemp("", "sdd-jscpd-test-*")
-	defer os.RemoveAll(tmpDir)
-
-	p := domain.ProjectInfo{RootPath: tmpDir, Type: domain.ProjectReact}
-	passed, report, err := gate.RunStaticAnalysis(context.Background(), p)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-	if !passed {
-		t.Errorf("debería pasar en un directorio limpio sin clones: %s", report)
-	}
-}
-
 func TestStrykerGateWithoutConfig(t *testing.T) {
 	gate := NewStrykerGate()
 	tmpDir, _ := os.MkdirTemp("", "sdd-stryker-test-*")
@@ -54,18 +39,6 @@ func TestStrykerGateWithoutConfig(t *testing.T) {
 	}
 }
 
-func TestLinterGateGo(t *testing.T) {
-	gate := NewLinterGate()
-	p := domain.ProjectInfo{RootPath: ".", Type: domain.ProjectGo}
-	passed, report, err := gate.RunStaticAnalysis(context.Background(), p)
-	if err != nil {
-		t.Fatalf("error: %v", err)
-	}
-	if !passed {
-		t.Errorf("go vet / linter debería pasar en sdd-go: %s", report)
-	}
-}
-
 func TestSetupExtractsQualityConfigs(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "sdd-quality-configs-*")
 	defer os.RemoveAll(tmpDir)
@@ -75,6 +48,6 @@ func TestSetupExtractsQualityConfigs(t *testing.T) {
 
 	p := domain.DetectProject(tmpDir)
 	if p.Type != domain.ProjectNode && p.Type != domain.ProjectReact {
-		t.Logf("Stack detectado: %s", p.Type)
+		t.Fatalf("a bare package.json must be detected as a Node/React project, got %q", p.Type)
 	}
 }

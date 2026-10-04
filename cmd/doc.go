@@ -46,7 +46,7 @@ func runDoc(cmd *cobra.Command, args []string) error {
 
 	converter := doc.NewDocumentConverter()
 	fmt.Println("==================================================================")
-	fmt.Println("📄 SpecForge v3.0 — Conversor de Documentos a Markdown")
+	fmt.Println("📄 SpecForge — Conversor de Documentos a Markdown")
 	fmt.Println("==================================================================")
 	fmt.Println("  ✓ Motor: Microsoft MarkItDown (PDF, Excel .xlsx, Word .docx)")
 

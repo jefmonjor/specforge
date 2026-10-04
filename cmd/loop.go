@@ -61,7 +61,7 @@ func runLoop(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("==================================================================")
-	fmt.Println("🚀 SpecForge v3.0 — TDD Loop Resiliente (Red -> Green -> Refactor)")
+	fmt.Println("🚀 SpecForge — TDD Loop Resiliente (Red -> Green -> Refactor)")
 	fmt.Println("==================================================================")
 
 	proj := domain.DetectProject(cwd)

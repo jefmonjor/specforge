@@ -10,12 +10,12 @@ import (
 
 // Scenario representa un escenario BDD / Gherkin extraído de la especificación
 type Scenario struct {
-	Index       int      `json:"index"`
-	Title       string   `json:"title"`
-	Given       []string `json:"given"`
-	When        []string `json:"when"`
-	Then        []string `json:"then"`
-	RawContent  string   `json:"raw_content"`
+	Index      int      `json:"index"`
+	Title      string   `json:"title"`
+	Given      []string `json:"given"`
+	When       []string `json:"when"`
+	Then       []string `json:"then"`
+	RawContent string   `json:"raw_content"`
 }
 
 // BDDFeature representa la especificación funcional completa

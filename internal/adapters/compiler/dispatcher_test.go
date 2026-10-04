@@ -11,7 +11,7 @@ import (
 
 func TestResolveCommands(t *testing.T) {
 	cases := []struct {
-		projType        domain.ProjectType
+		projType         domain.ProjectType
 		expectedBuildCmd string
 		expectedTestCmd  string
 	}{

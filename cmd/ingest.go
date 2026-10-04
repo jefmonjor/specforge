@@ -49,7 +49,7 @@ func runIngest(cmd *cobra.Command, args []string) error {
 
 	start := time.Now()
 	fmt.Println("==================================================================")
-	fmt.Println("🚀 SpecForge v3.0 — Ingesta As-Is y Motor de Contexto")
+	fmt.Println("🚀 SpecForge — Ingesta As-Is y Motor de Contexto")
 	fmt.Println("==================================================================")
 
 	// Conversión automática por defecto de PDFs, Word y Excel a Markdown

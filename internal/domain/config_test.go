@@ -1,14 +1,15 @@
 package domain
 
 import (
+	"specforge/internal/buildinfo"
 	"testing"
 )
 
 func TestNewDefaultConfig(t *testing.T) {
 	cfg := NewDefaultConfig()
 
-	if cfg.Version != "3.0.0" {
-		t.Errorf("versión esperada 3.0.0, obtenida: %s", cfg.Version)
+	if cfg.Version != buildinfo.Version {
+		t.Errorf("config version must follow the build: want %s, got %s", buildinfo.Version, cfg.Version)
 	}
 	if cfg.Agent != "gemini" {
 		t.Errorf("agente por defecto esperado 'gemini', obtenido: %s", cfg.Agent)

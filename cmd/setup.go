@@ -65,7 +65,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 
 	baselineVer := assets.GetBaselineVersion()
 	fmt.Printf("==================================================================\n")
-	fmt.Printf("🚀 SpecForge v3.0 — Setup de Proyecto (Baseline: %s)\n", baselineVer)
+	fmt.Printf("🚀 SpecForge — Setup de Proyecto (Baseline: %s)\n", baselineVer)
 	fmt.Printf("==================================================================\n")
 
 	// 2. Crear estructura en .specify/ y extraer assets embebidos

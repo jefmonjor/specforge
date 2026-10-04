@@ -25,10 +25,10 @@ var (
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Inicializa la configuración de SDDFramework con Zero-Config y detección ADC",
-	Long: `Inicia el asistente interactivo para configurar el SDDFramework.
+	Short: "Inicializa la configuración de SpecForge con Zero-Config y detección ADC",
+	Long: `Inicia el asistente interactivo para configurar el SpecForge.
 Detecta automáticamente las credenciales de Google Cloud (ADC) de gcloud,
-el proyecto de trabajo, y genera el archivo ~/.sdd/config.json sin necesidad
+el proyecto de trabajo, y genera el archivo ~/.specforge/config.json sin necesidad
 de configurar manualmente variables de entorno del sistema operativo.`,
 	RunE: runInit,
 }
@@ -49,7 +49,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	store := storage.NewConfigStorage(cfgFile)
 
 	fmt.Println("==================================================================")
-	fmt.Println("🚀 SpecForge v3.0 — Asistente de Configuración Zero-Config")
+	fmt.Println("🚀 SpecForge — Asistente de Configuración Zero-Config")
 	fmt.Println("==================================================================")
 
 	if store.Exists() && !flagForce && !flagNonInteractive {
@@ -158,10 +158,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("validación de configuración fallida: %w", err)
 	}
 
-	// Guardar configuración en ~/.sdd/config.json
+	// Guardar configuración en ~/.specforge/config.json
 	cfg.PopulateEnvMap()
 	if err := store.Save(cfg); err != nil {
-		return fmt.Errorf("error guardando ~/.sdd/config.json: %w", err)
+		return fmt.Errorf("error guardando ~/.specforge/config.json: %w", err)
 	}
 
 	configPath, _ := store.GetConfigPath()

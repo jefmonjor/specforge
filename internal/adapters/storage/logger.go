@@ -19,7 +19,7 @@ const (
 	LevelError LogLevel = "ERROR"
 )
 
-// FileLogger gestiona el volcado diario de trazas en ~/.sdd/logs/sdd-YYYYMMDD.log
+// FileLogger gestiona el volcado diario de trazas en ~/.specforge/logs/sdd-YYYYMMDD.log
 type FileLogger struct {
 	mu         sync.Mutex
 	logDir     string

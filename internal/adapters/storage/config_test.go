@@ -3,8 +3,8 @@ package storage
 import (
 	"os"
 	"path/filepath"
-	"testing"
 	"specforge/internal/domain"
+	"testing"
 )
 
 func TestConfigStorageSaveAndLoad(t *testing.T) {

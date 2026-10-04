@@ -45,7 +45,7 @@ func (v *VisionAgent) RunVisualSpec(ctx context.Context, spec *domain.Spec, targ
 	}
 
 	fmt.Println("==================================================================")
-	fmt.Println("🧪 SpecForge v3.0 — Motor E2E Autónomo (TesterArmy Engine)")
+	fmt.Println("🧪 SpecForge — Motor E2E Autónomo (TesterArmy Engine)")
 	fmt.Println("==================================================================")
 	fmt.Printf("  • URL Objetivo:     %s\n", targetURL)
 	fmt.Printf("  • Agente Visual:    %s (Vertex AI ADC: %v)\n", agentName, v.cfg.Auth.UseVertexAI)

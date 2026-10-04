@@ -1,6 +1,6 @@
 # 📖 SpecForge: Complete User & Architecture Guide
 
-> **Engine:** Pure Static Go (`specforge.exe` / `specforge`, ~8.9 MB)  
+> **Engine:** single Go binary (`specforge.exe` / `specforge`, ~9 MB)  
 > **Methodology:** Spec-Driven Development (SDD) & Resilient Test-Driven Development (TDD)  
 > **License:** Apache License, Version 2.0  
 
@@ -54,7 +54,7 @@ SpecForge enforces disciplined software craftsmanship on top of generative AI co
       └─────────────────────────────────────────────────────────────┘
 ```
 
-* **Zero Runtime Dependencies:** Single static binary in pure Go. Does not require Go, Node.js, Python, or Playwright installed to run the CLI or the E2E engine.
+* **Single binary:** SpecForge itself needs nothing installed. It drives the Claude Code or Gemini CLI you already use, and each optional gate shells out to its own tool when present (`golangci-lint`, `ruff`, `jscpd`, `knip`, `stryker`, Maven, `markitdown`). The E2E engine needs a local Chrome or Edge, not Node.js or Playwright.
 * **Zero Keys:** Automatically inherits Google Cloud Application Default Credentials (ADC) or local session auth.
 * **Deterministic Verification:** Every transition is validated by compilers and linters with exit code enforcement.
 
@@ -117,7 +117,7 @@ git init
 specforge setup --stack react    # React + Vite + TS + Vitest + Knip + Stryker
 specforge setup --stack java     # Java 21 + Spring Boot 3 + Maven + ArchUnit
 specforge setup --stack go       # Go + Clean Architecture
-specforge setup --stack python   # Python + FastAPI + pytest + ruff
+specforge setup --stack python   # minimal pyproject.toml + src/main.py starter
 ```
 1. Deploys full source code and build files (`package.json`, `pom.xml`, or `go.mod`), replacing placeholders with your directory name.
 2. Pre-configures quality guardrails (`knip.json`, `.jscpd.json`, `stryker.conf.json`).
@@ -155,7 +155,7 @@ SpecForge transforms generic AI assistants into senior software crafters special
   - [2026-10-02 10:15:00] [Compilación / Test] Fallo: TypeError en cálculo. Solución: Tipado estricto. No repetir.
   ```
 * In phase **REFACTOR**: When a Quality Gate violation is resolved, the rule is recorded in `lessons.md`.
-* **Immediate Feedback:** On all subsequent turns, `LoadAgentContext` injects `lessons.md` into `<system_instruction>`. The AI never makes the same architectural mistake twice.
+* **Feedback on later turns:** `LoadAgentContext` prepends the six memory files, including `lessons.md`, to every headless prompt. Today a lesson records the failing output and a generic remedy; curating these entries is on the roadmap.
 
 ---
 
@@ -221,16 +221,16 @@ specforge loop
 ```
 
 ### The 3 Phases:
-1. **RED:** Generates unit test stubs. Executes test suite. If tests pass without implementation, it aborts for **YAGNI Violation**.
+1. **RED:** Asks the agent for a failing test. Executes test suite. If tests pass without implementation, it aborts for **YAGNI Violation**.
 2. **GREEN:** Generates minimal production code. Retries up to 3 times with compiler error feedback.
 3. **REFACTOR:** Executes static quality gates. Requests clean refactoring if any gate is breached.
 
 ### Fault Tolerance with `--resume`:
-State is persisted atomically in `.sdd-state.json`. If execution is interrupted by network failure or battery loss:
+State is persisted in `.sdd-state.json` after every step. If execution is interrupted by network failure or battery loss:
 ```bash
 specforge loop --resume
 ```
-Validates the SHA-256 spec seal and resumes at the exact micro-step without wasting tokens.
+Validates the SHA-256 spec seal and resumes at the persisted phase of the current scenario.
 
 ---
 
@@ -288,7 +288,7 @@ specforge audit --full      # Comprehensive codebase security audit
 | `specforge loop` | TDD assembly line (Red -> Green -> Refactor) | `--resume`, `--spec`, `--agent` |
 | `specforge e2e` | Autonomous Visual E2E test engine | `--url`, `--spec`, `--headless`, `--max-steps`, `--screenshot` |
 | `specforge audit` | Adversarial security audit | `--diff`, `--full`, `--fail-on [HIGH/MEDIUM]` |
-| `specforge consistency`| Deterministic consistency verification | `--FailOn` |
+| `specforge consistency`| Legacy-Java anti-contamination gate (javax→jakarta, Java < 17) | — |
 | `specforge build` | Build validation | `--dry-run` |
 | `specforge version` | Platform & telemetry info | — |
 

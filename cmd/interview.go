@@ -69,7 +69,7 @@ func runInterview(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println("==================================================================")
-	fmt.Println("🚀 SpecForge v3.0 — Entrevista Socrática BDD (Blindaje Win32)")
+	fmt.Println("🚀 SpecForge — Entrevista Socrática BDD (Blindaje Win32)")
 	fmt.Println("==================================================================")
 	fmt.Println("  ✓ Tuberías acopladas a Win32 (inmune a NativeCommandError)")
 	fmt.Printf("  ✓ Agente activo: %s (Vertex AI ADC: %v)\n", agentName, cfg.Auth.UseVertexAI)

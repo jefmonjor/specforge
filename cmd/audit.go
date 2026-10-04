@@ -25,7 +25,7 @@ var (
 var auditCmd = &cobra.Command{
 	Use:   "audit",
 	Short: "Auditoría de seguridad adversarial basada en el arnés de Cloudflare",
-	Long: `Ejecuta una auditoría de seguridad adversarial en 6 fases:
+	Long: `Ejecuta una auditoría de seguridad adversarial en 4 fases:
 1. Reconnaissance: Mapeo de superficies de ataque y fronteras de confianza (coverage-ledger.json).
 2. Hunting (Red Team): Detección de vulnerabilidades según catálogo de ataques (ATTACK-CLASSES.md).
 3. Validation (Blue Team): Intento activo e independiente de refutar falsos positivos.
@@ -64,7 +64,7 @@ func runAudit(cmd *cobra.Command, args []string) error {
 	isDiff := flagAuditDiff || !flagAuditFull
 
 	fmt.Println("==================================================================")
-	fmt.Println("🛡️ SDD-Free v3.0 — Auditoría Adversarial de Seguridad")
+	fmt.Println("🛡️ SpecForge — Auditoría Adversarial de Seguridad")
 	fmt.Println("==================================================================")
 	fmt.Printf("  ✓ Motor:        Arnés Adversarial de Cloudflare (Recon -> Hunter -> Verifier)\n")
 	fmt.Printf("  ✓ Agente:       %s\n", agentName)

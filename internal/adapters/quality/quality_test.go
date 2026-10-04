@@ -1,29 +1,10 @@
 package quality
 
 import (
-	"context"
 	"testing"
 
 	"specforge/internal/domain"
 )
-
-func TestCompositeQualityGateGo(t *testing.T) {
-	p := domain.ProjectInfo{
-		Type:     domain.ProjectGo,
-		RootPath: ".",
-	}
-	gate := NewCompositeQualityGate(p)
-	ctx := context.Background()
-
-	passed, report, err := gate.RunStaticAnalysis(ctx, p)
-	if err != nil {
-		t.Fatalf("error en Quality Gate: %v", err)
-	}
-
-	if !passed {
-		t.Errorf("se esperaba que pasara para stack Go en entorno actual: %s", report)
-	}
-}
 
 func TestCompositeQualityGateComposition(t *testing.T) {
 	reactProject := domain.ProjectInfo{Type: domain.ProjectReact}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"specforge/internal/adapters/storage"
+	"specforge/internal/buildinfo"
 	"specforge/internal/domain"
 )
 
@@ -17,9 +18,10 @@ var (
 var rootCmd = &cobra.Command{
 	Use:     "specforge",
 	Aliases: []string{"sdd", "forge"},
-	Short:   "SpecForge CLI v3.0.0 — Resilient Spec-Driven & TDD Assembly Line",
+	Short:   "SpecForge — Resilient Spec-Driven & TDD Assembly Line",
+	Version: buildinfo.Version,
 	Long: `==================================================================
-🚀 SpecForge v3.0.0 (Open Source Engine)
+🚀 SpecForge (Open Source Engine)
    Resilient Spec-Driven Development & TDD Assembly Line
 ==================================================================
 

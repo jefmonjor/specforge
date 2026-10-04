@@ -18,11 +18,11 @@ type FileEntry struct {
 
 // ProjectContext reúne el mapa del proyecto, árbol de archivos y resumen para el LLM
 type ProjectContext struct {
-	ProjectRoot string
-	ProjectInfo ProjectInfo
-	TotalFiles  int
-	TotalSize   int64
-	Files       []FileEntry
+	ProjectRoot   string
+	ProjectInfo   ProjectInfo
+	TotalFiles    int
+	TotalSize     int64
+	Files         []FileEntry
 	DirectoryTree string
 }
 

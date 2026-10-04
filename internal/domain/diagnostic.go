@@ -35,7 +35,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Elimina los archivos no utilizados, limpia las exportaciones huérfanas o desinstala las librerías muertas.",
 			ManualCmd:   "npx knip",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§8)",
+			DocsRef:     "USER_GUIDE.md (§8)",
 		}
 	}
 
@@ -48,7 +48,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Extrae la lógica común a una función compartida, servicio o componente reutilizable.",
 			ManualCmd:   "npx jscpd ./src --threshold 0",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§8)",
+			DocsRef:     "USER_GUIDE.md (§8)",
 		}
 	}
 
@@ -61,7 +61,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Refuerza las pruebas unitarias añadiendo aserciones estrictas para los casos límite identificados.",
 			ManualCmd:   "npx stryker run",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§8)",
+			DocsRef:     "USER_GUIDE.md (§8)",
 		}
 	}
 
@@ -74,7 +74,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Revisa la prueba unitaria: asegura que la aserción evalúa lógica aún no implementada.",
 			ManualCmd:   "sdd loop",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§7)",
+			DocsRef:     "USER_GUIDE.md (§7)",
 		}
 	}
 
@@ -87,7 +87,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Si los cambios son intencionados, ejecuta 'sdd interview' para resellar. Si no, revierte spec.md.",
 			ManualCmd:   "sdd interview",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§6)",
+			DocsRef:     "USER_GUIDE.md (§6)",
 		}
 	}
 
@@ -100,7 +100,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Crea una rama de trabajo: git checkout -b feature/nombre-de-tu-funcionalidad",
 			ManualCmd:   "git checkout -b feature/<nombre>",
 			ResumeCmd:   "sdd setup",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§2)",
+			DocsRef:     "USER_GUIDE.md (§2)",
 		}
 	}
 
@@ -110,10 +110,10 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Title:       "Límite de Reintentos Alcanzado en Fase GREEN (3/3)",
 			Cause:       "La IA no consiguió poner los tests en verde tras 3 intentos sucesivos.",
 			Explanation: "El framework pausa automáticamente para evitar consumo innecesario de tokens del modelo.",
-			Action:      "Revisa la traza del compilador en ~/.sdd/logs/, corrige el código manualmente y reanuda.",
-			ManualCmd:   "Get-Content ~/.sdd/logs/sdd-*.log -Tail 50",
+			Action:      "Revisa la traza del compilador en ~/.specforge/logs/, corrige el código manualmente y reanuda.",
+			ManualCmd:   "specforge --debug <command>   # then inspect ~/.specforge/logs/",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§11)",
+			DocsRef:     "USER_GUIDE.md (§11)",
 		}
 	}
 
@@ -126,7 +126,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Invierte la dependencia mediante interfaces/puertos o desacopla los imports ilegales.",
 			ManualCmd:   "mvn test -Dtest=*ArchitectureTest*",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§8)",
+			DocsRef:     "USER_GUIDE.md (§8)",
 		}
 	}
 
@@ -139,7 +139,7 @@ func DiagnoseError(err error) *DiagnosticReport {
 			Action:      "Corrige las líneas señaladas en el reporte o ejecuta el autofix de tu linter.",
 			ManualCmd:   "npm run lint -- --fix  (o go vet ./...)",
 			ResumeCmd:   "sdd loop --resume",
-			DocsRef:     "docs/GUIA_DE_USO_V3.md (§8)",
+			DocsRef:     "USER_GUIDE.md (§8)",
 		}
 	}
 
@@ -148,10 +148,10 @@ func DiagnoseError(err error) *DiagnosticReport {
 		Title:       "Interrupción en la Ejecución",
 		Cause:       msg,
 		Explanation: "El proceso se detuvo. El estado previo se encuentra protegido en .sdd-state.json.",
-		Action:      "Revisa las trazas de depuración o los logs silenciosos en ~/.sdd/logs/.",
+		Action:      "Revisa las trazas de depuración o los logs silenciosos en ~/.specforge/logs/.",
 		ManualCmd:   "sdd loop --debug",
 		ResumeCmd:   "sdd loop --resume",
-		DocsRef:     "docs/GUIA_DE_USO_V3.md",
+		DocsRef:     "USER_GUIDE.md",
 	}
 }
 

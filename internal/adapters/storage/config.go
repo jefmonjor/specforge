@@ -8,7 +8,7 @@ import (
 	"specforge/internal/domain"
 )
 
-// ConfigStorage implementa la persistencia de configuración en ~/.sdd/config.json
+// ConfigStorage implementa la persistencia de configuración en ~/.specforge/config.json
 type ConfigStorage struct {
 	customPath string
 }
