@@ -43,12 +43,18 @@ SpecForge · interview · Gift cards
   (exit 5)
 ```
 
-| # | Section · unknowns | The agent asked | The developer answered |
-| :---: | :--- | :--- | :--- |
-| 1 | 1. Intent · 10 | What problem do gift cards solve for your business, and who buys and who redeems them? | Shoppers buy gift cards online to give as presents; recipients redeem them at checkout to pay all or part of an order. It brings new customers and early cash. |
-| 2 | 4. Invariants · 10 | What can a gift card's balance never do? For example, can it go below zero, can it be redeemed for more than the order total, and can a card be used again once its balance is spent? | The balance can never go below zero. A redemption can never take more than the card's balance nor more than the order total. A card with zero balance cannot be redeemed again. Cards have a unique code. |
-| 3 | 5. User stories · 9 | When a buyer purchases a gift card, how is its value decided? | One of the fixed amounts 25, 50 or 100 euros. Payment is out of scope. Each card gets a unique 16-character code. Cards never expire. Partial redemption keeps the remaining balance. |
-| 4 | 8. Errors · 5 | What should happen when a recipient presents a code that matches no gift card? | Refuse with UNKNOWN_CARD "unknown gift card"; EMPTY_CARD when the balance is zero. No performance requirements. Out of scope: refunds, transfers, physical cards, expiry. |
+1. Section **1. Intent** · 10 unknown(s) left<br>
+   *Asked:* What problem do gift cards solve for your business, and who buys and who redeems them?<br>
+   *Answered:* Shoppers buy gift cards online to give as presents; recipients redeem them at checkout to pay all or part of an order. It brings new customers and early cash.
+2. Section **4. Invariants** · 10 unknown(s) left<br>
+   *Asked:* What can a gift card's balance never do? For example, can it go below zero, can it be redeemed for more than the order total, and can a card be used again once its balance is spent?<br>
+   *Answered:* The balance can never go below zero. A redemption can never take more than the card's balance nor more than the order total. A card with zero balance cannot be redeemed again. Cards have a unique code.
+3. Section **5. User stories** · 9 unknown(s) left<br>
+   *Asked:* When a buyer purchases a gift card, how is its value decided?<br>
+   *Answered:* One of the fixed amounts 25, 50 or 100 euros. Payment is out of scope. Each card gets a unique 16-character code. Cards never expire. Partial redemption keeps the remaining balance.
+4. Section **8. Errors** · 5 unknown(s) left<br>
+   *Asked:* What should happen when a recipient presents a code that matches no gift card?<br>
+   *Answered:* Refuse with UNKNOWN_CARD "unknown gift card"; EMPTY_CARD when the balance is zero. No performance requirements. Out of scope: refunds, transfers, physical cards, expiry.
 
 ```text
 $ specforge spec interview 2

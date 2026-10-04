@@ -17,6 +17,7 @@ loop against an approved specification, and verifies every step itself.
 
   specforge init                     choose your agent and language (once)
   specforge setup                    prepare this repository
+  specforge setup --new java         or start a new project (java, react, python, go)
   specforge spec new "<title>"       start a specification from the template
   specforge spec interview 0001      complete it with the agent
   specforge spec approve 0001        lint, record the approver and seal it
@@ -25,6 +26,12 @@ loop against an approved specification, and verifies every step itself.
   specforge deliver 0001             DELIVERY.md, trace.json and PR_BODY.md
   specforge audit                    adversarial security review of your branch
   specforge e2e 0001 --url <url>     verify the scenarios in a real browser
+
+Rewriting a legacy system (the legacy code stays read-only):
+
+  specforge legacy scan ../old       measure it: docs/legacy/INVENTORY.md
+  specforge legacy map               its business capabilities, sources checked
+  specforge spec from-legacy "<x>"   one specification per capability
 
 Exit codes: 0 ok · 1 error · 2 a gate said no · 3 the specification or
 loop state needs attention · 4 a tool or setting is missing · 5 a question
