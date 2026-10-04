@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -139,9 +140,9 @@ func sections(markdown string) []Issue {
 			continue
 		}
 		if m := numberedHead.FindStringSubmatch(line); m != nil && !inFence {
-			var n int
-			fmt.Sscan(m[1], &n)
-			present[n] = true
+			if n, err := strconv.Atoi(m[1]); err == nil {
+				present[n] = true
+			}
 		}
 	}
 	if len(present) == 0 {

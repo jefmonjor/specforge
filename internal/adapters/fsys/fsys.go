@@ -5,6 +5,7 @@
 package fsys
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -46,8 +47,7 @@ func (OS) AppendFile(path string, data []byte) error {
 		return err
 	}
 	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return fmt.Errorf("appending to %s: %w", path, err)
+		return errors.Join(fmt.Errorf("appending to %s: %w", path, err), f.Close())
 	}
 	return f.Close()
 }
@@ -66,17 +66,15 @@ func WriteAtomic(path string, data []byte, perm os.FileMode) error {
 	committed := false
 	defer func() {
 		if !committed {
-			os.Remove(tmpName)
+			_ = os.Remove(tmpName) // best effort: the error that got us here matters more
 		}
 	}()
 
 	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return fmt.Errorf("writing %s: %w", path, err)
+		return errors.Join(fmt.Errorf("writing %s: %w", path, err), tmp.Close())
 	}
 	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return fmt.Errorf("syncing %s: %w", path, err)
+		return errors.Join(fmt.Errorf("syncing %s: %w", path, err), tmp.Close())
 	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("writing %s: %w", path, err)

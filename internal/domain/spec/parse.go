@@ -240,8 +240,7 @@ func indexSteps(f *messages.Feature) map[string]*messages.Step {
 			idx[s.Id] = s
 		}
 	}
-	var walk func(children []*messages.FeatureChild)
-	walk = func(children []*messages.FeatureChild) {
+	walk := func(children []*messages.FeatureChild) {
 		for _, c := range children {
 			switch {
 			case c.Background != nil:

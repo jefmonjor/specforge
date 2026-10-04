@@ -18,6 +18,7 @@ test:
 lint:
 	@test -z "$$(gofmt -l .)" || { echo "gofmt: files need formatting:"; gofmt -l .; exit 1; }
 	go vet ./...
+	golangci-lint run ./...
 
 fmt:
 	gofmt -w .

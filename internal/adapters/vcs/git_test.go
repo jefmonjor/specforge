@@ -2,6 +2,7 @@ package vcs
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,7 +111,7 @@ func TestCommitRecordsOnlyThePaths(t *testing.T) {
 	if sha, err := g.Commit(ctx, root, "again", []string{"new.go"}); sha != "" || err != nil {
 		t.Fatalf("empty commit: %q %v", sha, err)
 	}
-	if _, err := g.Commit(ctx, t.TempDir(), "x", []string{"a"}); err != ports.ErrNotARepository {
+	if _, err := g.Commit(ctx, t.TempDir(), "x", []string{"a"}); !errors.Is(err, ports.ErrNotARepository) {
 		t.Fatalf("outside git: %v", err)
 	}
 }

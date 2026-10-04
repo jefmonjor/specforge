@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -48,7 +49,7 @@ type App struct {
 }
 
 type globalFlags struct {
-	debug, verbose, traceIO, quiet, nonInteractive bool
+	debug, verbose, traceIO, quiet, nonInteractive, json bool
 }
 
 // Main runs SpecForge with the process arguments and returns the exit code.
@@ -96,7 +97,11 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	d := ui.Diagnose(a.lang, err)
 	// Info, not Error: the diagnosis below is the console rendering of it.
 	a.log.Info("command failed", "err", err, "exit", d.Code)
-	ui.PrintDiagnosis(a.Err, a.lang, d)
+	if a.flags.json {
+		_ = json.NewEncoder(a.Err).Encode(d)
+	} else {
+		ui.PrintDiagnosis(a.Err, a.lang, d)
+	}
 	return d.Code
 }
 
@@ -157,4 +162,15 @@ func (a *App) defaultAgent(name string, proc ports.CommandRunner, log *slog.Logg
 		opts = append(opts, agent.WithStream(f))
 	}
 	return agent.New(flavor, proc, log, opts...), nil
+}
+
+// emit writes v as JSON to stdout when --json is set and reports whether
+// it did; commands print their human output otherwise.
+func (a *App) emit(v any) (bool, error) {
+	if !a.flags.json {
+		return false, nil
+	}
+	enc := json.NewEncoder(a.Out)
+	enc.SetIndent("", "  ")
+	return true, enc.Encode(v)
 }

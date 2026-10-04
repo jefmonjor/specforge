@@ -49,7 +49,7 @@ func (d *Duplication) Check(ctx context.Context, root string, _ stack.Profile) (
 	if err != nil {
 		return quality.Result{}, err
 	}
-	defer os.RemoveAll(outDir)
+	defer func() { _ = os.RemoveAll(outDir) }() // best effort: a temp directory
 
 	res, err := globalOrLocal(ctx, d.proc, root, "jscpd", ".", "--silent", "--reporters", "json", "--output", outDir, "--ignore", jscpdIgnore)
 	if err != nil {

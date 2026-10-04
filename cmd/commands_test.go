@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,5 +190,25 @@ func TestSpecClarifyThenApproveShowsTheDelta(t *testing.T) {
 	h.expect(0, "spec", "approve", "--by", "Ana")
 	if !strings.Contains(h.err.String(), "MODIFIED · Request a link") {
 		t.Fatalf("stderr:\n%s", h.err)
+	}
+}
+
+func TestJSONOutput(t *testing.T) {
+	h := newHarness(t)
+	h.expect(0, "version", "--json")
+	var v map[string]string
+	if err := json.Unmarshal(h.out.Bytes(), &v); err != nil || v["version"] == "" {
+		t.Fatalf("version json %q: %v", h.out, err)
+	}
+	h.write("specs/0001-reset.md", readySpec)
+	h.expect(0, "spec", "list", "--json")
+	var rows []map[string]string
+	if err := json.Unmarshal(h.out.Bytes(), &rows); err != nil || len(rows) != 1 || rows[0]["state"] != "draft" || rows[0]["path"] != "specs/0001-reset.md" {
+		t.Fatalf("list json %q: %v", h.out, err)
+	}
+	h.expect(4, "loop", "--json") // no agent configured
+	var d map[string]any
+	if err := json.Unmarshal(h.err.Bytes(), &d); err != nil || d["exit"] != float64(4) || d["action"] != "run `specforge init`" {
+		t.Fatalf("error json %q: %v", h.err, err)
 	}
 }

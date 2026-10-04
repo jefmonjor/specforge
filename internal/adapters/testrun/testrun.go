@@ -8,6 +8,7 @@ package testrun
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,9 +70,12 @@ func tempReport(pattern string) (string, func(), error) {
 		return "", nil, fmt.Errorf("creating test report file: %w", err)
 	}
 	name := f.Name()
-	f.Close()
-	os.Remove(name) // the runner creates it; an empty file would look like a report
-	return name, func() { os.Remove(name) }, nil
+	// Only the unique name is needed: the runner creates the file, and an
+	// empty one would look like a report.
+	if err := errors.Join(f.Close(), os.Remove(name)); err != nil {
+		return "", nil, fmt.Errorf("preparing test report file: %w", err)
+	}
+	return name, func() { _ = os.Remove(name) }, nil
 }
 
 // clip keeps the beginning and the end of long output, where compilers and

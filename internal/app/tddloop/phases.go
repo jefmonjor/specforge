@@ -39,100 +39,103 @@ func (s *Service) red(ctx context.Context, r *run) error {
 		if fb == "" {
 			data.Feedback = r.st.ReviewNote
 		}
-
-		pending, err := s.answerPending(ctx, r, sc)
+		t, testsBefore, err := s.redTurn(ctx, r, sc, data)
 		if err != nil {
 			return err
 		}
-		var (
-			t           turn
-			testsBefore map[string]string
-		)
-		switch {
-		case pending != nil && pending.Kind == tdd.PendingVerify:
-			testsBefore = pending.Tests
-			t, err = s.observe(ctx, r, pending)
-		case pending != nil:
-			testsBefore = pending.Tests
-			s.withAnswer(r, sc, &data, pending)
-			t, err = s.agentStep(ctx, r, prompts.Red, data, pending.Workspace)
-		default:
-			if testsBefore, err = s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile); err != nil {
-				return err
-			}
-			t, err = s.agentStep(ctx, r, prompts.Red, data, nil)
-		}
-		if err != nil {
-			if r.st.Pending != nil {
-				r.st.Pending.Tests = testsBefore
-			}
+		done, next, err := s.verifyRed(ctx, r, sc, t, testsBefore)
+		if err != nil || done {
 			return err
 		}
-		if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
-			fb = s.reject(r, RejectFalseClaim, joinPaths(bad), "")
-			continue
-		}
-
-		testsAfter, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
-		if err != nil {
-			return err
-		}
-		newTests := changedKeys(testsBefore, testsAfter)
-		if len(newTests) == 0 {
-			fb = s.reject(r, RejectNoTest, "", "")
-			continue
-		}
-		if !s.anyContains(r, newTests, sc.Marker) {
-			fb = s.reject(r, RejectNoMarker, sc.Marker, "")
-			continue
-		}
-
-		out, err := s.runTests(ctx, r, sc.Marker)
-		if err != nil {
-			return err
-		}
-		switch out.Red() {
-		case tdd.RedNotCompiled:
-			fb = s.reject(r, RejectNotCompiled, "", out.Output)
-			continue
-		case tdd.RedNothingRan:
-			fb = s.reject(r, RejectNothingRan, sc.Marker, out.Output)
-			continue
-		case tdd.RedPremature:
-			accepted, stricter, err := s.decidePremature(ctx, r, sc, t.Changed)
-			if err != nil {
-				s.pendVerify(r, sc, t, testsBefore, err)
-				return err
-			}
-			if accepted {
-				return nil
-			}
-			fb = stricter
-			continue
-		}
-		if !out.Exact {
-			ok, why, err := s.confirmInexact(ctx, r, out)
-			if err != nil {
-				s.pendVerify(r, sc, t, testsBefore, err)
-				return err
-			}
-			if !ok {
-				fb = s.reject(r, RejectUnconfirmed, why, out.Output)
-				continue
-			}
-		}
-
-		r.st.TestHashes = testsAfter
-		r.st.AddFiles(t.Changed...)
-		r.st.LastFailure = out.Output
-		if err := s.learn(r); err != nil {
-			return err
-		}
-		r.st.Record("red", "accepted", fmt.Sprintf("%d failing test(s)", out.Failed), s.d.Now())
-		s.d.Events.Accepted(tdd.PhaseRed, sc)
-		r.st.Advance(s.d.Now())
-		return s.save(r)
+		fb = next
 	}
+}
+
+// redTurn gets the agent's RED attempt: a fresh turn, the continuation of
+// a turn a question interrupted, or (for a question SpecForge asked while
+// verifying) the interrupted turn as it was left on disk. testsBefore are
+// the test fingerprints the attempt is measured against.
+func (s *Service) redTurn(ctx context.Context, r *run, sc tdd.ScenarioRef, data prompts.Data) (t turn, testsBefore map[string]string, err error) {
+	pending, err := s.answerPending(ctx, r, sc)
+	if err != nil {
+		return turn{}, nil, err
+	}
+	switch {
+	case pending != nil && pending.Kind == tdd.PendingVerify:
+		testsBefore = pending.Tests
+		t, err = s.observe(ctx, r, pending)
+	case pending != nil:
+		testsBefore = pending.Tests
+		s.withAnswer(r, sc, &data, pending)
+		t, err = s.agentStep(ctx, r, prompts.Red, data, pending.Workspace)
+	default:
+		if testsBefore, err = s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile); err != nil {
+			return turn{}, nil, err
+		}
+		t, err = s.agentStep(ctx, r, prompts.Red, data, nil)
+	}
+	if err != nil && r.st.Pending != nil {
+		r.st.Pending.Tests = testsBefore
+	}
+	return t, testsBefore, err
+}
+
+// verifyRed accepts the attempt only when the agent's claims hold, a test
+// carrying the marker changed, and that test compiles, runs and fails.
+// Otherwise it returns the feedback for the next attempt.
+func (s *Service) verifyRed(ctx context.Context, r *run, sc tdd.ScenarioRef, t turn, testsBefore map[string]string) (done bool, feedback string, err error) {
+	if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
+		return false, s.reject(r, RejectFalseClaim, joinPaths(bad), ""), nil
+	}
+	testsAfter, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
+	if err != nil {
+		return false, "", err
+	}
+	newTests := changedKeys(testsBefore, testsAfter)
+	if len(newTests) == 0 {
+		return false, s.reject(r, RejectNoTest, "", ""), nil
+	}
+	if !s.anyContains(r, newTests, sc.Marker) {
+		return false, s.reject(r, RejectNoMarker, sc.Marker, ""), nil
+	}
+
+	out, err := s.runTests(ctx, r, sc.Marker)
+	if err != nil {
+		return false, "", err
+	}
+	switch out.Red() {
+	case tdd.RedNotCompiled:
+		return false, s.reject(r, RejectNotCompiled, "", out.Output), nil
+	case tdd.RedNothingRan:
+		return false, s.reject(r, RejectNothingRan, sc.Marker, out.Output), nil
+	case tdd.RedPremature:
+		accepted, stricter, err := s.decidePremature(ctx, r, sc, t.Changed)
+		if err != nil {
+			s.pendVerify(r, sc, t, testsBefore, err)
+		}
+		return accepted, stricter, err
+	}
+	if !out.Exact {
+		ok, why, err := s.confirmInexact(ctx, r, out)
+		if err != nil {
+			s.pendVerify(r, sc, t, testsBefore, err)
+			return false, "", err
+		}
+		if !ok {
+			return false, s.reject(r, RejectUnconfirmed, why, out.Output), nil
+		}
+	}
+
+	r.st.TestHashes = testsAfter
+	r.st.AddFiles(t.Changed...)
+	r.st.LastFailure = out.Output
+	if err := s.learn(r); err != nil {
+		return false, "", err
+	}
+	r.st.Record("red", "accepted", fmt.Sprintf("%d failing test(s)", out.Failed), s.d.Now())
+	s.d.Events.Accepted(tdd.PhaseRed, sc)
+	r.st.Advance(s.d.Now())
+	return true, "", s.save(r)
 }
 
 // green asks for the minimum implementation and accepts it only when the
@@ -500,7 +503,7 @@ func (s *Service) existingRed(ctx context.Context, r *run, sc tdd.ScenarioRef) (
 // implementation means. accepted is true when the scenario was closed.
 func (s *Service) decidePremature(ctx context.Context, r *run, sc tdd.ScenarioRef, written []string) (accepted bool, stricterFeedback string, err error) {
 	q := question(r.o.Language, "premature")
-	answer, err := s.d.Asker.Ask(ctx, s.origin(r, sc), ports.Question{Text: fmt.Sprintf(q.text, sc.Index), Options: q.options, Strict: true})
+	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginVerify), ports.Question{Text: fmt.Sprintf(q.text, sc.Index), Options: q.options, Strict: true})
 	if err != nil {
 		return false, "", fmt.Errorf("%w: %w", tdd.ErrPrematureGreen, err)
 	}

@@ -63,7 +63,7 @@ func (s *Service) review(ctx context.Context, r *run, sc tdd.ScenarioRef, gates 
 	q := question(r.o.Language, "review")
 	files := strings.Join(slices.Sorted(slices.Values(r.st.FilesWritten)), ", ")
 	context := strings.TrimSpace(fmt.Sprintf("%s: %s · gates: %s", sc.Marker, files, gates))
-	answer, err := s.d.Asker.Ask(ctx, s.origin(r, sc), ports.Question{Text: fmt.Sprintf(q.text, sc.Index, sc.Title), Context: context, Options: q.options})
+	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginReview), ports.Question{Text: fmt.Sprintf(q.text, sc.Index, sc.Title), Context: context, Options: q.options})
 	if err != nil {
 		var pending *clarify.PendingQuestionError
 		if errors.As(err, &pending) {

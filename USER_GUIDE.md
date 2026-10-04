@@ -13,16 +13,17 @@ SpecForge drives a coding agent ([Claude Code](https://docs.anthropic.com/en/doc
 - [9. Quality gates](#9-quality-gates)
 - [10. Security audit: `audit`](#10-security-audit-audit)
 - [11. Browser verification: `e2e`](#11-browser-verification-e2e)
-- [12. Configuration reference](#12-configuration-reference)
-- [13. Files SpecForge writes](#13-files-specforge-writes)
-- [14. Exit codes](#14-exit-codes)
-- [15. Troubleshooting](#15-troubleshooting)
-- [16. Architecture](#16-architecture)
+- [12. Hand-over: `deliver`](#12-hand-over-deliver)
+- [13. Configuration reference](#13-configuration-reference)
+- [14. Files SpecForge writes](#14-files-specforge-writes)
+- [15. Exit codes](#15-exit-codes)
+- [16. Troubleshooting](#16-troubleshooting)
+- [17. Architecture](#17-architecture)
 
 ## 1. How it works
 
 ```text
-spec new ─► interview / edit ─► clarify ─► approve (R0) ─► plan ─► plan approve (R1) ─► loop ─► audit ─► e2e
+spec new ─► interview / edit ─► clarify ─► approve (R0) ─► plan ─► plan approve (R1) ─► loop ─► audit ─► e2e ─► deliver (R4)
                                                                                        │
                                   per scenario:  RED ─► GREEN ─► REFACTOR ─► review (R2) ─► commit
 ```
@@ -206,7 +207,7 @@ specforge audit --full --fail-on medium
 
 Three passes run with your agent over each chunk of code: **reconnaissance**, a red-team **hunter** that proposes findings with file, line and evidence, and a blue-team **validator** that confirms or rejects each one. Every answer must match the embedded JSON schema; an invalid answer gets one retry and then the audit stops with an error, never with an empty passing report (*fail-closed*). Findings the validator cannot settle at or above the threshold are questions for you. A confirmed finding at or above `--fail-on` (default `high`) exits with code 2.
 
-The base ref is validated as a commit and passed after `--end-of-options`, so it can never be read as a git option. Reports go to `docs/security/` (`REPORT.md`, `report.json`) with owner-only permissions.
+The base ref is validated as a commit and passed after `--end-of-options`, so it can never be read as a git option. Reports go to `docs/security/` (`REPORT.md`, `findings.json`, `coverage-ledger.json`) with owner-only permissions.
 
 ## 11. Browser verification: `e2e`
 
@@ -219,7 +220,24 @@ specforge e2e 0001 --url http://localhost:3000 --scenario 2 --headed
 
 Each step saves a screenshot. Results go to `docs/e2e/<spec>/` (`report.json`, `REPORT.md`, `scenario-NN/step-MM.png`). The command exits with code 2 when the pass rate is below `--min-pass-rate` (default 100). `--insecure` accepts invalid TLS certificates for local test servers; it is off by default. Only approved specifications run.
 
-## 12. Configuration reference
+## 12. Hand-over: `deliver`
+
+```bash
+specforge deliver 0001
+gh pr create --body-file specs/0001-password-reset/PR_BODY.md
+```
+
+`deliver` writes three files next to the specification, built only from what SpecForge recorded, never from the agent's word:
+
+| File | For | Content |
+| :--- | :--- | :--- |
+| `DELIVERY.md` | people | Who approved the specification and the plan, and when. One row per scenario: its tests (file and test names carrying the marker), its commit, its gates (✓ passed · ⚠ skipped · ✗ failed) and notes (already satisfied, changes requested in review, rejected attempts). The decisions taken, the questions still open, the lessons, the audit and E2E results, and what is out of scope. |
+| `trace.json` | tools | The same data, machine-readable. |
+| `PR_BODY.md` | the pull request | A summary, the scenario table, the decisions, the checks and what is not done. When the repository has a pull request template (`.github/pull_request_template.md` and the other places GitHub looks), its headings are kept and the summary goes under the first one. |
+
+A delivery is honest about gaps: unfinished scenarios, open questions and checks that did not run are listed, and an incomplete delivery says so in its first line. Reviews and SpecForge's own verification questions are shown per scenario, not mixed with your product decisions. The loop state lives in `.specforge/`, so run `deliver` where the loop ran; `trace.json` keeps the trace once committed.
+
+## 13. Configuration reference
 
 Values resolve in this order: command-line flag, then `specforge.yaml`, then your user configuration, then the default.
 
@@ -243,9 +261,9 @@ quality:
 
 Unknown keys are an error, so a typo never silently leaves a default in place.
 
-Global flags: `--verbose` (progress details and the agent's live output), `--debug` (debug records in the log), `--trace-io` (every prompt and answer in the log), `--quiet` (only warnings, errors and data), `--non-interactive` (never ask: write questions to a file and exit 5).
+Global flags: `--verbose` (progress details and the agent's live output), `--debug` (debug records in the log), `--trace-io` (every prompt and answer in the log), `--quiet` (only warnings, errors and data), `--non-interactive` (never ask: write questions to a file and exit 5), `--json` (data from `version`, `spec list` and `deliver` as JSON on stdout, and errors as `{"exit", "title", "cause", "action"}` on stderr).
 
-## 13. Files SpecForge writes
+## 14. Files SpecForge writes
 
 | Path | Committed | Content |
 | :--- | :---: | :--- |
@@ -256,6 +274,7 @@ Global flags: `--verbose` (progress details and the agent's live output), `--deb
 | `specs/NNNN-slug/approvals.md` | yes | Every approval with its scenario changes. |
 | `specs/NNNN-slug/decisions.md` | yes | Every question the agent asked and your answer. |
 | `specs/LESSONS.md` | yes | Lessons the agent wrote after a rejected attempt. |
+| `specs/NNNN-slug/DELIVERY.md`, `trace.json`, `PR_BODY.md` | yes | The hand-over written by `deliver`. |
 | `specs/NNNN-slug/questions.md` | yes | Questions asked when nobody was at the terminal. |
 | `docs/security/` | your choice | Audit reports (owner-only permissions). |
 | `docs/e2e/<spec>/` | your choice | E2E reports and screenshots. |
@@ -263,7 +282,7 @@ Global flags: `--verbose` (progress details and the agent's live output), `--deb
 
 The log file lives in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux), rotated, with owner-only permissions.
 
-## 14. Exit codes
+## 15. Exit codes
 
 | Code | Meaning |
 | :---: | :--- |
@@ -277,7 +296,7 @@ The log file lives in your user cache directory (`~/.cache/specforge/logs/specfo
 
 Every failure prints what happened, why and what to do next.
 
-## 15. Troubleshooting
+## 16. Troubleshooting
 
 - **What did the agent receive and answer?** Re-run with `--trace-io` and read the log file.
 - **The agent claims files it did not write.** The attempt is rejected and the agent is told which ones; that is the loop working. Repeated rejections exhaust `max_attempts` (exit 2).
@@ -285,7 +304,7 @@ Every failure prints what happened, why and what to do next.
 - **The loop says the specification changed.** Revert the edit, or review it and run `specforge spec approve` again; unchanged scenarios keep their progress.
 - **A gate shows ⚠ skipped.** Install the tool, or accept the warning; `--strict` makes it block.
 
-## 16. Architecture
+## 17. Architecture
 
 SpecForge follows the architecture it asks of your code: the domain is pure, use cases depend on small ports, adapters do the I/O and `cmd/` only wires them.
 
@@ -295,12 +314,14 @@ internal/
   domain/                 pure: no I/O
     spec/                 Gherkin parsing (official parser), seal, lint, front matter, open questions
     lessons/              the curated lessons list
+    delivery/             the delivery trace and its rendering
     tdd/                  loop state, test outcomes, typed errors
     stack/                stack detection, test commands, test-file rules
     quality/ security/ e2e/
   app/                    use cases
     tddloop/              Red → Green → Refactor with verification, review and commit
     specs/ planning/      specification lifecycle and approvals; drafting the plan
+    deliver/              the hand-over: DELIVERY.md, trace.json, PR_BODY.md
     conversation/         one agent turn under the response contract
     setup/                repository setup
     audit/ e2erun/        security audit, browser verification

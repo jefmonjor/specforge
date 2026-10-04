@@ -21,7 +21,8 @@ loop against an approved specification, and verifies every step itself.
   specforge spec interview 0001      complete it with the agent
   specforge spec approve 0001        lint, record the approver and seal it
   specforge plan 0001                draft where the code goes; then plan approve
-  specforge loop 0001                Red → Green → Refactor, scenario by scenario
+  specforge loop 0001                Red → Green → Refactor, review, one commit per scenario
+  specforge deliver 0001             DELIVERY.md, trace.json and PR_BODY.md
   specforge audit                    adversarial security review of your branch
   specforge e2e 0001 --url <url>     verify the scenarios in a real browser
 
@@ -43,6 +44,7 @@ awaits your answer · 130 interrupted.`,
 	f.BoolVar(&a.flags.traceIO, "trace-io", false, "record every prompt and agent answer in the log file")
 	f.BoolVarP(&a.flags.quiet, "quiet", "q", false, "print only warnings, errors and data")
 	f.BoolVar(&a.flags.nonInteractive, "non-interactive", false, "never ask: write questions to a file and exit with code 5")
+	f.BoolVar(&a.flags.json, "json", false, "print data (version, spec list, deliver) and errors as JSON")
 
 	root.AddCommand(
 		a.initCommand(),
@@ -50,6 +52,7 @@ awaits your answer · 130 interrupted.`,
 		a.specCommand(),
 		a.planCommand(),
 		a.loopCommand(),
+		a.deliverCommand(),
 		a.auditCommand(),
 		a.e2eCommand(),
 		a.versionCommand(),
@@ -63,6 +66,9 @@ func (a *App) versionCommand() *cobra.Command {
 		Short: "Print the version, commit and build date",
 		Args:  cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
+			if ok, err := a.emit(map[string]string{"version": buildinfo.Version, "commit": buildinfo.Commit, "date": buildinfo.Date}); ok {
+				return err
+			}
 			fmt.Fprintln(a.Out, "specforge "+buildinfo.String())
 			return nil
 		},

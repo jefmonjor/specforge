@@ -73,7 +73,11 @@ Results, a screenshot per step and REPORT.md go to docs/e2e/<spec>/.`,
 			if err != nil {
 				return err
 			}
-			defer br.Close()
+			defer func() {
+				if err := br.Close(); err != nil {
+					a.log.Warn("closing the browser", "err", err)
+				}
+			}()
 
 			con := a.console()
 			con.Title(con.T("e2e.title", entry.Title))

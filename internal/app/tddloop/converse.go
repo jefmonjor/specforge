@@ -55,9 +55,21 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 	return resp, nil
 }
 
+// Phases of the questions SpecForge asks itself, as opposed to those the
+// agent asks: they are recorded under their own label so the delivery can
+// tell the developer's product decisions from process checks.
+const (
+	OriginReview = "REVIEW"
+	OriginVerify = "VERIFY"
+)
+
 func (s *Service) origin(r *run, sc tdd.ScenarioRef) clarify.Origin {
+	return s.originAs(r, sc, string(r.st.Phase))
+}
+
+func (s *Service) originAs(r *run, sc tdd.ScenarioRef, phase string) clarify.Origin {
 	return clarify.Origin{
-		Phase:         string(r.st.Phase),
+		Phase:         phase,
 		Scenario:      sc.Index,
 		Marker:        sc.Marker,
 		DecisionsFile: r.lay.Decisions(r.o.SpecPath),

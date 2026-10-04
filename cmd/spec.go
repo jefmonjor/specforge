@@ -76,6 +76,19 @@ func (a *App) specListCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			type row struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+				State string `json:"state"`
+				Path  string `json:"path"`
+			}
+			rows := []row{}
+			for _, e := range all {
+				rows = append(rows, row{e.ID, e.Title, string(e.State), e.Rel})
+			}
+			if ok, err := a.emit(rows); ok {
+				return err
+			}
 			con := a.console()
 			if len(all) == 0 {
 				con.Info(con.T("spec.none"))

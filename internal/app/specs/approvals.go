@@ -3,6 +3,7 @@ package specs
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -68,8 +69,10 @@ func lastApproval(log string) []ScenarioChange {
 			continue
 		}
 		if m := approvalLine.FindStringSubmatch(strings.TrimSpace(line)); m != nil {
-			var idx int
-			fmt.Sscan(m[2], &idx)
+			idx, err := strconv.Atoi(m[2])
+			if err != nil {
+				continue
+			}
 			last = append(last, ScenarioChange{Change: Change(m[1]), Index: idx, Title: m[3], Fingerprint: m[4]})
 		}
 	}

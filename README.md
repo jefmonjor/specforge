@@ -113,6 +113,7 @@ Test results come from each runner's machine-readable report (`go test -json`, S
 | 📝 | `spec new · interview · clarify · lint · approve · list` | The specification lifecycle: a numbered file from the template, a conversation with your agent to complete it, open questions answered one by one and written back as decisions, the lint, and the approval gate that seals it and records what changed since the last approval. |
 | 🗺️ | `plan · plan approve` | The agent drafts where the code goes, with one planned test per scenario, and may write nothing but the plan. You review and approve it before any code exists; the loop follows it. |
 | 🔁 | `loop` | The Red → Green → Refactor line described above, then your review of each scenario and one commit per scenario. `--resume`, `--restart`, `--scenario N --from green`. |
+| 📦 | `deliver` | `DELIVERY.md`, `trace.json` and `PR_BODY.md`, built only from what SpecForge recorded: approvals, one row per scenario with its tests, commit and gates, the decisions, what is still open. It keeps your repository's PR template. |
 | 🛡 | `audit` | Adversarial security review of your branch: reconnaissance, a red-team hunter and a blue-team validator. Every answer must match a JSON schema, or the audit fails closed. Doubtful findings are questions for you. |
 | 🌐 | `e2e` | Verifies each scenario in a real Chrome, Chromium or Edge through [chromedp](https://github.com/chromedp/chromedp). The agent picks typed actions; SpecForge validates each one (known element, same origin) and checks each `Then` against evidence itself. A screenshot per step. |
 
@@ -140,6 +141,7 @@ specforge plan 0001                         # where the code goes; then: specfor
 specforge loop 0001                         # Red → Green → Refactor → your review → one commit per scenario
 specforge audit                             # security review of your branch
 specforge e2e 0001 --url http://localhost:3000
+specforge deliver 0001                      # DELIVERY.md, trace.json, PR_BODY.md
 ```
 
 ### What you need
@@ -162,7 +164,7 @@ Node tools run with `npx --no-install`: nothing is downloaded during the loop. T
 ## 📏 The CLI contract
 
 - **Exit codes**: `0` ok · `1` error · `2` a gate said no · `3` the specification or loop state needs attention · `4` a tool or setting is missing · `5` a question awaits your answer · `130` interrupted.
-- **Streams**: status on stderr, data on stdout. `--quiet`, `--verbose`, `--non-interactive`, `--trace-io` (every prompt and answer in the log file).
+- **Streams**: status on stderr, data on stdout. `--json` for data and errors, `--quiet`, `--verbose`, `--non-interactive`, `--trace-io` (every prompt and answer in the log file).
 - **Languages**: prompts, templates and messages in English or Spanish (`language:`); Gherkin in any language Cucumber supports.
 
 ## 🧩 Under the hood
@@ -188,14 +190,14 @@ make build    # version, commit and date injected with -ldflags
 
 ## 📍 Status & roadmap
 
-SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**. CI runs `gofmt`, `go vet`, `go mod tidy`, the race detector with a 70 % coverage floor and builds for Linux, macOS and Windows.
+SpecForge 4 is a rewrite of the v3 core around one rule: **verify, don't trust**. CI runs `gofmt`, `go vet`, `golangci-lint`, `go mod tidy`, the race detector with a 70 % coverage floor and builds for Linux, macOS and Windows.
 
 - [x] Verified loop: real test reports, file snapshots, test fingerprints, response contract, questions with resume
 - [x] Specification lifecycle with lint, approval and a line-ending-proof seal
 - [x] Fail-closed audit and per-scenario browser verification
 - [x] Plan step (R1) and per-scenario review (R2) with a commit per scenario
 - [x] `spec clarify`, approval history with scenario deltas, curated lessons
-- [ ] `deliver`: a delivery report and PR body traced from scenario to test to commit
+- [x] `deliver`: a delivery report and PR body traced from scenario to test to commit
 - [ ] Turn-based interview owned by SpecForge
 
 The full plan, with the reasoning behind each item, is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bug reports are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).

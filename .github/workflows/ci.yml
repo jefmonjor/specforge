@@ -31,6 +31,21 @@ jobs:
           echo "total coverage: ${total}%"
           awk -v t="$total" 'BEGIN { if (t+0 < 70.0) { print "coverage below 70% floor"; exit 1 } }'
 
+  lint:
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.14.0
+          # Built with the Go version of go.mod: a binary built with an
+          # older Go refuses to lint a newer module.
+          install-mode: goinstall
+
   build:
     name: build (${{ matrix.os }})
     needs: checks

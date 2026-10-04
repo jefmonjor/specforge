@@ -34,110 +34,144 @@ const (
 
 // Diagnosis explains an error to the developer.
 type Diagnosis struct {
-	Code   int
-	Title  string
-	Cause  string
-	Action string
+	Code   int    `json:"exit"`
+	Title  string `json:"title"`
+	Cause  string `json:"cause"`
+	Action string `json:"action,omitempty"`
 }
 
 // Diagnose classifies err.
 func Diagnose(lang string, err error) Diagnosis {
 	d := Diagnosis{Code: ExitError, Cause: err.Error()}
-	set := func(code int, key string) {
-		d.Code = code
-		d.Title = T(lang, "diag."+key+".title")
-		d.Action = T(lang, "diag."+key+".action")
+	key := ""
+	if errors.Is(err, context.Canceled) {
+		d.Code, key = ExitInterrupted, "interrupted"
+	} else {
+		for _, classify := range []classifier{questionErrors, specErrors, gateErrors, environmentErrors} {
+			if code, k := classify(lang, err, &d); k != "" {
+				d.Code, key = code, k
+				break
+			}
+		}
 	}
+	if key != "" {
+		d.Title = T(lang, "diag."+key+".title")
+		if d.Action == "" {
+			d.Action = T(lang, "diag."+key+".action")
+		}
+	}
+	return d
+}
 
+// A classifier recognises a family of errors. It returns the exit code and
+// the message key, and may refine the cause and the action; key is "" when
+// err is not in its family.
+type classifier func(lang string, err error, d *Diagnosis) (code int, key string)
+
+func questionErrors(lang string, err error, d *Diagnosis) (int, string) {
+	var pending *clarify.PendingQuestionError
+	if errors.As(err, &pending) {
+		d.Cause = pending.Question
+		d.Action = T(lang, "diag.pending.action", pending.File)
+		return ExitQuestion, "pending"
+	}
+	return 0, ""
+}
+
+func specErrors(_ string, err error, d *Diagnosis) (int, string) {
 	var (
 		tamper   *tdd.TamperingError
-		openQ    *tdd.OpenQuestionsError
-		blocked  *tdd.AgentBlockedError
 		tampered *spec.TamperedError
-		pending  *clarify.PendingQuestionError
-		gates    *tddloop.GatesError
-		secBlock *audit.BlockedError
-		stepErr  *audit.StepError
-		e2eBelow *e2erun.BelowThresholdError
+		openQ    *tdd.OpenQuestionsError
 		lint     *specs.LintError
 		ambig    *specs.AmbiguousError
 		notFound *specs.NotFoundError
-		scope    *planning.ScopeError
-		partial  *planning.IncompleteError
 	)
 	switch {
-	case errors.Is(err, context.Canceled):
-		set(ExitInterrupted, "interrupted")
-	case errors.As(err, &pending):
-		set(ExitQuestion, "pending")
-		d.Cause = pending.Question
-		d.Action = T(lang, "diag.pending.action", pending.File)
 	case errors.As(err, &tamper):
-		set(ExitSpec, "tampering")
+		return ExitSpec, "tampering"
 	case errors.As(err, &tampered):
-		set(ExitSpec, "tampered")
+		return ExitSpec, "tampered"
 	case errors.Is(err, spec.ErrNotSealed):
-		set(ExitSpec, "notsealed")
+		return ExitSpec, "notsealed"
 	case errors.As(err, &openQ):
-		set(ExitSpec, "openquestions")
 		d.Cause = strings.Join(openQ.Questions, "\n")
+		return ExitSpec, "openquestions"
 	case errors.As(err, &lint):
-		set(ExitSpec, "lint")
-		var lines []string
+		lines := []string{lint.Path}
 		for _, i := range lint.Issues {
 			lines = append(lines, i.String())
 		}
-		d.Cause = lint.Path + "\n" + strings.Join(lines, "\n")
+		d.Cause = strings.Join(lines, "\n")
+		return ExitSpec, "lint"
 	case errors.As(err, &ambig):
-		set(ExitSpec, "ambiguous")
+		return ExitSpec, "ambiguous"
 	case errors.As(err, &notFound), errors.Is(err, specs.ErrNoSpecs):
-		set(ExitSpec, "nospec")
+		return ExitSpec, "nospec"
 	case errors.Is(err, spec.ErrNoScenarios):
-		set(ExitSpec, "noscenarios")
-	case errors.Is(err, tddloop.ErrPlanNotApproved), errors.Is(err, tddloop.ErrPlanOutdated), errors.Is(err, specs.ErrNoPlan), errors.Is(err, specs.ErrPlanNeedsApprovedSpec):
-		set(ExitSpec, "plan")
+		return ExitSpec, "noscenarios"
+	case errors.Is(err, tddloop.ErrPlanNotApproved), errors.Is(err, tddloop.ErrPlanOutdated),
+		errors.Is(err, specs.ErrNoPlan), errors.Is(err, specs.ErrPlanNeedsApprovedSpec):
+		return ExitSpec, "plan"
 	case errors.Is(err, tddloop.ErrLoopInProgress), errors.Is(err, tddloop.ErrNothingToResume), errors.Is(err, tdd.ErrStateMismatch):
-		set(ExitSpec, "state")
+		return ExitSpec, "state"
+	}
+	return 0, ""
+}
+
+func gateErrors(_ string, err error, d *Diagnosis) (int, string) {
+	var (
+		gates    *tddloop.GatesError
+		blocked  *tdd.AgentBlockedError
+		scope    *planning.ScopeError
+		partial  *planning.IncompleteError
+		secBlock *audit.BlockedError
+		stepErr  *audit.StepError
+		e2eBelow *e2erun.BelowThresholdError
+	)
+	switch {
 	case errors.Is(err, tdd.ErrPrematureGreen):
-		set(ExitGate, "premature")
+		return ExitGate, "premature"
 	case errors.Is(err, tdd.ErrAttemptsExhausted):
-		set(ExitGate, "attempts")
+		return ExitGate, "attempts"
 	case errors.As(err, &gates):
-		set(ExitGate, "gates")
+		d.Cause = gates.Report.Explain(gates.Strict)
 		if gates.SuiteFailure != "" {
 			d.Cause = err.Error() + "\n" + gates.SuiteFailure
-		} else {
-			d.Cause = gates.Report.Explain(gates.Strict)
 		}
+		return ExitGate, "gates"
 	case errors.As(err, &blocked):
-		set(ExitGate, "blocked")
-		d.Cause = blocked.Reason
-		if blocked.SuggestedAction != "" {
-			d.Action = blocked.SuggestedAction
-		}
+		d.Cause, d.Action = blocked.Reason, blocked.SuggestedAction
+		return ExitGate, "blocked"
 	case errors.Is(err, protocol.ErrNoContract), errors.Is(err, tddloop.ErrTooManyQuestions):
-		set(ExitGate, "contract")
+		return ExitGate, "contract"
 	case errors.As(err, &scope), errors.As(err, &partial):
-		set(ExitGate, "plandraft")
+		return ExitGate, "plandraft"
 	case errors.As(err, &secBlock):
-		set(ExitGate, "security")
 		var lines []string
 		for _, f := range secBlock.Findings {
 			lines = append(lines, fmt.Sprintf("[%s] %s (%s, %s) %s:%d", f.ID, f.Title, f.Severity, f.Status, f.File, f.Line))
 		}
 		d.Cause = strings.Join(lines, "\n")
+		return ExitGate, "security"
 	case errors.As(err, &stepErr):
-		set(ExitGate, "auditstep")
+		return ExitGate, "auditstep"
 	case errors.As(err, &e2eBelow):
-		set(ExitGate, "e2e")
-	case errors.Is(err, ports.ErrToolNotFound), errors.Is(err, tdd.ErrUnsupportedStack):
-		set(ExitEnvironment, "tool")
-	case errors.Is(err, config.ErrNoAgent):
-		set(ExitEnvironment, "noagent")
-	case errors.Is(err, ports.ErrTimeout):
-		set(ExitEnvironment, "timeout")
+		return ExitGate, "e2e"
 	}
-	return d
+	return 0, ""
+}
+
+func environmentErrors(_ string, err error, _ *Diagnosis) (int, string) {
+	switch {
+	case errors.Is(err, ports.ErrToolNotFound), errors.Is(err, tdd.ErrUnsupportedStack):
+		return ExitEnvironment, "tool"
+	case errors.Is(err, config.ErrNoAgent):
+		return ExitEnvironment, "noagent"
+	case errors.Is(err, ports.ErrTimeout):
+		return ExitEnvironment, "timeout"
+	}
+	return 0, ""
 }
 
 // PrintDiagnosis writes the box for err to w.

@@ -138,3 +138,12 @@ func TestStrictQuestionIgnoresAnInvalidWrittenAnswer(t *testing.T) {
 		t.Fatalf("questions.md:\n%s", data)
 	}
 }
+
+func TestEntries(t *testing.T) {
+	log := "### 2026-10-04 15:30 · GREEN · escenario 3\n\n- **Pregunta:** ¿Canal?\n  - Opciones: a · b\n- **Respuesta:** email\n\n" +
+		"### 2026-10-04 16:00 · RED\n\n- **Question:** Rounding?\n- **Answer:** _awaiting an answer_\n"
+	got := Entries(log)
+	if len(got) != 2 || got[0].Question != "¿Canal?" || got[0].Answer != "email" || got[1].Answer != "" || got[1].Heading != "2026-10-04 16:00 · RED" {
+		t.Fatalf("entries %+v", got)
+	}
+}

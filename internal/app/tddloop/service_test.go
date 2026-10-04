@@ -233,7 +233,7 @@ func TestTheAgentCanAskInEveryPhase(t *testing.T) {
 		ask("Keep the helper exported?"),
 		writes(map[string]string{"reset.go": "package m\n// clean\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), tdd.Outcome{Compiled: true, Failed: 1, Output: "boom"}}
+	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), {Compiled: true, Failed: 1, Output: "boom"}}
 	h.gate.results = []quality.Result{{Gate: "fake-gate", Status: quality.Failed, Summary: "dup"}}
 	h.prompter.answers = []string{"package m", "from request", "no"}
 

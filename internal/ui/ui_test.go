@@ -5,6 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -123,5 +126,29 @@ func TestStrictQuestionAsksAgain(t *testing.T) {
 	}
 	if strings.Count(errOut.String(), "type a number from 1 to 2") != 2 {
 		t.Fatalf("output:\n%s", errOut.String())
+	}
+}
+
+// TestEveryUsedKeyExists scans the source for message keys passed to T so
+// a key missing from both languages cannot slip through.
+func TestEveryUsedKeyExists(t *testing.T) {
+	keyCall := regexp.MustCompile(`\.T\("([a-z0-9.-]+)"|T\([a-zA-Z.]+, "([a-z0-9.-]+)"`)
+	for _, dir := range []string{".", "../../cmd"} {
+		files, _ := filepath.Glob(filepath.Join(dir, "*.go"))
+		for _, f := range files {
+			if strings.HasSuffix(f, "_test.go") {
+				continue
+			}
+			src, _ := os.ReadFile(f)
+			for _, m := range keyCall.FindAllStringSubmatch(string(src), -1) {
+				key := m[1] + m[2]
+				if strings.HasSuffix(key, ".") || strings.HasSuffix(key, "-") {
+					continue // a prefix completed at run time
+				}
+				if _, ok := messages["en"][key]; !ok {
+					t.Errorf("%s uses %q, which has no message", f, key)
+				}
+			}
+		}
 	}
 }

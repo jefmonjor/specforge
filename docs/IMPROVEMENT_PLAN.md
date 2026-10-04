@@ -743,15 +743,16 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 - [x] Glosario e invariantes desde la propia spec. *(En PR #3.)*
 - **Hecho:** ejecución real con Claude Code de `plan` (plan mínimo, un test por escenario, riesgo de redondeo señalado en vez de inventado) y del loop con R2 en terminal y un commit por escenario; tests de aplicación y de CLI para cada rama (cambio, vuelta a RED, salto, lección, clarify, delta).
 
-### Fase 3 — Entrega y recorte (2 semanas) · P8, P6
+### Fase 3 — Entrega y recorte ✅ (PR #5) · P8, P6
 
-- [ ] `deliver`: `DELIVERY.md`, `trace.json`, `PR_BODY.md` desde artefactos; plantilla de PR del repo.
-- [ ] `contrib/bank`: Tekton, Nexus (`settings.xml`), `consistency`, ADC/auth, PATH. Config = `{agent, language}`.
-- [ ] Borrar `build`, `doc` (→ flag), alias raíz, `openspec/config.yaml`, READMEs de scaffold con `/opsx`.
-- [ ] Contrato CLI: kebab-case, stderr/stdout, `--json`, `--quiet`, exit codes, `--non-interactive`, `Flags().Changed`, `--no-recursive`.
-- [ ] `os.UserConfigDir()`, `SPECFORGE_HOME`, un nombre, godoc en inglés, `.golangci.yml`.
-- [ ] Ingest con `ctx`, topes y librería gitignore; `doc` con `ctx`, errores agregados y colisiones.
-- **Hecho cuando:** `grep -ri "nexus\|tekton\|as400\|jakarta\|vertex" internal cmd assets` = 0 fuera de `contrib/`; 8 comandos; `deliver` produce un `DELIVERY.md` en el que cada fila enlaza a un commit real. **Principios:** P8 verificable, P6 medible.
+- [x] **`deliver`** (R4): `DELIVERY.md`, `trace.json` y `PR_BODY.md` solo desde artefactos (spec y plan sellados, estado del loop casado por huella de escenario, `decisions.md`, `questions.md`, `LESSONS.md`, `docs/security/findings.json`, `docs/e2e/<spec>/report.json`). Cada fila: tests con sus nombres por marcador, commit, puertas (✓ · ⚠ omitida · ✗) y notas. Lo incompleto se dice en la primera línea. Respeta la plantilla de PR del repo.
+- [x] Las preguntas de proceso (revisión R2, verificación de RED) se registran como `REVIEW`/`VERIFY` y no se mezclan con las decisiones de producto en la entrega.
+- [x] Recorte: ADC/GCP, PATH, Tekton, Nexus, `consistency`, `build`, `doc`, `ingest`, alias, `openspec`, scaffolds. *Decisión: borrados en lugar de `contrib/bank` (P6); siguen en la historia de git, etiqueta v3.0.0.* *(En PR #3.)*
+- [x] Contrato de CLI: kebab-case, estado a stderr y datos a stdout, **`--json`** (datos de `version`, `spec list`, `deliver` y errores como `{exit,title,cause,action}`), `--quiet`, códigos de salida, `--non-interactive`.
+- [x] `os.UserConfigDir()`, `SPECFORGE_HOME`, un nombre, godoc en inglés. *(En PR #3.)*
+- [x] **`.golangci.yml`** (errcheck, errorlint, gocyclo ≤ 25, revive, staticcheck, unparam, unconvert, gofmt) en CI con `golangci-lint-action` compilado con la Go de `go.mod`; 0 avisos. Refactor de `red()` (turno + verificación) y de `Diagnose` (clasificadores por familia) para cumplirlo, sin subir umbrales.
+- [x] Test que comprueba que toda clave de mensaje usada en el código existe en el catálogo.
+- **Hecho:** `deliver` sobre el proyecto real construido por Claude Code: 2/2 escenarios, cada fila con su test y su commit reales.
 
 ### Fase 4 — Entrevista por turnos y E2E real (3-4 semanas) · P1, P2, P3
 
@@ -903,6 +904,7 @@ gofmt -l . → 71 ficheros (CRLF)   →   0 tras PR #2
 | [#2](https://github.com/jefmonjor/specforge/pull/2) | Higiene y red de seguridad | 0 | Abierta · fusionar **antes** que cualquier otra |
 | #3 | Núcleo verificable, CLI nueva y recorte del código v3 | 1 | Abierta, apilada sobre #2 |
 | #4 | Plan (R1), revisión (R2), commit por escenario, clarify, historial de aprobaciones, lecciones | 2 | Abierta, apilada sobre #3 |
+| #5 | `deliver`, `--json`, golangci-lint | 3 | Abierta, apilada sobre #4 |
 
 ---
 

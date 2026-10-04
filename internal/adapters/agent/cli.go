@@ -6,6 +6,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -159,10 +160,9 @@ func (c *CLI) Interactive(ctx context.Context, req ports.AgentRequest) error {
 	if err != nil {
 		return fmt.Errorf("creating prompt file: %w", err)
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }() // best effort: a temp file
 	if _, err := f.WriteString(req.Prompt); err != nil {
-		f.Close()
-		return fmt.Errorf("writing prompt file: %w", err)
+		return errors.Join(fmt.Errorf("writing prompt file: %w", err), f.Close())
 	}
 	if err := f.Close(); err != nil {
 		return fmt.Errorf("writing prompt file: %w", err)

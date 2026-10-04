@@ -142,3 +142,52 @@ func TestApprovedSpecStillVerifies(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestDeliverTracesTheFinishedLoop(t *testing.T) {
+	h := loopProject(t)
+	h.expect(3, "deliver", "9")
+
+	// Before the loop: every scenario is pending and the delivery says so.
+	h.expect(0, "deliver")
+	if !strings.Contains(h.err.String(), "incomplete") || !strings.Contains(h.read("specs/0001-reset/DELIVERY.md"), "⏳ not finished") {
+		t.Fatalf("stderr:\n%s\nDELIVERY.md:\n%s", h.err, h.read("specs/0001-reset/DELIVERY.md"))
+	}
+
+	h.agent.rules = []rule{
+		{when: "# Task: RED", files: map[string]string{
+			"reset/reset_test.go": "package reset\n\nimport \"testing\"\n\nfunc TestSDD_0001_001_SendsALink(t *testing.T) {\n\tif Link(\"ana\") == \"\" {\n\t\tt.Fatal(\"no link\")\n\t}\n}\n",
+			"reset/reset.go":      "package reset\n\nfunc Link(user string) string { return \"\" }\n",
+		}, reply: done("reset/reset_test.go", "reset/reset.go")},
+		{when: "# Task: GREEN", files: map[string]string{
+			"reset/reset.go": "package reset\n\nfunc Link(user string) string { return \"https://example.com/reset/\" + user }\n",
+		}, reply: done("reset/reset.go")},
+	}
+	h.tty, h.stdin = true, "Accept\n"
+	h.expect(0, "loop")
+	h.tty = false
+	h.write(".github/pull_request_template.md", "## Why\n\n## Checklist\n- [ ] reviewed\n")
+	h.expect(0, "deliver")
+	if strings.TrimSpace(h.out.String()) != "specs/0001-reset/DELIVERY.md\nspecs/0001-reset/trace.json\nspecs/0001-reset/PR_BODY.md" {
+		t.Fatalf("stdout:\n%s", h.out)
+	}
+	sha := strings.TrimSpace(gitOut(t, h.root, "rev-parse", "--short=7", "HEAD"))
+	md := h.read("specs/0001-reset/DELIVERY.md")
+	for _, want := range []string{
+		"# Delivery · 0001 Password reset",
+		"approved by Ana on 2026-10-04",
+		"1/1 finished · 1 through RED → GREEN → REFACTOR",
+		"| 1 | Request a link | `reset/reset_test.go` · `TestSDD_0001_001_SendsALink` | `" + sha + "` |",
+		"## Decisions taken during development\n\n- none",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("DELIVERY.md lacks %q:\n%s", want, md)
+		}
+	}
+	body := h.read("specs/0001-reset/PR_BODY.md")
+	if !strings.HasPrefix(body, "## Why\n\nImplements specification 0001") || !strings.Contains(body, "- [ ] reviewed") {
+		t.Fatalf("PR_BODY.md:\n%s", body)
+	}
+	if !strings.Contains(h.read("specs/0001-reset/trace.json"), `"marker": "SDD_0001_001"`) {
+		t.Fatalf("trace.json:\n%s", h.read("specs/0001-reset/trace.json"))
+	}
+}

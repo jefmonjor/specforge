@@ -3,6 +3,7 @@ package ui
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -80,7 +81,7 @@ func (p *Prompter) readLine(ctx context.Context) (string, error) {
 	case <-ctx.Done():
 		return "", ctx.Err()
 	case r := <-ch:
-		if r.err == io.EOF {
+		if errors.Is(r.err, io.EOF) {
 			return "", ports.ErrNonInteractive
 		}
 		return r.line, r.err

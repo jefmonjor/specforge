@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,15 +85,14 @@ func SaveUser(d Dirs, u User) error {
 func LoadProject(root string) (Project, error) {
 	var p Project
 	path := filepath.Join(root, ProjectFile)
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return p, nil
 	}
 	if err != nil {
 		return p, err
 	}
-	defer f.Close()
-	dec := yaml.NewDecoder(f)
+	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&p); err != nil && !errors.Is(err, io.EOF) {
 		return p, fmt.Errorf("%s: %w", path, err)

@@ -184,3 +184,38 @@ func (a *Asker) entry(o Origin, q ports.Question, answer string) string {
 func oneLine(s string) string {
 	return strings.Join(strings.Fields(s), " ")
 }
+
+// Entry is one question of a decisions or questions log.
+type Entry struct {
+	Heading  string // "2026-10-04 15:30 · GREEN · scenario 3 (`SDD_0001_003`)"
+	Phase    string // "GREEN"
+	Question string
+	Answer   string // "" while unanswered
+}
+
+// Entries parses a decisions or questions log written by Asker, in any
+// language.
+func Entries(log string) []Entry {
+	var out []Entry
+	var cur *Entry
+	for _, line := range strings.Split(strings.ReplaceAll(log, "\r\n", "\n"), "\n") {
+		if h, ok := strings.CutPrefix(line, "### "); ok {
+			e := Entry{Heading: strings.TrimSpace(h)}
+			if parts := strings.Split(e.Heading, " · "); len(parts) > 1 {
+				e.Phase = parts[1]
+			}
+			out = append(out, e)
+			cur = &out[len(out)-1]
+			continue
+		}
+		if cur == nil {
+			continue
+		}
+		if v, ok := field(line, func(l labels) string { return l.question }); ok {
+			cur.Question = v
+		} else if v, ok := field(line, func(l labels) string { return l.answer }); ok && !isPlaceholder(v) {
+			cur.Answer = v
+		}
+	}
+	return out
+}
