@@ -766,6 +766,26 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 
 ---
 
+### Fase 5 — v5: migración legacy y stacks finos ✅ · P1, P2, P3, P6
+
+Origen: en una prueba de migración Java 8 → 21, v3 «creaba más» que v4. v3 leía el repo con `interview --from-repo`, `ingest` y gates de migración; v4 lo había recortado. La v5 recupera lo que funcionaba, pero sobre el núcleo verificable: el agente ya no recibe fragmentos de código pegados en el prompt (v3), sino que **lee el repo legacy directamente** y SpecForge comprueba lo que dice.
+
+- [x] **Legacy de solo lectura**: `AgentRequest.ReadDirs` → `--add-dir` (Claude) / `--include-directories` (Gemini). `docturn.Watch` hashea el repo antes y después de cada turno (mapa, spec, plan y cada fase del loop) y rechaza cualquier cambio (`legacyreadonly`, exit 2).
+- [x] **`legacy scan`**: inventario determinista (`internal/domain/legacy`, puro sobre `fs.FS`): build Maven/Gradle/Ant, release Java declarada (la más baja; incluye toolchains de Gradle), frameworks por imports (Servlet, JSP, Struts 1/2, EJB, JPA, Hibernate, Spring, JDBC, JAX-RPC/WS, JAXB, JMS, Log4j 1, JUnit 3/4, `Vector`/`Hashtable`, `Date`/`Calendar`) y qué implica cada uno para Java 21, en `es`/`en`.
+- [x] **`legacy map`** y **`spec from-legacy`**: turnos de documento (`internal/app/docturn`, extraído de `planning`) con comprobación propia: cada cita `` `ruta:línea` `` se abre en el legacy (anti-invención); sección obligatoria `13. Legacy sources`; lint de plantilla salvo preguntas abiertas; una capacidad por spec. Lo inexplicable va a `[NEEDS CLARIFICATION]` con su fuente.
+- [x] **Plan y loop** reciben la ruta legacy, la sección de fuentes y la release objetivo; prompts con los modismos de Java 21.
+- [x] **Gate de migración** (`migration.java_release`, `forbidden_imports`; por defecto los `javax.*` que Jakarta renombró, Log4j 1, JUnit 3, `Vector`, `Hashtable`): release declarada e imports con fichero:línea. Sin herramienta externa: nunca se omite.
+- [x] **Scaffolds `setup --new java|react|python|go`** instalados y ejecutados de verdad antes de fijar versiones: Java 21 (JUnit 6, AssertJ, ArchUnit con capas hexagonales y sin restos de Java EE, PMD), React (Vite 7, React 19, Vitest 4.0, Testing Library, ESLint, Knip, jscpd, Stryker), Python (src, pytest, Ruff), Go (golangci-lint v2). `--legacy` escribe la sección `migration:`.
+- [x] **Runners finos**: pytest y Ruff del `.venv` del proyecto; `mvnw`/`gradlew`; lint Java con PMD que extrae cada violación (con `-q` Maven las ocultaba).
+- [x] Estándares de código ampliados (Java 21 moderno, React accesible y testeado por comportamiento, Python con `Decimal` y `src/`).
+- **Hallazgos de las pruebas reales, cada uno con su arreglo y su test:**
+  - Responder una pregunta durante `plan` escribía `decisions.md`, y el control de alcance lo contaba como fichero fuera del plan (bug latente de v4): los registros de SpecForge quedan permitidos en todo turno de documento.
+  - La primera spec desde legacy mezcló dos capacidades (el cálculo del neto y la ejecución web de la nómina): el prompt exige quedarse en una y mandar las demás a *fuera de alcance*. Resultado: 6 escenarios en lugar de 16 y 6 preguntas en lugar de 16.
+  - Vitest 5 rompe el runner de Stryker 10 (0 tests por mutante: todo «sobrevive») y Vitest 4.1 tumba npm 10 al resolver peers: el scaffold fija Vitest 4.0 con Vite 7 (puntuación de mutación 100 % en el arranque). jsdom 30 exige Node ≥ 22.22: se fija jsdom 29. TypeScript 7 no lo admite typescript-eslint: TypeScript 6.0.
+  - En el loop real de React, el gate de duplicación contaba `package-lock.json` (2,5 % «duplicado», 11 clones) y bloqueó REFACTOR con exit 2: jscpd cuenta ahora solo formatos de código fuente e ignora `.venv`, `reports`, `coverage` y `.stryker-tmp`.
+  - `assets/scaffolds/go/go.mod` cortaba el embed (límite de módulo) y `main.go` se compilaba como paquete de SpecForge: se guardan como `.tmpl`.
+- **Hecho:** migración real con Claude Code de un legacy Java 6 sintético (servlet, DAO JDBC, `Vector`/`Hashtable`, Log4j 1, JSP, JUnit 3): inventario, mapa de 5 capacidades con todas las citas verificadas (detectó incluso que el DAO del servlet nunca se asigna), spec del neto con 6 rarezas convertidas en preguntas (dinero en `double`, bonus sin retención, log antes de truncar…), plan con `BigDecimal` y `RoundingMode.DOWN`, y loop con Maven en el que PMD rechazó y REFACTOR corrigió; el legacy, intacto. Loops reales también en Python (Decimal, ruff del `.venv`) y React (Vitest, Testing Library, Knip, Stryker).
+
 ## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)
 
 | Métrica | v3 | Objetivo | v4 medido | Principio |

@@ -199,3 +199,21 @@ func TestMavenLintRunsPMDOnlyWhenTheBuildDeclaresIt(t *testing.T) {
 		t.Fatalf("%+v", res)
 	}
 }
+
+// Regression from a real React run: package-lock.json alone failed the
+// duplication gate. Only source formats count, and reports are ignored.
+func TestDuplicationCountsOnlySourceCode(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "package.json"), []byte(`{}`), 0o644)
+	proc := &fakeProc{results: map[string]ports.CommandResult{}}
+	_, _ = (&Duplication{proc: proc}).Check(context.Background(), root, nodeP)
+	call := strings.Join(proc.calls, " ")
+	for _, want := range []string{"--format go,java", "typescript,jsx,tsx", "**/reports/**", "**/.venv/**"} {
+		if !strings.Contains(call, want) {
+			t.Errorf("jscpd call lacks %q: %s", want, call)
+		}
+	}
+	if strings.Contains(call, "json,") || strings.Contains(call, "markdown") {
+		t.Errorf("non-source formats counted: %s", call)
+	}
+}
