@@ -437,12 +437,12 @@ Everything is kept in `specs/0001-slug/review/SDD_….json`, and `--resume` neve
 
 ### The independent verifier
 
-The writer's test can pin a bug: a test written from the code agrees with the code. The verifier checks the **specification** instead. In a disposable copy of your project (dependency directories linked, plus a copy of the last commit to compare old behaviour), an agent derives its own probes from every invariant and scenario and runs them.
+The writer's test can pin a bug: a test written from the code agrees with the code. The verifier checks the **specification** instead. In a disposable copy of your project (dependency directories linked, plus a copy of the last commit to compare old behaviour), an agent derives its own probes from every invariant and scenario and runs them. It is the only agent allowed to run shell commands without asking, because nothing it does there is kept; the guard still applies.
 
 SpecForge requires:
 
 - a verdict, `met`, `unmet` or `unverified`, for **every** invariant and scenario asked;
-- for every broken one, the **exact command** and the output it **observed**;
+- for every broken one, the **exact command** and the output it **observed**; SpecForge runs the command again and refuses a failure it cannot reproduce;
 - your real project unchanged, fingerprinted before and after;
 - an answer valid for its schema (one retry, then fail closed).
 
