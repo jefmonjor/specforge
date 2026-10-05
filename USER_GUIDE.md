@@ -63,11 +63,16 @@ R=$R/releases/latest/download
 # or darwin-amd64, linux-amd64,
 # linux-arm64
 F=specforge-darwin-arm64
-curl -Lo specforge $R/$F
-chmod +x specforge
-sudo mv specforge /usr/local/bin/
+curl -LO $R/$F
+curl -LO $R/checksums.txt
+sha256sum -c checksums.txt \
+  --ignore-missing
+chmod +x $F
+sudo mv $F /usr/local/bin/specforge
 specforge version
 ```
+
+`sha256sum` must print `OK` for your file; on macOS use `shasum -a 256 -c` instead. Verify before renaming the file: the check matches by name.
 
 **Windows:** download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and put it in a folder on your `PATH`. SpecForge never edits your `PATH` or registry.
 

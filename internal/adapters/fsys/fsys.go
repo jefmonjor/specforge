@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"specforge/internal/ports"
 )
@@ -83,16 +84,38 @@ func WriteAtomic(path string, data []byte, perm os.FileMode) error {
 	if err := os.Chmod(tmpName, perm); err != nil {
 		return fmt.Errorf("setting permissions on %s: %w", path, err)
 	}
-	if err := os.Rename(tmpName, path); err != nil {
-		if runtime.GOOS == "windows" {
-			_ = os.Remove(path)
-			if retryErr := os.Rename(tmpName, path); retryErr == nil {
-				committed = true
-				return nil
-			}
-		}
+	if err := replace(tmpName, path); err != nil {
 		return fmt.Errorf("replacing %s: %w", path, err)
 	}
 	committed = true
 	return nil
+}
+
+// renameFile is os.Rename, replaceable in tests.
+var renameFile = os.Rename
+
+// retryReplace is true where another process can lock a file against
+// replacement (Windows); replaceable in tests.
+var retryReplace = runtime.GOOS == "windows"
+
+// replaceRetries bounds how long replace waits for another process.
+var replaceRetries = []time.Duration{10, 20, 40, 80, 160, 320} // milliseconds
+
+// replace renames tmp over path. On Windows os.Rename already replaces an
+// existing file, but fails while another process (an antivirus, an editor,
+// a search indexer) has path open; that lock is short-lived, so it retries
+// for about half a second. The existing file is never deleted first: a
+// failure leaves it intact, never a missing file.
+func replace(tmp, path string) error {
+	err := renameFile(tmp, path)
+	if err == nil || !retryReplace {
+		return err
+	}
+	for _, wait := range replaceRetries {
+		time.Sleep(wait * time.Millisecond)
+		if err = renameFile(tmp, path); err == nil {
+			return nil
+		}
+	}
+	return err
 }

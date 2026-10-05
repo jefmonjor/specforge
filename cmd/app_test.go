@@ -131,7 +131,19 @@ func (s *scriptedAgent) Interactive(context.Context, ports.AgentRequest) error {
 func TestMain(m *testing.M) {
 	// Keep the real user configuration out of every test.
 	os.Setenv(config.HomeEnv, os.TempDir())
-	os.Exit(m.Run())
+	// And the developer's git configuration: a global include, a signing
+	// key or a credential helper must not change what the tests see, on
+	// any platform. Every git call, SpecForge's own included, inherits it.
+	empty, err := os.CreateTemp("", "specforge-gitconfig-*")
+	if err != nil {
+		panic(err)
+	}
+	_ = empty.Close()
+	os.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	os.Setenv("GIT_CONFIG_GLOBAL", empty.Name())
+	code := m.Run()
+	_ = os.Remove(empty.Name())
+	os.Exit(code)
 }
 
 func requireTool(t *testing.T, name string) {
