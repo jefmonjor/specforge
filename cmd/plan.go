@@ -7,16 +7,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/vcs"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/planning"
-	"specforge/internal/config"
-	"specforge/internal/domain/stack"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
-	"specforge/internal/ui"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/vcs"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/planning"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ui"
 )
 
 func (a *App) planCommand() *cobra.Command {

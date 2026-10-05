@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Prompter asks questions on the terminal.

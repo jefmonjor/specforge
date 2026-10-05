@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/domain/change"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 const specMD = "# Discounts\n\n## 5. Acceptance criteria\n\n```gherkin\nFeature: Discounts\n" +

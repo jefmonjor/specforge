@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/answer"
-	"specforge/internal/app/prompts"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/verification"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/answer"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/verification"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // StepError reports a verifier whose answer never was a complete report.

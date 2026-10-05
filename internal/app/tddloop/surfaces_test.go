@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 const planBody = "# Plan\n\n## Components\n- `reset.go`: the reset link (new)\n- `expiry.go`: link expiry (new)\n\n" +

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/config"
-	"specforge/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
 )
 
 func TestVersion(t *testing.T) {

@@ -3,8 +3,8 @@ package ports
 import (
 	"context"
 
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 // Gate is one REFACTOR quality check. Check returns a Skipped result, not

@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"specforge/internal/domain/change"
-	"specforge/internal/domain/review"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Changes implements ports.VCS. Tracked paths are measured with

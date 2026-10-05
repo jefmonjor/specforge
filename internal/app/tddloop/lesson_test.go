@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 func TestALessonAfterARejectionIsKeptAndShown(t *testing.T) {

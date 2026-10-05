@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/layout"
-	"specforge/internal/app/specs"
-	"specforge/internal/config"
-	"specforge/internal/domain/stack"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/app/specs"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // project is the repository a command works on, with its settings.

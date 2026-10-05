@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // TestHelperProcess is not a real test: it is the child process that the

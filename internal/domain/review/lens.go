@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
 )
 
 // Lens is one angle of review. Each runs as its own read-only agent turn.

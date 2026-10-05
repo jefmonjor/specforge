@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/app/verifier"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/domain/verification"
+	"github.com/jefmonjor/specforge/v6/internal/app/verifier"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/verification"
 )
 
 type fakeVerifier struct {

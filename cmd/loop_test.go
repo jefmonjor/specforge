@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
 )
 
 func gitInit(t *testing.T, dir string) {

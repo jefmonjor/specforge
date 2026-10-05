@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"specforge/internal/domain/e2e"
+	"github.com/jefmonjor/specforge/v6/internal/domain/e2e"
 )
 
 // Browser drives a real browser for E2E verification. Every call is bounded

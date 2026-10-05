@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/process"
-	"specforge/internal/app/scaffold"
-	"specforge/internal/app/setup"
-	"specforge/internal/config"
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/app/scaffold"
+	"github.com/jefmonjor/specforge/v6/internal/app/setup"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 func (a *App) setupCommand() *cobra.Command {

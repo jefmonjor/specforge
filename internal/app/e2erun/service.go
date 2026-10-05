@@ -18,13 +18,13 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/layout"
-	"specforge/internal/app/prompts"
-	"specforge/internal/domain/e2e"
-	"specforge/internal/domain/spec"
-	"specforge/internal/jsontext"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/domain/e2e"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/jsontext"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Options configure a run.

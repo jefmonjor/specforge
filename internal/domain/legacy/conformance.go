@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 // Target is what the rewritten code must comply with.

@@ -8,9 +8,9 @@ import (
 	"slices"
 	"time"
 
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/verification"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/verification"
 )
 
 // StateVersion is bumped whenever State changes. Older states that only

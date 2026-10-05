@@ -20,12 +20,12 @@ import (
 	"strings"
 	"time"
 
-	"specforge/assets"
-	"specforge/internal/app/answer"
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/security"
-	"specforge/internal/jsontext"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/assets"
+	"github.com/jefmonjor/specforge/v6/internal/app/answer"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/security"
+	"github.com/jefmonjor/specforge/v6/internal/jsontext"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Scope selects what is audited.

@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // answerInFile replaces the first pending placeholder of questions.md.

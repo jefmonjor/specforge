@@ -17,8 +17,8 @@ import (
 	"strings"
 	"text/template"
 
-	"specforge/assets"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/assets"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Kinds are the scaffolds available.

@@ -53,11 +53,17 @@ specforge version
 ```
 
 <details>
-<summary><b>Windows, or build it from source</b></summary>
+<summary><b>Windows, with <code>go install</code>, or from source</b></summary>
 
 **Windows:** download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and put it in a folder on your `PATH`. SpecForge never edits your `PATH` or registry.
 
-**From source** (Go version from [`go.mod`](go.mod)):
+**With Go** (6.1.1 or later; the Go version in [`go.mod`](go.mod)):
+
+```bash
+go install github.com/jefmonjor/specforge/v6@latest
+```
+
+**From source:**
 
 ```bash
 git clone \
@@ -417,11 +423,11 @@ SpecForge 6 keeps the one rule, **verify, don't trust**, and makes the checking 
 - [x] Edit surfaces from the plan; delivery budget and stacked slices
 - [x] Review lenses with proof checked against the diff; refuter; one correction
 - [x] Independent verifier in a copy; destructive-command guard
-- [x] Blind double review; scenarios side by side · [docs/V6_PLAN.md](docs/V6_PLAN.md)
+- [x] Blind double review; scenarios side by side · [docs/history/V6_PLAN.md](docs/history/V6_PLAN.md)
 - [x] Proven end to end with Claude Code: baseline, risk, lenses, two scenarios side by side, the verifier and the guard · [docs/DEMO.md](docs/DEMO.md#8-specforge-6-risk-lenses-verifier-parallel-guard)
 - [x] 6.1: the guard reads what a command runs; checkpoints and `restore`; copies that write each byte once; scenarios keep their marker through any change, and `spec change` applies change requests · [docs/DEMO.md](docs/DEMO.md#9-specforge-61-closing-the-gaps)
 
-The reasoning behind every item is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bugs are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
+The reasoning behind every item is in [docs/history/IMPROVEMENT_PLAN.md](docs/history/IMPROVEMENT_PLAN.md). Ideas and bugs are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 
 ## 🤝 Contributing & license
 

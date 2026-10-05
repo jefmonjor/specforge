@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/adapters/scratch"
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/scratch"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 const parallelPlan = "# Plan\n\n## Components\n" +

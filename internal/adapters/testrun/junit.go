@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // junitSuite covers the JUnit XML written by Maven Surefire, Gradle and

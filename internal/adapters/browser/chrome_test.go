@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/domain/e2e"
+	"github.com/jefmonjor/specforge/v6/internal/domain/e2e"
 )
 
 const resetPage = `<!doctype html><html><head><title>Reset</title></head><body>

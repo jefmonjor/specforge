@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"specforge/internal/domain/stack"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // TestRequest selects which tests to run.

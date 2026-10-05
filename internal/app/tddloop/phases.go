@@ -8,13 +8,13 @@ import (
 	"sort"
 	"strings"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/prompts"
-	"specforge/internal/domain/lessons"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/domain/lessons"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // red asks for a failing test and accepts it only when a test file carrying

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/domain/legacy"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/legacy"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type fakeProc struct {
@@ -150,7 +150,7 @@ func TestCancelledContextStopsTheGates(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	proc := &fakeProc{errs: map[string]error{"ruff": context.Canceled}}
-	if _, err := Run(ctx, []ports.Gate{&Lint{proc: proc}}, t.TempDir(), stack.Profile{Kind: stack.Python}); err == nil {
+	if _, err := (&Lint{proc: proc}).Check(ctx, t.TempDir(), stack.Profile{Kind: stack.Python}); err == nil {
 		t.Fatal("cancellation must surface as an error")
 	}
 }

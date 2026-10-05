@@ -7,15 +7,15 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/vcs"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/app/reviewer"
-	"specforge/internal/config"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ui"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/vcs"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/app/reviewer"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ui"
 )
 
 func (a *App) reviewCommand() *cobra.Command {

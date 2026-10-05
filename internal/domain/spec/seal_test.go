@@ -19,9 +19,6 @@ func TestSealRoundTrip(t *testing.T) {
 	if !ok || s.Algorithm != SealV1 || s.Hash != hash {
 		t.Fatalf("ReadSeal = %+v %v", s, ok)
 	}
-	if err := VerifyAgainst(sealed, hash); err != nil {
-		t.Fatalf("VerifyAgainst: %v", err)
-	}
 }
 
 func TestSealIsIndependentOfLineEndingsAndTrailingSpaces(t *testing.T) {
@@ -53,9 +50,6 @@ func TestTamperingIsDetected(t *testing.T) {
 	if err := Verify(tampered); !errors.As(err, &te) || te.Expected != hash {
 		t.Fatalf("want TamperedError, got %v", err)
 	}
-	if err := VerifyAgainst(tampered, hash); !errors.As(err, &te) {
-		t.Fatalf("VerifyAgainst: want TamperedError, got %v", err)
-	}
 }
 
 func TestAQuotedOldSealInTheBodyIsPartOfTheContent(t *testing.T) {
@@ -86,9 +80,6 @@ func TestLegacyV0SealsStillVerify(t *testing.T) {
 
 	if err := Verify(legacy); err != nil {
 		t.Fatalf("a v0 seal written by SpecForge 3.0 must still verify: %v", err)
-	}
-	if err := VerifyAgainst(legacy, hash); err != nil {
-		t.Fatalf("VerifyAgainst v0: %v", err)
 	}
 	if err := Verify(legacy + "edit\n"); err == nil {
 		// The seal is no longer the last line, so the file reads as unsealed.

@@ -1,4 +1,4 @@
-module specforge
+module github.com/jefmonjor/specforge/v6
 
 go 1.26.0
 

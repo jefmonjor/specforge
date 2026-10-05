@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/process"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 const diff = "diff --git a/net.go b/net.go\n--- a/net.go\n+++ b/net.go\n@@ -10,2 +10,3 @@\n tax := gross.Times(rate)\n-return gross.Minus(tax)\n+net := gross.Minus(tax)\n+return net.Plus(bonus)\n"

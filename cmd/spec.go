@@ -9,16 +9,16 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/interview"
-	"specforge/internal/app/prompts"
-	"specforge/internal/app/specs"
-	"specforge/internal/config"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ports"
-	"specforge/internal/ui"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/interview"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/app/specs"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ui"
 )
 
 func (a *App) specCommand() *cobra.Command {

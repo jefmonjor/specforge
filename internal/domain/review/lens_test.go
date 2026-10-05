@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"specforge/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
 )
 
 func TestSelect(t *testing.T) {

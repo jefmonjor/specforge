@@ -7,9 +7,9 @@ import (
 	"sort"
 	"strings"
 
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // DeadCode runs Knip on Node projects.

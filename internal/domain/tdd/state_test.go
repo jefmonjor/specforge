@@ -1,7 +1,7 @@
 package tdd
 
 import (
-	"specforge/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
 	"testing"
 	"time"
 )

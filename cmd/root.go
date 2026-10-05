@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/buildinfo"
+	"github.com/jefmonjor/specforge/v6/internal/buildinfo"
 )
 
 func (a *App) rootCommand() *cobra.Command {

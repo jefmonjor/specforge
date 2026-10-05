@@ -12,15 +12,15 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/conversation"
-	"specforge/internal/app/docturn"
-	"specforge/internal/app/layout"
-	"specforge/internal/app/prompts"
-	"specforge/internal/app/specs"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/conversation"
+	"github.com/jefmonjor/specforge/v6/internal/app/docturn"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/app/specs"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // maxTreeFiles bounds the file list shown to the agent.

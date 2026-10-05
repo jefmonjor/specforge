@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"strings"
 
-	"specforge/internal/domain/risk"
-	"specforge/internal/jsontext"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/jsontext"
 )
 
 // Status is what the agent reports about its turn.

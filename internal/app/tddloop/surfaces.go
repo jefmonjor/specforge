@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/domain/change"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // Surface modes (plan.surfaces in specforge.yaml).

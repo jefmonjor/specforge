@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"specforge/internal/app/layout"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Settings is each agent's project settings file.

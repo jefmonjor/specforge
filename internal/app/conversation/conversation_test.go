@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/protocol"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/protocol"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type agent struct {

@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type fakePrompter struct {

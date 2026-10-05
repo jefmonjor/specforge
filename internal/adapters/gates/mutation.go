@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Mutation runs Stryker on Node projects that configure it and compares the

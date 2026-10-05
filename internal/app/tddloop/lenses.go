@@ -8,14 +8,14 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/app/prompts"
-	"specforge/internal/app/reviewer"
-	"specforge/internal/domain/change"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/app/reviewer"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ErrReviewStopped: the developer stopped the loop on a review finding.

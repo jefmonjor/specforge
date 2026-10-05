@@ -1,10 +1,10 @@
 package tddloop
 
 import (
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // Rejection says why an attempt was not accepted.

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/reviewer"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/reviewer"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // fakeReviewer answers with scripted verdicts.

@@ -10,9 +10,9 @@ import (
 	"errors"
 	"fmt"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/protocol"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/protocol"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ErrTooManyQuestions: the agent keeps asking within one turn.

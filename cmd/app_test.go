@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/browser"
-	"specforge/internal/adapters/process"
-	"specforge/internal/config"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/browser"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // harness runs commands in a temporary project with a scripted agent.

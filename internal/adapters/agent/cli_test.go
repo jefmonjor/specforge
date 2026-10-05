@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/logging"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/logging"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type fakeProc struct {
@@ -105,15 +105,5 @@ func TestRunPropagatesMissingTool(t *testing.T) {
 	_, err := New(Gemini, proc, logging.Discard()).Run(context.Background(), ports.AgentRequest{})
 	if !errors.Is(err, ports.ErrToolNotFound) {
 		t.Fatalf("want ErrToolNotFound, got %v", err)
-	}
-}
-
-func TestActivityIsStoppedEvenOnError(t *testing.T) {
-	started, stopped := 0, 0
-	act := WithActivity(func(string) func() { started++; return func() { stopped++ } })
-	proc := &fakeProc{err: errors.New("boom")}
-	_, _ = New(Claude, proc, logging.Discard(), act).Run(context.Background(), ports.AgentRequest{})
-	if started != 1 || stopped != 1 {
-		t.Fatalf("started=%d stopped=%d", started, stopped)
 	}
 }

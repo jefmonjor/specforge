@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/layout"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 func newService(t *testing.T, lang string) (Service, string) {

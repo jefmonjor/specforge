@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/answer"
-	"specforge/internal/app/prompts"
-	"specforge/internal/domain/review"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/answer"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // StepError reports a review turn whose answer never matched its schema.

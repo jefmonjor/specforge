@@ -15,13 +15,13 @@ import (
 	"syscall"
 	"time"
 
-	"specforge/internal/adapters/agent"
-	"specforge/internal/adapters/browser"
-	"specforge/internal/adapters/logging"
-	"specforge/internal/adapters/process"
-	"specforge/internal/config"
-	"specforge/internal/ports"
-	"specforge/internal/ui"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/agent"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/browser"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/logging"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ui"
 )
 
 // App holds the process streams and the factories of every adapter, so a

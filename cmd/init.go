@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/agent"
-	"specforge/internal/adapters/process"
-	"specforge/internal/config"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/agent"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 func (a *App) initCommand() *cobra.Command {

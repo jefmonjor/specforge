@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // jestReport is the JSON report shared by Jest (--json) and Vitest

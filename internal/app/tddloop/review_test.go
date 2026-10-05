@@ -2,12 +2,12 @@ package tddloop
 
 import (
 	"context"
-	"specforge/internal/domain/change"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 	"strings"
 	"testing"
 
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 type fakeVCS struct{ commits [][]string }

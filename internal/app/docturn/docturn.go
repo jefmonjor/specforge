@@ -13,11 +13,11 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/conversation"
-	"specforge/internal/app/protocol"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/conversation"
+	"github.com/jefmonjor/specforge/v6/internal/app/protocol"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ScopeError reports files the agent changed outside what it may change.

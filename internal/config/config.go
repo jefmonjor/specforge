@@ -15,9 +15,9 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
 )
 
 // Supported values.

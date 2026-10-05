@@ -5,7 +5,6 @@
 package workspace
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -16,8 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // maxWalkedFiles bounds a snapshot outside git.
@@ -178,18 +177,4 @@ func hashFile(path string) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
-}
-
-// ContainsAny reports whether the file at path contains any of needles.
-func ContainsAny(path string, needles ...string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false
-	}
-	for _, n := range needles {
-		if bytes.Contains(data, []byte(n)) {
-			return true
-		}
-	}
-	return false
 }

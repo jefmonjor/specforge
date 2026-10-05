@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"time"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // OS is the real filesystem.

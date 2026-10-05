@@ -5,7 +5,7 @@ package main
 import (
 	"os"
 
-	"specforge/cmd"
+	"github.com/jefmonjor/specforge/v6/cmd"
 )
 
 func main() {

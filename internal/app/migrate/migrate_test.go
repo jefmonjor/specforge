@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/process"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/docturn"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/docturn"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // legacyFiles is a small Java 6 payroll application.

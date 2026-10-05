@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/app/doctor"
+	"github.com/jefmonjor/specforge/v6/internal/app/doctor"
 )
 
 func TestDoctorSaysWhatIsMissingAndExits4(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 // maxScannedFiles bounds a scan; the inventory says when it was reached.
@@ -242,10 +242,6 @@ var releasePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`JavaLanguageVersion\.of\(\s*(\d+)\s*\)`),
 	regexp.MustCompile(`\brelease(?:\.set\(\s*|\s*=\s*)(\d+)`),
 }
-
-// DeclaredRelease is the Java release the build at the root of fsys
-// declares ("1.6", "21"), or "" when it declares none.
-func DeclaredRelease(fsys fs.FS) string { return javaRelease(fsys) }
 
 // javaRelease reads the release the build declares; the lowest wins, since
 // that is what the code must still compile for.

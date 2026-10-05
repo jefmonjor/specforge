@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 // linked are dependency directories the copies share with the project

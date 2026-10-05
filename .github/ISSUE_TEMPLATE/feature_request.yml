@@ -1,0 +1,22 @@
+name: Feature request
+description: Something SpecForge should check, ask or do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What goes wrong or takes too long today, with an example from a real project if you have one.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: How SpecForge would behave. SpecForge checks what the agent does instead of trusting what it says; say how your idea would be verified.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered

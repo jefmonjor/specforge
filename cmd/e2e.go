@@ -7,13 +7,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/browser"
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/e2erun"
-	"specforge/internal/config"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ui"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/browser"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/e2erun"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ui"
 )
 
 func (a *App) e2eCommand() *cobra.Command {

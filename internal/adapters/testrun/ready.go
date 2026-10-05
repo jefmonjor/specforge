@@ -4,9 +4,9 @@ import (
 	"context"
 	"strings"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 var _ ports.Readier = (*Runner)(nil)

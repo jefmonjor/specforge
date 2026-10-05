@@ -11,12 +11,12 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/specs"
-	"specforge/internal/config"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/specs"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 func TestDiagnoseExitCodes(t *testing.T) {

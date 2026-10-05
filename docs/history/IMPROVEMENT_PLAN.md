@@ -706,9 +706,9 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 - [x] `Makefile` + `.goreleaser.yaml` sustituyen a los 4 scripts.
 - [x] CI: `gofmt -l`, `go vet`, `tidy -diff`, `go test -race -cover` con suelo 35 %, build Linux/macOS/Windows.
 - [x] Referencias y afirmaciones falsas corregidas en `USER_GUIDE.md`, `diagnostic.go`, `audit.go`.
-- [ ] `golangci-lint` en CI con `.golangci.yml` (errcheck, funlen, gocyclo, goconst, revive).
-- [ ] Scaffold Go alineado a `go 1.26`.
-- **Hecho cuando:** CI verde en Linux/macOS/Windows en un clon limpio. ✅ verificado localmente; pendiente la primera ejecución en GitHub Actions al fusionar.
+- [x] `golangci-lint` en CI con `.golangci.yml` *(hecho en la Fase 3: errorlint, gocyclo, revive, unconvert, unparam y los de serie)*.
+- [x] Scaffold Go alineado a `go 1.26` *(hecho en la v5)*.
+- **Hecho cuando:** CI verde en Linux/macOS/Windows en un clon limpio. ✅ verde en GitHub Actions desde la primera fusión.
 
 ### Fase 1 — Que las puertas se nieguen y la IA pregunte ✅ (PR #3) · P1, P3, P5
 
@@ -761,7 +761,7 @@ Cada fase se cierra con una *definición de hecho* y una **comprobación de prin
 - [x] **`spec interview` propiedad de la herramienta**: cada turno es una llamada headless con contrato (`question`, `context` = por qué importa, `section`, `unknowns`); el agente escribe la respuesta anterior en la spec y devuelve la siguiente pregunta o `done`. Transcripción en `specs/NNNN/interview.jsonl` y respuestas en `decisions.md`. Solo puede cambiar la spec (otro fichero ⇒ error). Termina **solo** cuando el lint no encuentra `TODO` ni estructura ausente: un `done` prematuro se devuelve con los problemas (máx. 3 rondas). Lo que no se sabe queda como `[NEEDS CLARIFICATION]`, nunca inventado. Sin terminal: pregunta en `questions.md`, exit 5, y la siguiente ejecución continúa. `--chat` conserva la conversación libre con el agente.
 - [x] E2E por escenario con `then_index`, evidencia verificada en Go, `report.json`, capturas por paso, `--min-pass-rate`; selectores sin mutar el DOM; certificados opt-in; `CHROME_PATH`. *(Adelantado en PR #3.)*
 - [x] **Demo**: `docs/DEMO.md` con las sesiones reales con Claude Code (entrevista, plan, loop con revisión, entrega) y la tabla de defectos que destaparon.
-- [ ] **v4.0.0**: publicar la release es decisión del mantenedor (etiqueta + `goreleaser`); todo lo necesario está listo.
+- [x] **Release**: la v4 no se etiquetó; llegó a `main` con la PR #7 y las releases publicadas son v5.0.0, v6.0.0 y v6.1.0.
 - **Hecho:** entrevista real en modo CI: 4 preguntas ⇒ spec completa con 8 invariantes, cada una con su escenario de fallo, 12 escenarios, contratos, errores, fuera de alcance y supuestos con quién los confirmó; `spec approve` sin un solo aviso.
 
 ---

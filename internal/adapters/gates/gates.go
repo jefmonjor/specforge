@@ -14,10 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ForProfile returns the gates that apply to p, in execution order.
@@ -29,20 +29,6 @@ func ForProfile(p stack.Profile, proc ports.CommandRunner, t quality.Thresholds)
 		}
 	}
 	return out
-}
-
-// Run executes gates in order and collects their results. It stops only if
-// ctx is cancelled.
-func Run(ctx context.Context, gs []ports.Gate, root string, p stack.Profile) (quality.Report, error) {
-	var report quality.Report
-	for _, g := range gs {
-		res, err := g.Check(ctx, root, p)
-		if err != nil {
-			return report, err
-		}
-		report = append(report, res)
-	}
-	return report, nil
 }
 
 func skipped(gate, why string) quality.Result {

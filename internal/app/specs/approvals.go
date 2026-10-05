@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/layout"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ReadLedger reads the scenario ledger of a specification: empty before
