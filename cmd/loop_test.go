@@ -13,15 +13,16 @@ func gitInit(t *testing.T, dir string) {
 	t.Helper()
 	for _, args := range [][]string{
 		{"init", "-q", "-b", "main"},
-		{"config", "user.name", "Test"},
-		{"config", "user.email", "test@example.com"},
-		{"config", "commit.gpgsign", "false"},
+		{"config", "--local", "user.name", "Test"},
+		{"config", "--local", "user.email", "test@example.com"},
+		{"config", "--local", "commit.gpgsign", "false"},
 		{"-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"},
 		{"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init"},
 	} {
 		c := exec.Command("git", args...)
 		c.Dir = dir
-		if out, err := c.CombinedOutput(); err != nil {
+		out, err := c.CombinedOutput()
+		if err != nil && len(args) > 1 && args[0] != "config" {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}

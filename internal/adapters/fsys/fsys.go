@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"specforge/internal/ports"
 )
@@ -83,6 +84,13 @@ func WriteAtomic(path string, data []byte, perm os.FileMode) error {
 		return fmt.Errorf("setting permissions on %s: %w", path, err)
 	}
 	if err := os.Rename(tmpName, path); err != nil {
+		if runtime.GOOS == "windows" {
+			_ = os.Remove(path)
+			if retryErr := os.Rename(tmpName, path); retryErr == nil {
+				committed = true
+				return nil
+			}
+		}
 		return fmt.Errorf("replacing %s: %w", path, err)
 	}
 	committed = true

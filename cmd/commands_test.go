@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -29,8 +30,10 @@ func TestInit(t *testing.T) {
 	if err != nil || u.Agent != "claude" || u.Language != "es" {
 		t.Fatalf("saved %+v %v", u, err)
 	}
-	if info, err := os.Stat(h.home.UserFile()); err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("config file mode: %v %v", info, err)
+	if runtime.GOOS != "windows" {
+		if info, err := os.Stat(h.home.UserFile()); err != nil || info.Mode().Perm() != 0o600 {
+			t.Fatalf("config file mode: %v %v", info, err)
+		}
 	}
 
 	// Interactive: numbered answers.
