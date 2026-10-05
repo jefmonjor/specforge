@@ -6,6 +6,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -33,6 +34,7 @@ type App struct {
 	// stderr are terminals).
 	Interactive bool
 	Getwd       func() (string, error)
+	Getenv      func(string) string
 	Now         func() time.Time
 	UserDirs    func() (config.Dirs, error)
 
@@ -69,6 +71,7 @@ func New() *App {
 		Err:         os.Stderr,
 		Interactive: ui.IsTerminal(os.Stdin) && ui.IsTerminal(os.Stderr),
 		Getwd:       os.Getwd,
+		Getenv:      os.Getenv,
 		Now:         time.Now,
 		UserDirs:    config.UserDirs,
 		NewProcess:  func(log *slog.Logger) ports.CommandRunner { return process.NewRunner(log) },
@@ -93,6 +96,10 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	defer a.closeLog()
 	if err == nil {
 		return ui.ExitOK
+	}
+	var exit *exitError
+	if errors.As(err, &exit) {
+		return exit.code
 	}
 	d := ui.Diagnose(a.lang, err)
 	// Info, not Error: the diagnosis below is the console rendering of it.

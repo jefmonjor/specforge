@@ -12,6 +12,8 @@ import (
 	"specforge/internal/adapters/process"
 	"specforge/internal/adapters/testrun"
 	"specforge/internal/app/doctor"
+	"specforge/internal/app/guardhook"
+	"specforge/internal/app/layout"
 	"specforge/internal/buildinfo"
 	"specforge/internal/config"
 	"specforge/internal/domain/legacy"
@@ -60,6 +62,7 @@ included.`,
 					return gates.ProbesFor(prof, proc, p.settings.Quality, target)
 				},
 				Browser: browser.Find,
+				Guard:   a.guardProbe(p),
 			}, doctor.Options{
 				Root:        p.root,
 				Agent:       p.settings.Agent,
@@ -127,4 +130,14 @@ func firstErr(errs ...error) error {
 		}
 	}
 	return nil
+}
+
+// guardProbe checks the guard hook, unless the guard is off.
+func (a *App) guardProbe(p project) func(string) ports.Readiness {
+	if p.settings.GuardMode == guardhook.Off {
+		return nil
+	}
+	return func(agent string) ports.Readiness {
+		return guardhook.Readiness(fsys.OS{}, layout.Layout{Root: p.root}, agent)
+	}
 }

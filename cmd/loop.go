@@ -14,6 +14,7 @@ import (
 	"specforge/internal/adapters/vcs"
 	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/guardhook"
 	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/app/verifier"
@@ -129,7 +130,9 @@ The state is saved after every step: --resume continues where it stopped.`,
 				LensesAuto:   p.settings.LensesAuto,
 				Lenses:       p.settings.Lenses,
 				Verify:       p.settings.Verify,
-				Strict:       p.settings.Quality.Strict,
+				// The agents the loop runs cannot answer the guard's questions.
+				AgentEnv: []string{guardhook.LoopEnv + "=1"},
+				Strict:   p.settings.Quality.Strict,
 
 				Legacy:           legacyDir,
 				JavaRelease:      p.settings.Migration.JavaRelease,

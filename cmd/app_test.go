@@ -30,6 +30,8 @@ type harness struct {
 	tty   bool
 	// browserLaunched records whether the e2e command got that far.
 	browserLaunched bool
+	// env is what Getenv sees.
+	env map[string]string
 }
 
 func newHarness(t *testing.T) *harness {
@@ -51,6 +53,7 @@ func (h *harness) run(args ...string) int {
 	a.Out, a.Err = h.out, h.err
 	a.Interactive = h.tty
 	a.Getwd = func() (string, error) { return h.root, nil }
+	a.Getenv = func(k string) string { return h.env[k] }
 	a.Now = func() time.Time { return time.Date(2026, 10, 4, 10, 0, 0, 0, time.UTC) }
 	a.UserDirs = func() (config.Dirs, error) { return h.home, nil }
 	a.NewAgent = func(name string, _ ports.CommandRunner, _ *slog.Logger) (ports.Agent, error) {

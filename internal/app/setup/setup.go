@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"specforge/assets"
+	"specforge/internal/app/guardhook"
 	"specforge/internal/app/layout"
 	"specforge/internal/config"
 	"specforge/internal/domain/stack"
@@ -40,6 +41,9 @@ type Options struct {
 	// repository (path as written in specforge.yaml) targeting JavaRelease.
 	Legacy      string
 	JavaRelease int
+	// GuardBinary, when set, installs the destructive-command guard as each
+	// agent's pre-tool hook, run as `<GuardBinary> guard --hook <agent>`.
+	GuardBinary string
 }
 
 // Action is what happened to one file.
@@ -88,6 +92,18 @@ func Run(files ports.Files, o Options) ([]Change, error) {
 		a, err := upsertBlock(files, o.Layout.Abs(name), block)
 		if err := record(name, a, err); err != nil {
 			return changes, err
+		}
+	}
+	if o.GuardBinary != "" {
+		for _, agent := range o.Agents {
+			changed, err := guardhook.Install(files, o.Layout, agent, o.GuardBinary)
+			a := Unchanged
+			if changed {
+				a = Updated
+			}
+			if err := record(guardhook.Settings[agent], a, err); err != nil {
+				return changes, err
+			}
 		}
 	}
 	a, err = ensureLine(files, o.Layout.Abs(".gitignore"), ".specforge/")

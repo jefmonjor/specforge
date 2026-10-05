@@ -29,6 +29,8 @@ var (
 	SurfaceModes = []string{"ask", "strict", "off"}
 	// VerifyModes are the values of verify.
 	VerifyModes = []string{"high", "always", "feature", "off"}
+	// GuardModes are the values of guard.mode.
+	GuardModes = []string{"block", "confirm", "off"}
 	// Phases are the steps of work a model can be chosen for.
 	Phases = []string{"interview", "plan", "legacy", "red", "green", "refactor", "review", "refute", "verify", "audit", "e2e"}
 )
@@ -78,7 +80,16 @@ type Project struct {
 	// always, feature or off. VerifyMaxMB bounds the copy it works in.
 	Verify      string `yaml:"verify,omitempty"`
 	VerifyMaxMB int    `yaml:"verify_max_mb,omitempty"`
-	Plan        struct {
+	// Guard is the destructive-command guard installed as the agents'
+	// pre-tool hook.
+	Guard struct {
+		// Mode: block (default), confirm (ask when someone can answer) or
+		// off.
+		Mode string `yaml:"mode,omitempty"`
+		// Allow are command patterns (* matches anything) let through.
+		Allow []string `yaml:"allow,omitempty"`
+	} `yaml:"guard,omitempty"`
+	Plan struct {
 		// Surfaces: what happens when the agent edits a file the approved
 		// plan does not name (ask, strict or off).
 		Surfaces string `yaml:"surfaces,omitempty"`
@@ -180,6 +191,9 @@ type Settings struct {
 	// Verify is when the verifier runs; VerifyMaxBytes bounds its copy.
 	Verify         string
 	VerifyMaxBytes int64
+	// GuardMode and GuardAllow configure the destructive-command guard.
+	GuardMode  string
+	GuardAllow []string
 }
 
 // ModelFor resolves the model of a phase: --model, then models.<phase>,
@@ -231,6 +245,8 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		modelFlag:      strings.TrimSpace(f.Model),
 		Surfaces:       strings.ToLower(first(p.Plan.Surfaces, DefaultSurfaces)),
 		Verify:         strings.ToLower(first(p.Verify, "high")),
+		GuardMode:      strings.ToLower(first(p.Guard.Mode, "block")),
+		GuardAllow:     p.Guard.Allow,
 		VerifyMaxBytes: int64(max(p.VerifyMaxMB, 0)) << 20,
 		BudgetLines:    DefaultBudgetLines,
 	}
@@ -301,6 +317,9 @@ func (s Settings) validate(requireAgent bool) error {
 	}
 	if !slices.Contains(Languages, s.Language) {
 		errs = append(errs, fmt.Errorf("unsupported language %q (supported: %s)", s.Language, strings.Join(Languages, ", ")))
+	}
+	if !slices.Contains(GuardModes, s.GuardMode) {
+		errs = append(errs, fmt.Errorf("unknown guard.mode %q (supported: %s)", s.GuardMode, strings.Join(GuardModes, ", ")))
 	}
 	if !slices.Contains(VerifyModes, s.Verify) {
 		errs = append(errs, fmt.Errorf("unknown verify mode %q (supported: %s)", s.Verify, strings.Join(VerifyModes, ", ")))

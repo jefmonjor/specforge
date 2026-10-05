@@ -193,3 +193,19 @@ func TestVerifyMode(t *testing.T) {
 		t.Fatal("unknown mode")
 	}
 }
+
+func TestGuardSettings(t *testing.T) {
+	s, err := Resolve(User{Agent: "claude"}, Project{}, Overrides{}, true)
+	if err != nil || s.GuardMode != "block" {
+		t.Fatalf("default: %q %v", s.GuardMode, err)
+	}
+	p := Project{}
+	p.Guard.Mode, p.Guard.Allow = "Confirm", []string{"git push --force-with-lease origin claude/*"}
+	if s, err = Resolve(User{Agent: "claude"}, p, Overrides{}, true); err != nil || s.GuardMode != "confirm" || len(s.GuardAllow) != 1 {
+		t.Fatalf("configured: %+v %v", s.GuardMode, err)
+	}
+	p.Guard.Mode = "yolo"
+	if _, err := Resolve(User{Agent: "claude"}, p, Overrides{}, true); err == nil {
+		t.Fatal("unknown mode")
+	}
+}
