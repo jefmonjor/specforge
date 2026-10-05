@@ -29,7 +29,10 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 	}
 	render := func(t conversation.Turn) (string, error) {
 		d := data
-		if t.Retry {
+		switch {
+		case t.MissingOptions:
+			d.Feedback = feedback(r.o.Language, RejectNoOptions)
+		case t.Retry:
 			d.Feedback = feedback(r.o.Language, RejectNoContract)
 		}
 		if t.Answer != "" {
@@ -47,7 +50,8 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 			return s.save(r)
 		},
 	}
-	resp, err := conversation.Talk(ctx, s.d.Agent, s.d.Asker, origin, r.o.MaxClarifications, req, render, hooks)
+	rules := conversation.Rules{MaxQuestions: r.o.MaxClarifications, RequireOptions: true}
+	resp, err := conversation.Talk(ctx, s.d.Agent, s.d.Asker, origin, rules, req, render, hooks)
 	// The legacy code is the reference: a turn that changed it is refused
 	// whatever else it did.
 	if changed, werr := touched(); werr != nil || len(changed) > 0 {

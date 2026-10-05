@@ -127,6 +127,11 @@ var messages = map[string]map[string]string{
 		"loop.risk":               "risk %s · %s",
 		"loop.gate.notrun":        "%s gate left out for a %s-risk change (quality.mutation_from)",
 		"loop.review.skipped":     "passive change, accepted without review: %s",
+		"reject.no-options":       "the agent asked without deriving options",
+		"doctor.title":            "SpecForge · doctor",
+		"doctor.ready":            "ready: everything required is installed",
+		"diag.doctor.title":       "Something required is missing",
+		"diag.doctor.action":      "install what the lines marked ✗ above say, then run specforge doctor again",
 	},
 	"es": {
 		"setup.new.java":          "instala y comprueba las herramientas: mvn test (JUnit, ArchUnit), mvn pmd:check",
@@ -233,5 +238,10 @@ var messages = map[string]map[string]string{
 		"loop.risk":               "riesgo %s · %s",
 		"loop.gate.notrun":        "puerta %s omitida para un cambio de riesgo %s (quality.mutation_from)",
 		"loop.review.skipped":     "cambio pasivo, aceptado sin revisión: %s",
+		"reject.no-options":       "el agente preguntó sin derivar opciones",
+		"doctor.title":            "SpecForge · doctor",
+		"doctor.ready":            "listo: todo lo necesario está instalado",
+		"diag.doctor.title":       "Falta algo necesario",
+		"diag.doctor.action":      "instala lo que dicen las líneas marcadas con ✗ arriba y vuelve a ejecutar specforge doctor",
 	},
 }

@@ -9,6 +9,7 @@ import (
 
 	"specforge/internal/app/audit"
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/doctor"
 	"specforge/internal/app/e2erun"
 	"specforge/internal/app/interview"
 	"specforge/internal/app/migrate"
@@ -190,7 +191,10 @@ func draftKey(step string) string {
 }
 
 func environmentErrors(_ string, err error, _ *Diagnosis) (int, string) {
+	var missing *doctor.MissingError
 	switch {
+	case errors.As(err, &missing):
+		return ExitEnvironment, "doctor"
 	case errors.Is(err, migrate.ErrNoLegacy):
 		return ExitEnvironment, "nolegacy"
 	case errors.Is(err, ports.ErrToolNotFound), errors.Is(err, tdd.ErrUnsupportedStack):

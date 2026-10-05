@@ -18,6 +18,8 @@ If anything you need is not in the specification, the decisions log, the existin
 {"status": "needs_clarification", "question": "the exact question for the developer", "options": ["option A", "option B"], "context": "why you need it"}
 ```
 
+When your doubt is about files, paths, commands, names or technical alternatives, derive the candidate answers yourself and put at least two in `options`: the developer picks or trims them. A question without options is refused here; free text is for the developer, not for you to ask for.
+
 If you cannot continue for a reason the developer must fix (a missing tool, a broken build unrelated to this task), reply with:
 ```json
 {"status": "blocked", "reason": "what is wrong", "suggested_action": "what the developer should do"}

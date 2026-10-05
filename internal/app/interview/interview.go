@@ -115,7 +115,7 @@ func Run(ctx context.Context, d Deps, o Options) (Result, error) {
 		return s.res, err
 	}
 	for round := 1; ; round++ {
-		resp, err := conversation.Talk(ctx, d.Agent, d.Asker, s.origin, o.MaxTurns,
+		resp, err := conversation.Talk(ctx, d.Agent, d.Asker, s.origin, conversation.Rules{MaxQuestions: o.MaxTurns},
 			ports.AgentRequest{Dir: o.Root, Model: o.Model, Timeout: o.AgentTimeout}, s.render(resumed), s.hooks())
 		if err != nil {
 			return s.res, err

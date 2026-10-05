@@ -69,6 +69,9 @@ type Job struct {
 	Rejected func(problems []string)
 }
 
+// NoOptionsFeedback tells the agent its question needed candidate answers.
+const NoOptionsFeedback = "Your question had no options. Derive the candidate answers yourself (files, paths, commands, names, alternatives) and put at least two in \"options\"; the developer picks or trims them."
+
 // Run executes the job until the document is accepted.
 func Run(ctx context.Context, d Deps, j Job) error {
 	if j.MaxAttempts <= 0 {
@@ -85,12 +88,15 @@ func Run(ctx context.Context, d Deps, j Job) error {
 			return err
 		}
 		render := func(t conversation.Turn) (string, error) {
-			if t.Retry {
+			switch {
+			case t.MissingOptions:
+				return j.Render(strings.TrimSpace(feedback+"\n"+NoOptionsFeedback), t)
+			case t.Retry:
 				return j.Render(strings.TrimSpace(feedback+"\nYour last answer did not end with the JSON status object. Do the task again and end with the contract."), t)
 			}
 			return j.Render(feedback, t)
 		}
-		resp, err := conversation.Talk(ctx, d.Agent, d.Asker, j.Origin, 0, j.Request, render, j.Hooks)
+		resp, err := conversation.Talk(ctx, d.Agent, d.Asker, j.Origin, conversation.Rules{RequireOptions: true}, j.Request, render, j.Hooks)
 		if err != nil {
 			return err
 		}

@@ -2,6 +2,7 @@ package tddloop
 
 import (
 	"errors"
+	"specforge/internal/app/conversation"
 	"strings"
 	"testing"
 
@@ -361,5 +362,21 @@ func TestResumeWithoutStateFails(t *testing.T) {
 	h := newHarness(t, specBody)
 	if _, err := h.run(func(o *Options) { o.Resume = true }); !errors.Is(err, ErrNothingToResume) {
 		t.Fatalf("want ErrNothingToResume, got %v", err)
+	}
+}
+
+func TestAQuestionWithoutOptionsIsRefusedInTheLoop(t *testing.T) {
+	h := newHarness(t, specBody)
+	open := func(*project, string) string {
+		return "```json\n{\"status\":\"needs_clarification\",\"question\":\"Which files should I touch?\"}\n```"
+	}
+	h.agent.turns = []reply{open, open}
+	h.tests.outcomes = []tdd.Outcome{baseline()}
+	_, err := h.run()
+	if !errors.Is(err, conversation.ErrNoOptions) {
+		t.Fatalf("want ErrNoOptions, got %v", err)
+	}
+	if !strings.Contains(h.agent.prompts[1], "Derive the candidate answers yourself") || len(h.prompter.questions) != 0 {
+		t.Fatalf("the agent is told to derive options; the developer is never asked:\n%s", h.agent.prompts[1])
 	}
 }

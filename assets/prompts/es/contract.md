@@ -18,6 +18,8 @@ Si algo que necesitas no está en la especificación, en el registro de decision
 {"status": "needs_clarification", "question": "la pregunta exacta para el desarrollador", "options": ["opción A", "opción B"], "context": "por qué lo necesitas"}
 ```
 
+Cuando la duda sea sobre ficheros, rutas, comandos, nombres o alternativas técnicas, deriva tú las respuestas candidatas y pon al menos dos en `options`: el desarrollador elige o recorta. Aquí se rechaza una pregunta sin opciones; el texto libre es para el desarrollador, no para que tú lo pidas.
+
 Si no puedes continuar por algo que debe arreglar el desarrollador (una herramienta que falta, un build roto ajeno a esta tarea), responde con:
 ```json
 {"status": "blocked", "reason": "qué ocurre", "suggested_action": "qué debe hacer el desarrollador"}

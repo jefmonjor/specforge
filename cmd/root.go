@@ -18,6 +18,7 @@ loop against an approved specification, and verifies every step itself.
   specforge init                     choose your agent and language (once)
   specforge setup                    prepare this repository
   specforge setup --new java         or start a new project (java, react, python, go)
+  specforge doctor                   check the agent, git, test runner and gate tools
   specforge spec new "<title>"       start a specification from the template
   specforge spec interview 0001      complete it with the agent
   specforge spec approve 0001        lint, record the approver and seal it
@@ -56,6 +57,7 @@ awaits your answer · 130 interrupted.`,
 	root.AddCommand(
 		a.initCommand(),
 		a.setupCommand(),
+		a.doctorCommand(),
 		a.specCommand(),
 		a.legacyCommand(),
 		a.planCommand(),

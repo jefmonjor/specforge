@@ -18,6 +18,7 @@ var feedbackText = map[string]map[Rejection]string{
 		RejectReviewChange: "The developer reviewed this scenario and asked for a change: %s. Change the implementation accordingly; the tests stay as they are.",
 		RejectReviewRed:    "The developer reviewed this scenario and sent it back to RED: the test does not express the scenario. Rewrite the test so it checks exactly what the scenario says.",
 		RejectNewFailures:  "These tests did not fail before the loop and fail now:\n%s",
+		RejectNoOptions:    "Your question had no options. Derive the candidate answers yourself (files, paths, commands, names, alternatives) and put at least two in \"options\"; the developer picks or trims them.",
 	},
 	"es": {
 		RejectReviewChange: "El desarrollador revisó este escenario y pidió un cambio: %s. Cambia la implementación en consecuencia; los tests se quedan como están.",
@@ -32,6 +33,7 @@ var feedbackText = map[string]map[Rejection]string{
 		RejectPremature:    "El test pasó antes de existir la implementación. Escribe un test que falle hasta que el comportamiento de este escenario exista.",
 		RejectUnconfirmed:  "El desarrollador no aceptó el test anterior como un RED válido: %s",
 		RejectNewFailures:  "Estos tests no fallaban antes del loop y fallan ahora:\n%s",
+		RejectNoOptions:    "Tu pregunta no tenía opciones. Deriva tú las respuestas candidatas (ficheros, rutas, comandos, nombres, alternativas) y pon al menos dos en \"options\"; el desarrollador elige o recorta.",
 	},
 }
 
