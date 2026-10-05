@@ -83,3 +83,39 @@ func TestSpanishPlanSections(t *testing.T) {
 		t.Fatalf("surfaces = %+v", s)
 	}
 }
+
+const parallelPlan = "## Components\n" +
+	"- `pay/net.go`: the net salary (new) · SDD_0001_001\n" +
+	"- `pay/bonus.go`: the bonus · SDD_0001_002\n" +
+	"- `report/pdf.go`: the payslip · SDD_0001_003\n" +
+	"- `pay/money.go`: shared money type\n\n" +
+	"## Tests per scenario\n| Marker | Scenario | File | Test |\n| :--- | :--- | :--- | :--- |\n" +
+	"| SDD_0001_001 | Net | `pay/net_test.go` | TestSDD_0001_001 |\n" +
+	"| SDD_0001_002 | Bonus | `pay/bonus_test.go` | TestSDD_0001_002 |\n" +
+	"| SDD_0001_003 | Slip | `report/pdf_test.go` | TestSDD_0001_003 |\n"
+
+func TestScenarioSurfaces(t *testing.T) {
+	markers := []string{"SDD_0001_001", "SDD_0001_002", "SDD_0001_003"}
+	s := ScenarioSurfaces(parallelPlan, markers)
+	if got := strings.Join(s["SDD_0001_002"].Files, ","); got != "pay/bonus.go,pay/bonus_test.go,pay/money.go" {
+		t.Fatalf("scenario 2 = %s (its component, its test and the shared one)", got)
+	}
+	if !s["SDD_0001_001"].Allows("pay/rounding.go") {
+		t.Fatal("a new component's directory belongs to its scenario")
+	}
+	// The shared money.go makes every pair overlap.
+	if !s["SDD_0001_002"].Overlaps(s["SDD_0001_003"]) {
+		t.Fatal("a shared component overlaps")
+	}
+	withoutShared := strings.Replace(parallelPlan, "- `pay/money.go`: shared money type\n", "", 1)
+	s = ScenarioSurfaces(withoutShared, markers)
+	if s["SDD_0001_002"].Overlaps(s["SDD_0001_003"]) {
+		t.Fatal("pay/ and report/ are disjoint")
+	}
+	if !s["SDD_0001_001"].Overlaps(s["SDD_0001_002"]) {
+		t.Fatal("scenario 1 creates pay/, where scenario 2 works")
+	}
+	if !(Surfaces{}).Overlaps(s["SDD_0001_003"]) {
+		t.Fatal("unknown surfaces overlap everything")
+	}
+}

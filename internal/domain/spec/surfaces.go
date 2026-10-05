@@ -153,3 +153,89 @@ func asPath(tok string) (string, bool) {
 func cleanRel(p string) string {
 	return strings.TrimPrefix(path.Clean(strings.ReplaceAll(p, "\\", "/")), "./")
 }
+
+var scenarioMarker = regexp.MustCompile(`\bSDD_\d{4}_\d{3}\b`)
+
+// ScenarioSurfaces reads the surfaces of each scenario from a plan: a
+// component line that names markers belongs to those scenarios, one that
+// names none is shared by all of them, and each row of the tests table
+// belongs to its marker.
+func ScenarioSurfaces(plan string, markers []string) map[string]Surfaces {
+	files := map[string]map[string]bool{}
+	dirs := map[string]map[string]bool{}
+	for _, m := range markers {
+		files[m], dirs[m] = map[string]bool{}, map[string]bool{}
+	}
+	addTo := func(owners []string, p string, newDir bool) {
+		for _, m := range owners {
+			if files[m] == nil {
+				continue
+			}
+			switch {
+			case strings.HasSuffix(p, "/"):
+				dirs[m][strings.TrimSuffix(p, "/")] = true
+			default:
+				files[m][p] = true
+				if newDir && path.Dir(p) != "." {
+					dirs[m][path.Dir(p)] = true
+				}
+			}
+		}
+	}
+	for _, line := range strings.Split(Section(plan, ComponentsTitle), "\n") {
+		owners := scenarioMarker.FindAllString(line, -1)
+		if len(owners) == 0 {
+			owners = markers
+		}
+		for _, p := range linePaths(line) {
+			addTo(owners, p, newWord.MatchString(line))
+		}
+	}
+	for _, line := range strings.Split(Section(plan, PlanTestsTitle), "\n") {
+		owners := scenarioMarker.FindAllString(line, -1)
+		for _, p := range linePaths(line) {
+			addTo(owners, p, false)
+		}
+	}
+	out := map[string]Surfaces{}
+	for _, m := range markers {
+		var s Surfaces
+		for f := range files[m] {
+			s.Files = append(s.Files, f)
+		}
+		for d := range dirs[m] {
+			s.Dirs = append(s.Dirs, d)
+		}
+		slices.Sort(s.Files)
+		slices.Sort(s.Dirs)
+		out[m] = s
+	}
+	return out
+}
+
+// Overlaps reports whether two surfaces could touch the same file: a file
+// in both, or a file or directory of one inside a directory of the other.
+// Empty surfaces overlap everything: nothing is known about them.
+func (s Surfaces) Overlaps(o Surfaces) bool {
+	if s.Empty() || o.Empty() {
+		return true
+	}
+	for _, f := range s.Files {
+		if o.Allows(f) {
+			return true
+		}
+	}
+	for _, f := range o.Files {
+		if s.Allows(f) {
+			return true
+		}
+	}
+	for _, a := range s.Dirs {
+		for _, b := range o.Dirs {
+			if a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/") {
+				return true
+			}
+		}
+	}
+	return false
+}

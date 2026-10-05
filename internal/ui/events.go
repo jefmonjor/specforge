@@ -181,6 +181,26 @@ func (e *LoopEvents) Verified(_ tdd.ScenarioRef, rec tdd.VerifyRecord) {
 	}
 }
 
+func (e *LoopEvents) Parallel(markers []string) {
+	e.halt()
+	e.C.Title(e.C.T("loop.parallel", strings.Join(markers, " · ")))
+}
+
+func (e *LoopEvents) ParallelSkipped(sc tdd.ScenarioRef, why string) {
+	e.halt()
+	e.C.Warn(e.C.T("loop.parallel.skipped", sc.Marker, why))
+}
+
+func (e *LoopEvents) SeamFailed(string) {
+	e.halt()
+	e.C.Warn(e.C.T("loop.parallel.seam"))
+}
+
+func (e *LoopEvents) Integrated(sc tdd.ScenarioRef) {
+	e.halt()
+	e.C.OK(e.C.T("loop.parallel.integrated", sc.Marker))
+}
+
 // Verifying implements verifier.Events.
 func (e *LoopEvents) Verifying(n int) { e.start(e.C.T("verify.running", n)) }
 

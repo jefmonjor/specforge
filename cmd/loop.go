@@ -93,6 +93,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 			files := fsys.OS{}
 			events := &ui.LoopEvents{C: con, Agent: ag.Name(), Stack: profile.Name()}
 			ws := workspace.New(proc)
+			sandboxes := scratch.New(proc, p.settings.VerifyMaxBytes)
 			svc := tddloop.New(tddloop.Deps{
 				Agent: ag,
 				Tests: testrun.New(proc),
@@ -103,11 +104,11 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
 				VCS:       vcs.New(proc),
 				Reviewer:  reviewer.New(reviewer.Deps{Agent: ag, Workspace: ws, Events: events}),
-				Verifier: verifier.New(verifier.Deps{Agent: ag, Scratch: scratch.New(proc, p.settings.VerifyMaxBytes),
-					Workspace: ws, Files: files, Events: events}),
-				Events: events,
-				Log:    a.log,
-				Now:    a.Now,
+				Verifier:  verifier.New(verifier.Deps{Agent: ag, Scratch: sandboxes, Workspace: ws, Files: files, Events: events}),
+				Scratch:   sandboxes,
+				Events:    events,
+				Log:       a.log,
+				Now:       a.Now,
 			})
 			_, err = svc.Run(ctx, tddloop.Options{
 				Root:         p.root,
@@ -131,6 +132,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Lenses:       p.settings.Lenses,
 				Verify:       p.settings.Verify,
 				Blind:        p.settings.BlindReview,
+				Parallel:     p.settings.Parallel,
 				// The agents the loop runs cannot answer the guard's questions.
 				AgentEnv: []string{guardhook.LoopEnv + "=1"},
 				Strict:   p.settings.Quality.Strict,

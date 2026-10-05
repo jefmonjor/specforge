@@ -96,3 +96,24 @@ func TestCopyOutsideGitAndTheSizeLimit(t *testing.T) {
 		t.Fatalf("want ErrTooLarge, got %v", err)
 	}
 }
+
+func TestSandboxIsARepositoryOfTheCopy(t *testing.T) {
+	if !process.Available("git") {
+		t.Skip("git not installed")
+	}
+	root := t.TempDir()
+	write(t, root, "a.go", "package a\n")
+	c, err := New(process.NewRunner(nil), 0).Sandbox(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Remove() }()
+	out, err := exec.Command("git", "-C", c.Dir, "status", "--porcelain").CombinedOutput()
+	if err != nil || len(out) != 0 {
+		t.Fatalf("a clean repository at the copy: %v %q", err, out)
+	}
+	write(t, c.Dir, "a.go", "package a // changed\n")
+	if out, _ := exec.Command("git", "-C", c.Dir, "status", "--porcelain").CombinedOutput(); string(out) != " M a.go\n" {
+		t.Fatalf("changes in the sandbox are measured from the copy: %q", out)
+	}
+}

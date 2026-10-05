@@ -76,6 +76,11 @@ type Project struct {
 	// Lenses are the review lenses after REFACTOR: auto (by risk), off, or
 	// a list of lenses.
 	Lenses StringList `yaml:"lenses,omitempty"`
+	// Loop tunes the loop: Parallel is how many scenarios with disjoint
+	// plan surfaces run side by side (1 by default).
+	Loop struct {
+		Parallel int `yaml:"parallel,omitempty"`
+	} `yaml:"loop,omitempty"`
 	// BlindReview runs the lenses of high-risk changes twice,
 	// independently (models.review2 for the second pass).
 	BlindReview bool `yaml:"blind_review,omitempty"`
@@ -193,6 +198,8 @@ type Settings struct {
 	Lenses     []review.Lens
 	// BlindReview doubles the lenses of high-risk changes.
 	BlindReview bool
+	// Parallel is loop.parallel.
+	Parallel int
 	// Verify is when the verifier runs; VerifyMaxBytes bounds its copy.
 	Verify         string
 	VerifyMaxBytes int64
@@ -253,6 +260,7 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		GuardMode:      strings.ToLower(first(p.Guard.Mode, "block")),
 		GuardAllow:     p.Guard.Allow,
 		BlindReview:    p.BlindReview,
+		Parallel:       max(p.Loop.Parallel, 1),
 		VerifyMaxBytes: int64(max(p.VerifyMaxMB, 0)) << 20,
 		BudgetLines:    DefaultBudgetLines,
 	}

@@ -234,3 +234,25 @@ func untar(r io.Reader, dst string) error {
 		}
 	}
 }
+
+// Sandbox implements ports.Scratch.
+func (c *Copier) Sandbox(ctx context.Context, root string) (ports.Copies, error) {
+	copies, err := c.Copy(ctx, root, "")
+	if err != nil {
+		return copies, err
+	}
+	// A private identity, no hooks and no signing: this repository only
+	// marks where the sandbox started.
+	base := []string{"-C", copies.Dir, "-c", "user.name=SpecForge", "-c", "user.email=specforge@localhost",
+		"-c", "commit.gpgsign=false", "-c", "core.hooksPath=" + os.DevNull}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "-A"}, {"commit", "-q", "--allow-empty", "--no-verify", "-m", "sandbox"}} {
+		res, err := c.proc.Run(ctx, ports.Command{Name: "git", Args: append(append([]string{}, base...), args...)})
+		if err == nil && !res.Success() {
+			err = fmt.Errorf("git %s in the sandbox: %s", args[0], res.Combined())
+		}
+		if err != nil {
+			return ports.Copies{}, errors.Join(err, copies.Remove())
+		}
+	}
+	return copies, nil
+}

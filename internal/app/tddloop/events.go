@@ -59,6 +59,15 @@ type Events interface {
 	// when committing is off or the project is not a git repository.
 	Committed(sc tdd.ScenarioRef, sha string)
 	Finished(st *tdd.State)
+	// Parallel reports scenarios starting side by side, each in a sandbox.
+	Parallel(markers []string)
+	// ParallelSkipped reports a scenario of a batch that runs again on its
+	// own, and why.
+	ParallelSkipped(sc tdd.ScenarioRef, why string)
+	// SeamFailed reports a batch whose combined work fails the suite.
+	SeamFailed(failure string)
+	// Integrated reports a scenario of a batch brought into the project.
+	Integrated(sc tdd.ScenarioRef)
 }
 
 // NopEvents ignores every event.
@@ -82,3 +91,7 @@ func (NopEvents) Accepted(tdd.Phase, tdd.ScenarioRef)            {}
 func (NopEvents) Satisfied(tdd.ScenarioRef)                      {}
 func (NopEvents) Committed(tdd.ScenarioRef, string)              {}
 func (NopEvents) Finished(*tdd.State)                            {}
+func (NopEvents) Parallel([]string)                              {}
+func (NopEvents) ParallelSkipped(tdd.ScenarioRef, string)        {}
+func (NopEvents) SeamFailed(string)                              {}
+func (NopEvents) Integrated(tdd.ScenarioRef)                     {}

@@ -75,9 +75,12 @@ type Deps struct {
 	Reviewer Reviewer
 	// Verifier checks the specification in a copy; nil skips it.
 	Verifier Verifier
-	Events   Events
-	Log      *slog.Logger
-	Now      func() time.Time
+	// Scratch makes the sandboxes of a parallel loop; nil runs every
+	// scenario in turn.
+	Scratch ports.Scratch
+	Events  Events
+	Log     *slog.Logger
+	Now     func() time.Time
 }
 
 // Reviewer runs review lenses over a change and validates a correction.
@@ -120,6 +123,14 @@ type Options struct {
 	Lenses     []review.Lens
 	// Blind doubles the lenses of high-risk scenarios.
 	Blind bool
+	// Parallel is how many scenarios with disjoint plan surfaces may run
+	// side by side, each in its own sandbox (1: one at a time).
+	Parallel int
+	// Single runs only Scenario and stops: a scenario of a parallel loop.
+	Single bool
+	// Seed is the baseline a new loop starts from instead of running the
+	// suite again.
+	Seed *tdd.Baseline
 	// Verify is when the independent verifier runs: "high" (scenarios of
 	// high risk, the default), "always", "feature" (once, at the end) or
 	// "off".
@@ -208,6 +219,9 @@ type run struct {
 	// fresh is true when this invocation started a new loop: the baseline
 	// is taken before its first RED.
 	fresh bool
+	// sequential are scenarios a parallel batch could not finish: they run
+	// one at a time.
+	sequential map[int]bool
 }
 
 // Run executes the loop until every scenario is done or a step stops it.
@@ -233,7 +247,7 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 	}
 	s.d.Events.Started(r.st, r.doc)
 	if r.fresh {
-		if err := s.takeBaseline(ctx, r); err != nil {
+		if err := s.startBaseline(ctx, r); err != nil {
 			return r.st, errors.Join(err, s.save(r))
 		}
 	}
@@ -241,6 +255,15 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 	for !r.st.Done() {
 		if err := ctx.Err(); err != nil {
 			return r.st, errors.Join(err, s.save(r))
+		}
+		if r.o.Single && r.st.Current != r.o.Scenario-1 {
+			break // a parallel loop's scenario is finished
+		}
+		if batch := s.batch(r); len(batch) > 1 {
+			if err := s.runBatch(ctx, r, batch); err != nil {
+				return r.st, errors.Join(err, s.save(r))
+			}
+			continue
 		}
 		sc, _ := r.st.Scenario()
 		s.d.Events.Phase(r.st, sc)
@@ -259,6 +282,9 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 		if err != nil {
 			return r.st, errors.Join(err, s.save(r))
 		}
+	}
+	if r.o.Single {
+		return r.st, s.save(r)
 	}
 	if err := s.verifyFeature(ctx, r); err != nil {
 		return r.st, errors.Join(err, s.save(r))

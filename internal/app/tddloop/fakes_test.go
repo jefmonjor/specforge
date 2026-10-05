@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -122,17 +124,38 @@ func ask(question string) reply {
 }
 
 type fakeAgent struct {
+	mu      sync.Mutex
 	p       *project
 	turns   []reply
 	prompts []string
 	models  []string
+	// byScenario scripts a parallel loop: the turns of each scenario, by
+	// its number, written into the directory the agent runs in.
+	byScenario map[int][]reply
 }
+
+var scenarioOf = regexp.MustCompile(`Scenario (\d+) of`)
 
 func (a *fakeAgent) Name() string { return "fake" }
 
 func (a *fakeAgent) Run(_ context.Context, req ports.AgentRequest) (string, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
 	a.prompts = append(a.prompts, req.Prompt)
 	a.models = append(a.models, req.Model)
+	if a.byScenario != nil {
+		m := scenarioOf.FindStringSubmatch(req.Prompt)
+		n := 0
+		if m != nil {
+			n, _ = strconv.Atoi(m[1])
+		}
+		turns := a.byScenario[n]
+		if len(turns) == 0 {
+			return "", fmt.Errorf("unexpected agent call for scenario %d", n)
+		}
+		a.byScenario[n] = turns[1:]
+		return turns[0](&project{t: a.p.t, root: req.Dir}, req.Prompt), nil
+	}
 	if len(a.turns) == 0 {
 		return "", fmt.Errorf("unexpected agent call #%d", len(a.prompts))
 	}
@@ -144,12 +167,37 @@ func (a *fakeAgent) Run(_ context.Context, req ports.AgentRequest) (string, erro
 func (a *fakeAgent) Interactive(context.Context, ports.AgentRequest) error { return nil }
 
 type fakeTests struct {
+	mu       sync.Mutex
 	outcomes []tdd.Outcome
 	filters  []string
+	// keyed scripts a parallel loop by filter; fallback answers a filter
+	// whose script ran out. mainSuite answers the whole suite in the
+	// project itself (the seam check), not in a sandbox.
+	keyed     map[string][]tdd.Outcome
+	fallback  map[string]tdd.Outcome
+	mainRoot  string
+	mainSuite []tdd.Outcome
 }
 
 func (f *fakeTests) Run(_ context.Context, req ports.TestRequest) (tdd.Outcome, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.filters = append(f.filters, req.Filter)
+	if req.Root == f.mainRoot && req.Filter == "" && len(f.mainSuite) > 0 {
+		o := f.mainSuite[0]
+		f.mainSuite = f.mainSuite[1:]
+		return o, nil
+	}
+	if f.keyed != nil {
+		if q := f.keyed[req.Filter]; len(q) > 0 {
+			f.keyed[req.Filter] = q[1:]
+			return q[0], nil
+		}
+		if o, ok := f.fallback[req.Filter]; ok {
+			return o, nil
+		}
+		return tdd.Outcome{}, fmt.Errorf("unexpected test run (filter %q)", req.Filter)
+	}
 	if len(f.outcomes) == 0 {
 		return tdd.Outcome{}, fmt.Errorf("unexpected test run #%d (filter %q)", len(f.filters), req.Filter)
 	}
@@ -207,6 +255,10 @@ type recorder struct {
 	reviewSkipped int
 	reviews       []tdd.ReviewRecord
 	verified      []tdd.VerifyRecord
+	batches       [][]string
+	skipped       []string
+	integrated    []string
+	seams         int
 }
 
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
@@ -240,6 +292,18 @@ func (r *recorder) Reviewed(_ tdd.ScenarioRef, rec tdd.ReviewRecord) {
 }
 func (r *recorder) Verified(_ tdd.ScenarioRef, rec tdd.VerifyRecord) {
 	r.verified = append(r.verified, rec)
+}
+func (r *recorder) Parallel(m []string) { r.mu.Lock(); r.batches = append(r.batches, m); r.mu.Unlock() }
+func (r *recorder) ParallelSkipped(sc tdd.ScenarioRef, why string) {
+	r.mu.Lock()
+	r.skipped = append(r.skipped, sc.Marker+": "+why)
+	r.mu.Unlock()
+}
+func (r *recorder) SeamFailed(string) { r.mu.Lock(); r.seams++; r.mu.Unlock() }
+func (r *recorder) Integrated(sc tdd.ScenarioRef) {
+	r.mu.Lock()
+	r.integrated = append(r.integrated, sc.Marker)
+	r.mu.Unlock()
 }
 
 type harness struct {

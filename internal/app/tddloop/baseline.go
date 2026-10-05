@@ -8,6 +8,17 @@ import (
 	"specforge/internal/domain/tdd"
 )
 
+// startBaseline adopts the seed of a parallel loop's scenario, or takes
+// the baseline.
+func (s *Service) startBaseline(ctx context.Context, r *run) error {
+	if r.o.Seed != nil {
+		b := *r.o.Seed
+		r.st.Baseline = &b
+		return s.save(r)
+	}
+	return s.takeBaseline(ctx, r)
+}
+
 // takeBaseline runs the whole suite once before the first RED of a new
 // loop. What fails there already failed on the branch: it is recorded as
 // known, shown to the developer, and never blamed on the agent.
