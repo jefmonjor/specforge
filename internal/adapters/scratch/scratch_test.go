@@ -43,6 +43,7 @@ func TestCopyTheWorkingTreeAndTheBase(t *testing.T) {
 	write(t, root, ".gitignore", "secret.env\nnode_modules/\n")
 	write(t, root, "pay/net.go", "package pay // v1\n")
 	git(t, root, "init", "-q")
+	git(t, root, "config", "core.autocrlf", "false") // what was committed is what is checked out, on every OS
 	git(t, root, "add", "-A")
 	git(t, root, "commit", "-qm", "base")
 	write(t, root, "pay/net.go", "package pay // v2\n")
@@ -132,6 +133,7 @@ func committed(t *testing.T, root string, files map[string]string) {
 		write(t, root, rel, content)
 	}
 	git(t, root, "init", "-q")
+	git(t, root, "config", "core.autocrlf", "false") // what was committed is what is checked out, on every OS
 	git(t, root, "add", "-A")
 	git(t, root, "commit", "-qm", "base")
 }
