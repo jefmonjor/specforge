@@ -28,8 +28,8 @@ func (a *App) planCommand() *cobra.Command {
 approach, the files to create or change, one planned test per scenario, the
 interfaces and the risks. It writes specs/NNNN-slug/plan.md and nothing
 else; SpecForge rejects a draft that touches other files, leaves a
-scenario without a planned test or names one the specification no longer has. The agent asks when an architectural
-choice is not settled.
+scenario without a planned test or names a removed one. The agent asks
+when an architectural choice is not settled.
 
 Review the plan, edit it if you like, then approve it with plan approve.
 When plan.md exists the loop requires it approved and follows it.`,

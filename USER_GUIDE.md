@@ -355,7 +355,7 @@ Your agent applies the request to every section it touches, asks what the reques
 | add one | gets the next number, never a used one | does it; the plan must place it first |
 | remove one | its number is retired: `REMOVED` | warns that its tests are still in the project |
 
-`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop state in `.specforge/` at its first new approval, so its tests keep their names: make that approval in the clone where the loop ran (elsewhere the markers follow the scenarios' order), and commit `scenarios.json` afterwards.
+`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop state in `.specforge/` at its next approval, so its tests keep their names. Make that approval in the clone where the loop ran, then commit `scenarios.json`; elsewhere the markers follow the scenarios' order.
 
 ## 7. The plan: `plan`
 
@@ -374,7 +374,7 @@ specforge plan approve 0001
 
 The agent sees the approved specification and the list of project files. It may only write `plan.md`: SpecForge rejects a draft that changes any other file, and sends it back (up to `max_attempts`) while a scenario has no planned test. When an architectural choice is not settled, the agent asks.
 
-**Read the plan and edit it as you like**, then approve it (gate R1): approval checks that every scenario marker is there, none of a removed scenario, and no `TODO` is left (an already approved plan is checked again), records you and seals the file. Running `plan` again revises the current draft instead of starting over.
+**Read the plan and edit it as you like**, then approve it (gate R1): approval checks that every scenario marker is there, none is a removed one and no `TODO` is left, then records you and seals the file. Approving a plan that is already approved checks it again. Running `plan` again revises the current draft instead of starting over.
 
 The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario, and every prompt carries it. Its files become the agent's [edit surfaces](#edit-surfaces-from-the-plan), and its scenario markers decide which scenarios may run [side by side](#scenarios-side-by-side). Approval warns about a component line without a path in backticks. A specification approved again with a scenario added or removed needs the plan updated and approved again; until then the loop stops with exit 3.
 
@@ -776,7 +776,7 @@ Read them; don't edit them by hand.
 ### Not committed
 
 - **`.specforge/state/<spec>.json`**: the loop state for `--resume`. `setup` adds `.specforge/` to `.gitignore`.
-- **`refs/specforge/checkpoints/`**: the loop's [checkpoints](#checkpoints-restore), local git refs that no push carries (the newest 50).
+- **`refs/specforge/checkpoints/`**: the loop's [checkpoints](#checkpoints-restore), local git refs that no push carries.
 - The **log file**, in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux), rotated, owner-only.
 
 Commit everything else: the specifications, plans, logs and the delivery are the project's history.
@@ -962,7 +962,7 @@ Every failure prints what happened, why and what to do next.
 - **"A review step failed closed".** The lens, refuter or verifier never returned valid JSON. Run again; if it repeats, try another model with `models.review` or `models.verify`.
 - **"A refused file was not put back".** Restore it (`git checkout -- <file>`) and `loop --resume`.
 - **The guard blocks a command you need.** Run it yourself, or add its pattern to `guard.allow` (for a script, the command that runs it: `"sh ./scripts/clean.sh"`).
-- **"The plan does not place every scenario".** A scenario was added, or the plan names one that was removed: `specforge plan 0001` revises the plan, then `specforge plan approve 0001`.
+- **"The plan needs attention": it does not match the specification's scenarios.** A scenario was added, or the plan names one that was removed: `specforge plan 0001` revises the plan, then `specforge plan approve 0001`.
 - **Tests of removed scenarios are still here.** The loop warns about tests whose name carries a retired marker. Delete them, or keep them on purpose: no scenario runs them any more.
 - **`spec interview` says the specification is approved.** Use `specforge spec change 0001 "<what to change>"`.
 - **An agent destroyed work anyway.** `specforge restore` lists the checkpoints the loop saved before each agent turn; `specforge restore latest` brings the newest back without deleting anything written since.

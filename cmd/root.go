@@ -56,7 +56,7 @@ awaits your answer · 130 interrupted.`,
 	f.BoolVar(&a.flags.traceIO, "trace-io", false, "record every prompt and agent answer in the log file")
 	f.BoolVarP(&a.flags.quiet, "quiet", "q", false, "print only warnings, errors and data")
 	f.BoolVar(&a.flags.nonInteractive, "non-interactive", false, "never ask: write questions to a file and exit with code 5")
-	f.BoolVar(&a.flags.json, "json", false, "print data (version, spec list, deliver, doctor, review, verify, restore…) and errors as JSON")
+	f.BoolVar(&a.flags.json, "json", false, "print data and errors as JSON")
 
 	root.AddCommand(
 		a.initCommand(),
