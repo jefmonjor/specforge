@@ -203,7 +203,7 @@ For each stage, what SpecForge checks itself:
 | Stage | SpecForge verifies |
 | :--- | :--- |
 | **Spec** | No `TODO`, no open question, every scenario has a `When` and a `Then`. Who approved it. A SHA-256 seal. |
-| **Plan** | Only `plan.md` changed; every scenario has a planned test; you approved it. |
+| **Plan** | Only `plan.md` changed; every scenario has a planned test and none names a removed one; you approved it. |
 | **🔴 Red** | A test named with the scenario's marker (`SDD_0001_003`) exists, compiles, runs and **fails on an assertion**. One that passes too early goes to you. |
 | **🟢 Green** | The tests are byte-for-byte as RED left them, and they pass. Failures are fed back, up to 3 attempts. |
 | **🔵 Refactor** | The whole suite passes, except tests that already failed before the loop (named from the runner's report), and no quality gate blocks. A gate whose tool is missing shows ⚠ *skipped*, never ✓. |
@@ -244,13 +244,14 @@ And in `specs/0001-slug/`:
 
 - `approvals.md`: every approval and what changed in it.
 - `decisions.md`: every question and answer, reused in later prompts.
-- `interview.jsonl`: the interview transcript.
+- `interview.jsonl`, `change.jsonl`: the interview and change-request transcripts.
+- `scenarios.json`: each scenario's marker, kept for good. Commit it.
 - `review/SDD_…json` and `verify/SDD_…json`: each scenario's lens review and verification, with every discarded finding and why.
 - `DELIVERY.md`, `trace.json`, `PR_BODY.md`: the hand-over, rewritten by each `deliver`.
 
 `setup` also adds the guard to `.claude/settings.json` or `.gemini/settings.json`, keeping the rest of the file.
 
-The loop state for `--resume` lives in `.specforge/`, which `setup` adds to `.gitignore`.
+The loop state for `--resume` lives in `.specforge/`, which `setup` adds to `.gitignore`. The loop's checkpoints are local git refs under `refs/specforge/checkpoints/` that no push carries.
 
 **How do I…** change an approved spec, add a scenario, redo one, answer a question in CI? See the [recipes](USER_GUIDE.md#18-recipes).
 
@@ -387,10 +388,12 @@ internal/
   app/       use cases: tddloop,
              reviewer, verifier,
              doctor, guardhook,
-             planning, deliver, …
+             planning, restore,
+             deliver, …
   ports/     what use cases need
   adapters/  agent CLI, runners,
-             gates, git, browser
+             gates, git, checkpoints,
+             scratch copies, browser
 assets/      prompts, rules,
              templates, scaffolds
 ```

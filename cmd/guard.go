@@ -40,8 +40,8 @@ lists command patterns to let through, * matching anything.
 
 It also reads what the command runs: a script (sh x.sh, ./x.sh, source),
 the file given to an interpreter (python x.py, node x.js, go run x.go),
-code given inline (python -c, node -e), an npm/pnpm/yarn/bun script or a
-make target. It is not a sandbox: what a program imports, a compiled
+code given inline (python -c, node -e), an npm/pnpm/yarn/bun script, a
+make target, or a file the same command writes before running it. It is not a sandbox: what a program imports, a compiled
 binary or a variable's value at run time are out of its reach; the loop's
 checkpoints (specforge restore) recover from what gets past it.
 specforge setup installs the hook; doctor checks it; --selftest proves it

@@ -236,7 +236,7 @@ func ProjectConfig(lang string, p *stack.Profile, legacy string, javaRelease int
 		"# lenses: auto                   # review lenses after REFACTOR: auto (by risk) | off | [risk, reliability, readability, resilience]",
 		"# blind_review: false            # high risk: run the lenses twice, independently",
 		"# verify: high                   # independent verifier: high | always | feature | off",
-		"# verify_max_mb: 500             # largest project the verifier copies",
+		"# verify_max_mb: 500             # largest project the verifier or a sandbox copies",
 		"# plan:",
 		"#   surfaces: ask                # a file outside the approved plan: ask | strict | off",
 		"# delivery:",

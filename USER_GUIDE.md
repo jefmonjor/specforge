@@ -309,7 +309,7 @@ The interview ends only when the lint finds no `TODO` and no missing structure; 
 
 Without a terminal the question goes to `questions.md` (exit 5): write the answer there and run `spec interview` again; it continues where it stopped. `--chat` instead hands your terminal to the agent for a free conversation.
 
-You can always skip the interview and edit the file by hand.
+You can always skip the interview and edit the file by hand. On an approved specification, `interview` does nothing and points to `spec change`.
 
 ### Clarify
 
@@ -351,10 +351,11 @@ Your agent applies the request to every section it touches, asks what the reques
 | change its title, same steps | keeps its marker: `RENAMED` | nothing to redo |
 | change an invariant it names | `MODIFIED` | redoes it |
 | insert, move or reorder scenarios | the others keep theirs | nothing to redo for them |
+| change its title and its steps together | a new marker (`ADDED`); the old one is `REMOVED` | does it as new; the plan must follow |
 | add one | gets the next number, never a used one | does it; the plan must place it first |
 | remove one | its number is retired: `REMOVED` | warns that its tests are still in the project |
 
-`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop at its first new approval, so its tests keep their names.
+`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop state in `.specforge/` at its first new approval, so its tests keep their names: make that approval in the clone where the loop ran (elsewhere the markers follow the scenarios' order), and commit `scenarios.json` afterwards.
 
 ## 7. The plan: `plan`
 
@@ -373,9 +374,9 @@ specforge plan approve 0001
 
 The agent sees the approved specification and the list of project files. It may only write `plan.md`: SpecForge rejects a draft that changes any other file, and sends it back (up to `max_attempts`) while a scenario has no planned test. When an architectural choice is not settled, the agent asks.
 
-**Read the plan and edit it as you like**, then approve it (gate R1): approval checks that every scenario marker is there and no `TODO` is left, records you and seals the file. Running `plan` again revises the current draft instead of starting over.
+**Read the plan and edit it as you like**, then approve it (gate R1): approval checks that every scenario marker is there, none of a removed scenario, and no `TODO` is left (an already approved plan is checked again), records you and seals the file. Running `plan` again revises the current draft instead of starting over.
 
-The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario, and every prompt carries it. Its files become the agent's [edit surfaces](#edit-surfaces-from-the-plan), and its scenario markers decide which scenarios may run [side by side](#scenarios-side-by-side). Approval warns about a component line without a path in backticks. A specification amended with a new scenario needs the plan updated and approved again.
+The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario, and every prompt carries it. Its files become the agent's [edit surfaces](#edit-surfaces-from-the-plan), and its scenario markers decide which scenarios may run [side by side](#scenarios-side-by-side). Approval warns about a component line without a path in backticks. A specification approved again with a scenario added or removed needs the plan updated and approved again; until then the loop stops with exit 3.
 
 ## 8. The loop: `loop`
 
@@ -406,7 +407,7 @@ When a test with the scenario's marker already exists (an earlier run stopped be
 
 **Lessons.** When a phase needed more than one attempt, the agent may add a one-sentence `lesson`: the rule that would have avoided the mistake. SpecForge keeps it in `specs/LESSONS.md`, tagged with the stack, without duplicates and at most 30, and every later prompt for that stack shows them. The file is yours to edit.
 
-**State.** The loop state is saved after every step in `.specforge/state/<spec>.json`, written atomically. `--resume` re-reads the specification and checks the seal first. If the specification was approved again with changes, the scenarios whose text did not change keep their progress and the rest are redone. A finished loop is reported, not redone; `--restart` runs it again on purpose.
+**State.** The loop state is saved after every step in `.specforge/state/<spec>.json`, written atomically. `--resume` re-reads the specification and checks the seal first. If the specification was approved again with changes, progress is matched by marker: `UNCHANGED` and `RENAMED` scenarios keep everything (commit, risk, review, verification), `MODIFIED` ones go back to RED with their previous text in the prompt, `ADDED` ones are done, and for `REMOVED` ones the loop warns about tests that still carry their marker. A finished loop is reported, not redone; `--restart` runs it again on purpose.
 
 **Test runners.** The marker filter uses `go test -json -run`, Maven `-Dtest`, Gradle `--tests`, `vitest run -t`, `jest -t` or `pytest -k`. Results are read from the runner's machine-readable report (test2json, Surefire/JUnit XML, Vitest/Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "an assertion failed" are told apart. With plain `npm test` the filter is not exact and SpecForge asks you to confirm the RED.
 
@@ -475,7 +476,7 @@ SpecForge requires:
 - your real project unchanged, fingerprinted before and after;
 - an answer valid for its schema (one retry, then fail closed).
 
-`verify: high` (the default) runs it for high-risk scenarios, `always` for every one, `feature` once over the whole specification at the end, `off` never. What it shows broken gets the one correction, REFACTOR judges it, and only those requirements are verified again; what stays broken goes to you. The regression tests it proposes are offered: added only as new test files inside the project, with the whole suite still passing. A project larger than `verify_max_mb` (500) is skipped, with the reason.
+`verify: high` (the default) runs it for high-risk scenarios, `always` for every one, `feature` once over the whole specification at the end, `off` never. What it shows broken gets the one correction, REFACTOR judges it, and only those requirements are verified again; what stays broken goes to you. The regression tests it proposes are offered: added only as new test files inside the project, with the whole suite still passing. A project larger than `verify_max_mb` (500) is skipped, with the reason; the same limit applies to the sandboxes of [scenarios side by side](#scenarios-side-by-side).
 
 `specforge verify 0001` runs it over a whole specification on demand: exit 2 with the command that reproduces each broken requirement, the report in `specs/0001-slug/verify/feature.json`.
 
@@ -485,7 +486,7 @@ With an approved plan, the files the agent may change are its components (paths 
 
 ### Scenarios side by side
 
-With `loop.parallel: 2` (or more), consecutive scenarios whose plan surfaces do not overlap run at the same time, each in its own **sandbox**: a copy of the project made into a fresh git repository. A component line that names scenario markers (`· SDD_0001_002`) belongs to those; one that names none is shared by all, so an unmarked plan never runs anything in parallel.
+With `loop.parallel: 2` (or more), consecutive scenarios whose plan surfaces do not overlap run at the same time, each in its own **sandbox**: a copy of the project made into a fresh git repository that borrows the project's git objects, so it stores only what is new. A component line that names scenario markers (`· SDD_0001_002`) belongs to those; one that names none is shared by all, so an unmarked plan never runs anything in parallel.
 
 In its sandbox each scenario goes through RED, GREEN, REFACTOR and the review. Questions reach you one at a time. Then the work comes back in order: a file another scenario of the batch also wrote sends that scenario back to run on its own; the whole suite runs once over the combination (the **seam check**), and if it fails every file goes back as it was and the scenarios run again one by one. Only then does each scenario get your review and its own commit, in turn.
 
@@ -501,7 +502,7 @@ models:
   review: claude-opus-5-5
 ```
 
-Phases: `interview`, `plan`, `legacy`, `red`, `green`, `refactor`, `review`, `review2`, `refute`, `verify`, `audit`, `e2e`. The review's correction uses `green`'s model. `--model` overrides every phase.
+Phases: `interview`, `plan`, `legacy`, `red`, `green`, `refactor`, `review`, `review2`, `refute`, `verify`, `audit`, `e2e`. The review's correction uses `green`'s model; `spec change` and `spec clarify` use `interview`'s. `--model` overrides every phase.
 
 ## 10. Questions instead of guesses
 
@@ -678,7 +679,7 @@ During `plan` and `loop` the agent receives the legacy path, the sources section
 
 Agents run shell commands. The guard reads each one before it runs and blocks what destroys work:
 
-- recursive deletes (`rm -r`, `find -delete`, `find -exec rm`), `mkfs`, `shred`, `dd` onto a device;
+- recursive deletes (`rm -r`, `find -delete`, `find -exec rm`, `rimraf`, `del-cli`, `trash`), `mkfs`, `shred`, `dd` onto a device;
 - git commands that discard work or rewrite history: `reset --hard`, `clean -f`, `push --force` (and `+branch`, `:branch`, `--delete`), `branch -D`, `stash drop`/`clear`, `checkout .`, `restore`, `filter-branch`, `reflog expire`;
 - SQL that drops or empties data: `DROP`, `TRUNCATE`, `DELETE` or `UPDATE` without `WHERE` (comments ignored), MongoDB `drop()` and `deleteMany({})`, Redis `FLUSHALL`;
 - commands that touch secrets: `.env`, `.ssh/`, `*.pem`, `id_rsa`, `credentials`, `.netrc`.
@@ -713,7 +714,7 @@ Not only the command line. Before a command runs, the guard reads what it runs, 
 | `sh x.sh`, `./x.sh`, `source x`, `scripts/nuke` | the script, and the scripts it runs in turn; a shebang (`#!/usr/bin/env python3`) names the language |
 | `python x.py`, `node x.js`, `ruby`, `perl`, `php`, `go run x.go`, `deno run`, `bun x.ts` | the file, for calls that delete a tree (`shutil.rmtree`, a recursive `fs.rm`, `FileUtils.rm_rf`, `os.RemoveAll`…) and for shell or SQL in its strings (`os.system("rm -rf …")`, `["git", "reset", "--hard"]`, `"DELETE FROM users"`) |
 | `python -c "…"`, `node -e "…"`, `ruby -e`, `perl -e`, `php -r`, `bun -e`, `deno eval` | the code given inline, the same way |
-| `npm run clean`, `pnpm clean`, `yarn clean`, `bun run clean` | the script in `package.json`, and its `pre` script |
+| `npm run clean`, `pnpm clean`, `yarn clean`, `bun run clean` | the script in `package.json`, and its `pre` and `post` scripts |
 | `make clean` | the target's recipe in the `Makefile`, and its prerequisites' |
 | `echo '…' > x.sh && sh x.sh`, a heredoc | the text the command writes into the file it then runs |
 
@@ -723,7 +724,7 @@ What stays out of reach: what a program imports, a compiled binary, a variable's
 
 ### Checkpoints: `restore`
 
-Before every agent turn, the loop saves a **checkpoint** of your working tree: uncommitted and untracked files included, ignored ones (`node_modules`, `.env`) not. A checkpoint lives under `refs/specforge/checkpoints/`: no branch, commit, index, stash or push carries it, `git status` does not show it, and the newest 50 are kept. Only what changed is hashed, so one takes tens of milliseconds.
+Before every agent turn, the loop saves a **checkpoint** of your working tree: uncommitted and untracked files included, ignored ones (`node_modules`, `.env`) not. A checkpoint lives under `refs/specforge/checkpoints/`: no branch, commit, index, stash or push carries it, `git status` does not show it, and the newest 50 are kept. Only what changed is hashed, so one takes tens of milliseconds. Scenarios run [side by side](#scenarios-side-by-side) are not checkpointed inside their sandboxes, and a checkpoint that cannot be saved is noted in the loop state without stopping the loop.
 
 If something gets past the guard, nothing is lost:
 
@@ -746,7 +747,7 @@ Everything SpecForge uses lives in your repository, next to your code. `0001-slu
 
 ### Files you work in
 
-- 📝 **`specs/0001-slug.md`**: the specification. Edit it freely before approving. To change an approved one, edit it and run `spec approve` again.
+- 📝 **`specs/0001-slug.md`**: the specification. Edit it freely before approving. To change an approved one, run `spec change 0001 "<what to change>"` (or edit it), then `spec approve` again: every scenario keeps its marker.
 - 🗺️ **`specs/0001-slug/plan.md`**: the plan. After `plan`, edit what you like, then `plan approve`.
 - ❓ **`specs/0001-slug/questions.md`**: questions waiting for you when nobody was at a terminal. Replace `_awaiting an answer_` and run the same command again.
 - ⚙️ **`specforge.yaml`**: project settings ([section 19](#19-configuration-reference)).
@@ -775,6 +776,7 @@ Read them; don't edit them by hand.
 ### Not committed
 
 - **`.specforge/state/<spec>.json`**: the loop state for `--resume`. `setup` adds `.specforge/` to `.gitignore`.
+- **`refs/specforge/checkpoints/`**: the loop's [checkpoints](#checkpoints-restore), local git refs that no push carries (the newest 50).
 - The **log file**, in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux), rotated, owner-only.
 
 Commit everything else: the specifications, plans, logs and the delivery are the project's history.
@@ -796,7 +798,7 @@ specforge spec approve 0001
 specforge loop 0001
 ```
 
-Approval prints each scenario's marker and how it changed; the loop redoes only those.
+Approval prints every scenario that changed, with its marker (`approvals.md` records them all); the loop redoes only those.
 
 **Add or remove a scenario.** The same, and the plan must follow:
 
@@ -824,7 +826,7 @@ specforge loop 0001
 
 **Run without reviews or commits.** `--review off --no-commit`, or `review: off` and `commit: false` in `specforge.yaml`.
 
-**Use another agent or model once.** `--agent gemini` or `--model <name>` on `spec interview`, `plan`, `loop`, `audit`, `e2e`, `legacy map` and `spec from-legacy`.
+**Use another agent or model once.** `--agent gemini` or `--model <name>` on `spec interview`, `spec change`, `spec from-legacy`, `plan`, `loop`, `review`, `verify`, `audit`, `e2e` and `legacy map`. `spec clarify` uses the configured agent to apply the answers; without one it only records them.
 
 **Run in CI.** Add `--non-interactive`. Questions go to `questions.md` with exit code 5; every other outcome has its own [exit code](#20-exit-codes). `--json` prints data and errors as JSON.
 
@@ -899,6 +901,7 @@ lenses: auto
 blind_review: false
 # high | always | feature | off
 verify: high
+# largest project the verifier or a sandbox copies
 verify_max_mb: 500
 plan:
   # outside the plan: ask | strict | off
@@ -927,7 +930,7 @@ Unknown keys are an error, so a typo never silently leaves a default in place.
 **Global flags**
 
 - `--non-interactive`: never ask; write questions to a file and exit 5.
-- `--json`: data from `version`, `spec list` and `deliver` as JSON on stdout, and errors as `{"exit", "title", "cause", "action"}` on stderr.
+- `--json`: data from `version`, `spec list`, `deliver`, `doctor`, `legacy scan`, `review`, `verify` and `restore` as JSON on stdout, and errors as `{"exit", "title", "cause", "action"}` on stderr.
 - `--quiet`: only warnings, errors and data.
 - `--verbose`: progress details and the agent's live output.
 - `--debug`: debug records in the log.
@@ -938,7 +941,7 @@ Unknown keys are an error, so a typo never silently leaves a default in place.
 - **0**: done.
 - **1**: unexpected error or bad usage.
 - **2**: a gate said no: tests, quality, a review finding or a correction you stopped, the verifier, a refused file not put back, security findings, E2E pass rate, a legacy document that was not accepted, or the agent is blocked. The guard also blocks a command with exit 2, which your agent sees.
-- **3**: the specification or the loop state needs attention: not approved, changed after approval, lint issues, ambiguous or missing, test tampering, a loop in progress.
+- **3**: the specification or the loop state needs attention: not approved, changed after approval, a plan not approved or naming a removed scenario, lint issues, ambiguous or missing, test tampering, a loop in progress.
 - **4**: a tool, browser or setting is missing: agent CLI, test runner, configuration, legacy repository; `doctor` found something required missing.
 - **5**: a question awaits your answer (no terminal).
 - **130**: interrupted with Ctrl-C; the state saved so far is valid.
@@ -950,7 +953,7 @@ Every failure prints what happened, why and what to do next.
 - **What did the agent receive and answer?** Re-run with `--trace-io` and read the log file.
 - **The agent claims files it did not write.** The attempt is rejected and the agent is told which ones; that is the loop working. Repeated rejections exhaust `max_attempts` (exit 2).
 - **"Several stacks detected".** Set `stack:` in `specforge.yaml` or pass `--stack`.
-- **The loop says the specification changed.** Revert the edit, or review it and run `specforge spec approve` again; unchanged scenarios keep their progress.
+- **The loop says the specification changed.** Revert the edit, or review it and run `specforge spec approve` again; every scenario keeps its marker and unchanged ones keep their progress.
 - **A gate shows ⚠ skipped.** Install the tool, or accept the warning; `--strict` makes it block.
 - **"The agent changed the legacy code".** Restore the legacy repository (`git checkout .` there) and run the command again; the agent may only read it.
 - **A legacy document keeps coming back.** The diagnosis lists each citation that did not resolve, and the agent gets the same list. Citations are relative to the legacy repository.
@@ -959,6 +962,9 @@ Every failure prints what happened, why and what to do next.
 - **"A review step failed closed".** The lens, refuter or verifier never returned valid JSON. Run again; if it repeats, try another model with `models.review` or `models.verify`.
 - **"A refused file was not put back".** Restore it (`git checkout -- <file>`) and `loop --resume`.
 - **The guard blocks a command you need.** Run it yourself, or add its pattern to `guard.allow` (for a script, the command that runs it: `"sh ./scripts/clean.sh"`).
+- **"The plan does not place every scenario".** A scenario was added, or the plan names one that was removed: `specforge plan 0001` revises the plan, then `specforge plan approve 0001`.
+- **Tests of removed scenarios are still here.** The loop warns about tests whose name carries a retired marker. Delete them, or keep them on purpose: no scenario runs them any more.
+- **`spec interview` says the specification is approved.** Use `specforge spec change 0001 "<what to change>"`.
 - **An agent destroyed work anyway.** `specforge restore` lists the checkpoints the loop saved before each agent turn; `specforge restore latest` brings the newest back without deleting anything written since.
 
 ## 22. Architecture
@@ -971,12 +977,14 @@ cmd/            CLI, composition root,
 internal/
   domain/       pure, no I/O:
     spec/       Gherkin, seal, lint,
+                scenario markers,
                 plan surfaces
     risk/       tiers from paths, lines
     review/     diff hunks, findings,
                 proof, blind merge
     verification/ the verifier's report
-    guard/      destructive commands
+    guard/      destructive commands,
+                the scripts they run
     change/     lines per file
     legacy/     inventory, citations,
                 migration conformance
@@ -1002,7 +1010,8 @@ internal/
     prompts/ layout/
   ports/        what use cases need
   adapters/     agent CLI, processes,
-                runners, gates, git,
+                runners, gates, git
+                (diffs, checkpoints),
                 scratch copies, browser,
                 files, logs
   config/ ui/   settings, terminal UI

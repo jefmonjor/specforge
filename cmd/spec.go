@@ -149,7 +149,9 @@ func (a *App) specApproveCommand() *cobra.Command {
 		Long: `approve lints the specification and refuses while anything blocks it. Then it
 records the approver and the date in the front matter and seals the content
 with a SHA-256 hash. The approver is --by, else your git user.name, else a
-question. Approving an edited specification again accepts the change.`,
+question. Approving an edited specification again accepts the change: each
+scenario keeps its marker (specs/NNNN-slug/scenarios.json), approve prints
+what changed and says when the plan needs revising.`,
 		Example: "  specforge spec approve 0001\n  specforge spec approve 0001 --by \"Ana López\"",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

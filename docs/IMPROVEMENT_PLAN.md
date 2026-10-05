@@ -7,7 +7,7 @@
 > **Severidad:** 🔴 bloqueante = rompe la promesa central · 🟠 mayor = brecha metodológica o de diseño · 🟡 menor = pulido.
 > **Estado:** ✅ hecho · 🔄 en PR · ⬜ pendiente.
 >
-> **Estado final (Fases 0-4 ejecutadas):** las cinco fases están implementadas en PRs apiladas #2 → #3 → #4 → #5 → #6, con CI en verde y verificadas con ejecuciones reales de Claude Code (`docs/DEMO.md`). Desviaciones del plan, cada una anotada en su fase: el código de banco se borró en lugar de moverse a `contrib/bank`; no hay `spec amend` (enmendar = editar + `spec approve`, con delta registrado); el E2E por escenario se adelantó a la Fase 1. Queda a decisión del mantenedor publicar v4.0.0. Las secciones 1-16 describen el estado de partida (v3) y se conservan como auditoría.
+> **Estado final (Fases 0–6.1 ejecutadas):** las Fases 0–4 se implementaron en PRs apiladas #2 → #6 y se fusionaron juntas en #7; las Fases 5, 6 y 6.1 siguieron en #8–#13 ([Anexo C](#anexo-c--estado-de-prs)), con CI en verde y verificadas con ejecuciones reales de Claude Code (`docs/DEMO.md`). Desviaciones del plan, cada una anotada en su fase: el código de banco se borró en lugar de moverse a `contrib/bank`; no hay `spec amend`: `spec change` (6.1) aplica peticiones de cambio, y editar + `spec approve` sigue valiendo, con delta registrado; el E2E por escenario se adelantó a la Fase 1. Las secciones 1-16 describen el estado de partida (v3) y se conservan como auditoría.
 
 ---
 
@@ -1015,11 +1015,18 @@ gofmt -l . → 71 ficheros (CRLF)   →   0 tras PR #2
 | PR | Contenido | Fase | Estado |
 | :--- | :--- | :---: | :--- |
 | [#1](https://github.com/jefmonjor/specforge/pull/1) | README rediseñado + este plan | — | Fusionada |
-| [#2](https://github.com/jefmonjor/specforge/pull/2) | Higiene y red de seguridad | 0 | Abierta · fusionar **antes** que cualquier otra |
-| #3 | Núcleo verificable, CLI nueva y recorte del código v3 | 1 | Abierta, apilada sobre #2 |
-| #4 | Plan (R1), revisión (R2), commit por escenario, clarify, historial de aprobaciones, lecciones | 2 | Abierta, apilada sobre #3 |
-| #5 | `deliver`, `--json`, golangci-lint | 3 | Abierta, apilada sobre #4 |
-| #6 | Entrevista por turnos, demo real y cierre del plan | 4 | Abierta, apilada sobre #5 |
+| [#2](https://github.com/jefmonjor/specforge/pull/2) | Higiene y red de seguridad | 0 | Sustituida por #7 |
+| [#3](https://github.com/jefmonjor/specforge/pull/3) | Núcleo verificable, CLI nueva y recorte del código v3 | 1 | Sustituida por #7 |
+| [#4](https://github.com/jefmonjor/specforge/pull/4) | Plan (R1), revisión (R2), commit por escenario, clarify, historial de aprobaciones, lecciones | 2 | Sustituida por #7 |
+| [#5](https://github.com/jefmonjor/specforge/pull/5) | `deliver`, `--json`, golangci-lint | 3 | Sustituida por #7 |
+| [#6](https://github.com/jefmonjor/specforge/pull/6) | Entrevista por turnos, demo real y cierre del plan | 4 | Sustituida por #7 |
+| [#7](https://github.com/jefmonjor/specforge/pull/7) | SpecForge v4: las Fases 0–4 en una sola PR | 0–4 | Fusionada |
+| [#8](https://github.com/jefmonjor/specforge/pull/8) | SpecForge 5: migración legacy verificada y scaffolds Java, React, Python y Go | 5 | Fusionada |
+| [#9](https://github.com/jefmonjor/specforge/pull/9) | README y guía para escritorio y móvil; release por etiqueta | 5 | Fusionada |
+| [#10](https://github.com/jefmonjor/specforge/pull/10) | Release robusta, `WriteAtomic` sin borrar el original, tests aislados | 5 | Fusionada |
+| [#11](https://github.com/jefmonjor/specforge/pull/11) | Plan de SpecForge 6 ([V6_PLAN.md](V6_PLAN.md)) | 6 | Fusionada |
+| [#12](https://github.com/jefmonjor/specforge/pull/12) | SpecForge 6: línea base, riesgo, lentes, verificador, guardia, escenarios en paralelo | 6 | Fusionada · v6.0.0 |
+| [#13](https://github.com/jefmonjor/specforge/pull/13) | SpecForge 6.1: cambios de spec seguros, guardia que lee lo que se ejecuta, checkpoints, copias ligeras | 6.1 | Fusionada · etiqueta v6.1.0 pendiente |
 
 ---
 

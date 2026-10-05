@@ -1,6 +1,6 @@
 # A real session
 
-These are real runs of SpecForge with Claude Code: first on a new Go module, shortened where marked `…` and with local paths made relative. Two features: **discount codes** goes from specification to pull request body, and **gift cards** shows the interview. They also show what this README promises: the agent asked instead of guessing, and SpecForge checked each step itself. Section 7 is a SpecForge 5 run: a Java 6 payroll application rewritten on Java 21. Section 8 is SpecForge 6 on a Go payroll module: a branch that already had a failing test, risk tiers, review lenses, the independent verifier, two scenarios side by side and the command guard. Section 9 is SpecForge 6.1, which closes the two gaps section 8 left open: the guard could not see inside a script, and copies were heavy.
+These are real runs of SpecForge with Claude Code: first on a new Go module, shortened where marked `…` and with local paths made relative. Two features: **discount codes** goes from specification to pull request body, and **gift cards** shows the interview. They also show what this README promises: the agent asked instead of guessing, and SpecForge checked each step itself. Section 7 is a SpecForge 5 run: a Java 6 payroll application rewritten on Java 21. Section 8 is SpecForge 6 on a Go payroll module: a branch that already had a failing test, risk tiers, review lenses, the independent verifier, two scenarios side by side and the command guard. Section 9 is SpecForge 6.1, which closes the gaps section 8 left open: the guard could not see inside a script, copies were heavy, and changing an approved specification could move every scenario's marker.
 
 - [1. Set up](#1-set-up)
 - [2. The interview (gift cards)](#2-the-interview-gift-cards)
@@ -450,7 +450,7 @@ Each has a regression test that fails without the fix. The same pass shared what
 
 ## 9. SpecForge 6.1: closing the gaps
 
-SpecForge 6 left two known gaps: the guard read only the command line, so a script the agent wrote went unseen, and every copy wrote the whole project, sometimes several times over.
+SpecForge 6 left two known gaps: the guard read only the command line, so a script the agent wrote went unseen, and every copy wrote the whole project, sometimes several times over. Running the three ways into a specification for real found a third: changing an approved specification could move every scenario's marker.
 
 ### The guard reads what a command runs
 
@@ -525,6 +525,7 @@ $ specforge spec change 0001 "A tax rate below 0 or above 100 is refused with IN
   ✓ change written into specs/0001-net-pay.md; approving it will record:
       ADDED · SDD_0001_004 · A tax rate outside 0 to 100 is refused
 $ specforge spec approve 0001
+  ✓ specs/0001-net-pay.md approved by … · seal …
       ADDED · SDD_0001_004 · A tax rate outside 0 to 100 is refused
   next: specforge plan 0001 (it revises the plan for the added or removed scenarios), then plan approve 0001 and loop 0001
 ```
