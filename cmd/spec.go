@@ -290,7 +290,7 @@ agent for a free conversation.`,
 				Log:       a.log,
 				Now:       a.Now,
 			}, interview.Options{
-				Root: p.root, SpecPath: e.Path, Language: p.settings.Language, Model: p.settings.Model,
+				Root: p.root, SpecPath: e.Path, Language: p.settings.Language, Model: p.settings.ModelFor("interview"),
 				AgentTimeout: p.settings.AgentTimeout,
 			})
 			events.Done()
@@ -333,7 +333,7 @@ func (a *App) chatInterview(ctx context.Context, p project, e specs.Entry, ag po
 	if err != nil {
 		return err
 	}
-	if err := ag.Interactive(ctx, ports.AgentRequest{Prompt: prompt, Dir: p.root, Model: p.settings.Model}); err != nil {
+	if err := ag.Interactive(ctx, ports.AgentRequest{Prompt: prompt, Dir: p.root, Model: p.settings.ModelFor("interview")}); err != nil {
 		return err
 	}
 	con := a.console()

@@ -6,6 +6,8 @@ package tdd
 import (
 	"fmt"
 	"time"
+
+	"specforge/internal/domain/risk"
 )
 
 // StateVersion is bumped whenever State changes. Older states that only
@@ -40,6 +42,12 @@ type ScenarioRef struct {
 	// the commit that recorded it ("" when nothing was committed).
 	Files  []string `json:"files,omitempty"`
 	Commit string   `json:"commit,omitempty"`
+	// Risk is the latest assessment of the scenario's change. RaisedTo and
+	// RaisedWhy keep the agent's request for more scrutiny, which every
+	// later assessment applies again.
+	Risk      *risk.Assessment `json:"risk,omitempty"`
+	RaisedTo  risk.Tier        `json:"raised_to,omitempty"`
+	RaisedWhy string           `json:"raised_why,omitempty"`
 }
 
 // Checkpoint records one completed step for the audit trail.
@@ -264,6 +272,8 @@ func (s *State) Jump(index int, phase Phase, now time.Time) error {
 	s.Scenarios[s.Current].Satisfied = false
 	s.Scenarios[s.Current].Commit = ""
 	s.Scenarios[s.Current].Files = nil
+	s.Scenarios[s.Current].Risk = nil
+	s.Scenarios[s.Current].RaisedTo, s.Scenarios[s.Current].RaisedWhy = "", ""
 	s.Phase = phase
 	s.Attempts = 0
 	s.Pending = nil
@@ -298,6 +308,20 @@ func (s *State) seek() {
 	}
 	s.Current = len(s.Scenarios)
 	s.Phase = PhaseCompleted
+}
+
+// Raise records the agent's request for more scrutiny of the current
+// scenario. Only a stricter tier than the one already requested counts.
+func (s *State) Raise(to risk.Tier, why string) bool {
+	if s.Done() || !to.AtLeast(risk.Medium) {
+		return false
+	}
+	sc := &s.Scenarios[s.Current]
+	if sc.RaisedTo != "" && sc.RaisedTo.AtLeast(to) {
+		return false
+	}
+	sc.RaisedTo, sc.RaisedWhy = to, why
+	return true
 }
 
 // Fail records a failed attempt in the current phase.

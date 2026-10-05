@@ -15,6 +15,7 @@ type labels struct {
 	prSummary, prScenarios, prDecisions, prChecks, prNotDone, prImplements        string
 	incomplete                                                                    string
 	known, baseLine, baseClean                                                    string
+	risk                                                                          string
 }
 
 var catalog = map[string]labels{
@@ -36,6 +37,7 @@ var catalog = map[string]labels{
 		known:        "Known failures (already failing before the loop; not counted against it)",
 		baseLine:     "Baseline: %d test(s) already failed before the loop (`%s`); listed below, they never blocked a scenario.",
 		baseClean:    "Baseline: the whole suite passed before the loop (`%s`); any new failure blocked.",
+		risk:         "risk %s: %s",
 	},
 	"es": {
 		delivery: "Entrega", spec: "Especificación", plan: "Plan", noPlan: "sin plan (el ciclo trabajó desde la especificación)",
@@ -55,6 +57,7 @@ var catalog = map[string]labels{
 		known:        "Fallos conocidos (ya fallaban antes del loop; no cuentan contra él)",
 		baseLine:     "Línea base: %d test(s) ya fallaban antes del loop (`%s`); listados abajo, nunca bloquearon un escenario.",
 		baseClean:    "Línea base: la suite completa pasaba antes del loop (`%s`); cualquier fallo nuevo bloqueó.",
+		risk:         "riesgo %s: %s",
 	},
 }
 
@@ -210,6 +213,9 @@ func (sc Scenario) notes(l labels) []string {
 		out = append(out, l.satisfied)
 	case Pending:
 		out = append(out, l.pending)
+	}
+	if sc.Risk != nil {
+		out = append(out, fmt.Sprintf(l.risk, sc.Risk.Tier, escape(strings.Join(sc.Risk.Reasons, ", "))))
 	}
 	if sc.ReviewNotes > 0 {
 		out = append(out, fmt.Sprintf(l.reviewed, sc.ReviewNotes))

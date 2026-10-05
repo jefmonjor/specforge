@@ -223,7 +223,7 @@ func (a *App) migrateOptions(p project, arg string) (migrate.Options, error) {
 	}
 	m := p.settings.Migration
 	return migrate.Options{
-		Root: p.root, Legacy: dir, Language: p.settings.Language, Model: p.settings.Model,
+		Root: p.root, Legacy: dir, Language: p.settings.Language, Model: p.settings.ModelFor("legacy"),
 		AgentTimeout: p.settings.AgentTimeout, MaxAttempts: p.settings.MaxAttempts,
 		JavaRelease: m.JavaRelease, ForbiddenImports: m.ForbiddenImports,
 	}, nil

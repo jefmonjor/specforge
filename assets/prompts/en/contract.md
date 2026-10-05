@@ -9,6 +9,10 @@ When you finished the task:
 ```
 If this task needed more than one attempt, add `"lesson"`: one sentence with the rule that would have avoided the mistake. It is kept in `specs/LESSONS.md` and shown in later prompts, so make it general, not about this scenario.
 
+{{- if .Marker}}
+SpecForge sizes the review of this change from the paths and lines it touches. If it is more delicate than that suggests (it handles credentials, money, permissions, user data, or changes a public contract), add `"risk": "high"` (or `"medium"`) and `"risk_reason"`: one sentence saying why. You can raise the scrutiny, never lower it.
+{{end}}
+
 If anything you need is not in the specification, the decisions log, the existing code or this prompt, **do not assume it**. A wrong guess costs more than a question. Reply instead with:
 ```json
 {"status": "needs_clarification", "question": "the exact question for the developer", "options": ["option A", "option B"], "context": "why you need it"}

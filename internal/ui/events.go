@@ -9,6 +9,7 @@ import (
 	"specforge/internal/app/tddloop"
 	"specforge/internal/domain/e2e"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 )
@@ -120,6 +121,26 @@ func (e *LoopEvents) Gates(r quality.Report) {
 			e.C.Bad(line)
 		}
 	}
+}
+
+func (e *LoopEvents) Risk(_ tdd.ScenarioRef, a risk.Assessment) {
+	e.halt()
+	line := e.C.T("loop.risk", a.Tier, strings.Join(a.Reasons, " · "))
+	if a.Tier == risk.High {
+		e.C.Warn(line)
+		return
+	}
+	e.C.Info(line)
+}
+
+func (e *LoopEvents) GateNotRun(gate string, tier risk.Tier) {
+	e.halt()
+	e.C.Info(e.C.T("loop.gate.notrun", gate, tier))
+}
+
+func (e *LoopEvents) ReviewSkipped(_ tdd.ScenarioRef, a risk.Assessment) {
+	e.halt()
+	e.C.OK(e.C.T("loop.review.skipped", strings.Join(a.Reasons, " · ")))
 }
 
 func (e *LoopEvents) Accepted(p tdd.Phase, _ tdd.ScenarioRef) {

@@ -21,7 +21,7 @@ import (
 func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data prompts.Data) (protocol.Response, error) {
 	sc, _ := r.st.Scenario()
 	origin := s.origin(r, sc)
-	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Model, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
+	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Models.For(strings.ToLower(string(r.st.Phase))), Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
 		ReadDirs: docturn.Outside(r.o.Root, r.o.Legacy)}
 	touched, err := docturn.Watch(s.d.Workspace, req.ReadDirs)
 	if err != nil {
@@ -66,7 +66,7 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 	case resp.Status == protocol.Blocked:
 		return resp, &tdd.AgentBlockedError{Phase: r.st.Phase, Reason: resp.Reason, SuggestedAction: resp.SuggestedAction}
 	}
-	return resp, nil
+	return resp, s.raise(r, resp)
 }
 
 // Phases of the questions SpecForge asks itself, as opposed to those the

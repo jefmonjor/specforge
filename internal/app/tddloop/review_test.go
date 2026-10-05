@@ -2,6 +2,8 @@ package tddloop
 
 import (
 	"context"
+	"specforge/internal/domain/change"
+	"specforge/internal/ports"
 	"strings"
 	"testing"
 
@@ -16,6 +18,14 @@ func (*fakeVCS) Files(context.Context, string) ([]string, error)      { return n
 func (v *fakeVCS) Commit(_ context.Context, _, msg string, paths []string) (string, error) {
 	v.commits = append(v.commits, append([]string{msg}, paths...))
 	return "abc1234def", nil
+}
+
+// Changes reports a project outside git, so the loop measures files.
+func (*fakeVCS) Changes(context.Context, string, []string) ([]change.File, error) {
+	return nil, ports.ErrNotARepository
+}
+func (*fakeVCS) CommitChanges(context.Context, string, string) ([]change.File, error) {
+	return nil, nil
 }
 
 func reviewed(h *harness) *fakeVCS {

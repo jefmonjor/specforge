@@ -32,3 +32,15 @@ type Agent interface {
 	// Interactive hands the terminal to the agent, seeded with the prompt.
 	Interactive(ctx context.Context, req AgentRequest) error
 }
+
+// ModelFor picks the model for one phase of work ("plan", "red",
+// "review"…). Nil, or "" for a phase, lets the agent use its default.
+type ModelFor func(phase string) string
+
+// For returns the model for phase; it is safe on a nil ModelFor.
+func (m ModelFor) For(phase string) string {
+	if m == nil {
+		return ""
+	}
+	return m(phase)
+}

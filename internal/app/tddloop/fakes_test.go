@@ -16,6 +16,7 @@ import (
 	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
 	"specforge/internal/domain/tdd"
@@ -110,12 +111,14 @@ type fakeAgent struct {
 	p       *project
 	turns   []reply
 	prompts []string
+	models  []string
 }
 
 func (a *fakeAgent) Name() string { return "fake" }
 
 func (a *fakeAgent) Run(_ context.Context, req ports.AgentRequest) (string, error) {
 	a.prompts = append(a.prompts, req.Prompt)
+	a.models = append(a.models, req.Model)
 	if len(a.turns) == 0 {
 		return "", fmt.Errorf("unexpected agent call #%d", len(a.prompts))
 	}
@@ -184,6 +187,10 @@ type recorder struct {
 	amended   []string
 	commits   []string
 	known     int
+	risks     []risk.Tier
+	notRun    []string
+
+	reviewSkipped int
 }
 
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
@@ -207,6 +214,11 @@ func (r *recorder) Accepted(ph tdd.Phase, _ tdd.ScenarioRef) { r.accepted = appe
 func (r *recorder) Satisfied(tdd.ScenarioRef)                { r.satisfied++ }
 func (r *recorder) Committed(_ tdd.ScenarioRef, sha string)  { r.commits = append(r.commits, sha) }
 func (r *recorder) Finished(*tdd.State)                      {}
+func (r *recorder) GateNotRun(g string, _ risk.Tier)         { r.notRun = append(r.notRun, g) }
+func (r *recorder) Risk(_ tdd.ScenarioRef, a risk.Assessment) {
+	r.risks = append(r.risks, a.Tier)
+}
+func (r *recorder) ReviewSkipped(tdd.ScenarioRef, risk.Assessment) { r.reviewSkipped++ }
 
 type harness struct {
 	p        *project

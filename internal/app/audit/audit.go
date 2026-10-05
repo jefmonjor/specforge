@@ -56,7 +56,7 @@ type Options struct {
 // Deps are the collaborators of the audit.
 type Deps struct {
 	Agent  ports.Agent
-	VCS    ports.VCS
+	VCS    ports.DiffSource
 	Files  ports.Files
 	Lister func(root string) ([]string, error) // fallback when root is not a git repository
 	Asker  *clarify.Asker

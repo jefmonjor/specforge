@@ -124,6 +124,9 @@ var messages = map[string]map[string]string{
 		"loop.baseline.unnamed":   "the runner cannot name failing tests: any failure of the whole suite will block",
 		"loop.baseline.nobuild":   "the project does not build before the loop: RED will show why",
 		"reject.new-failures":     "tests that passed before the loop fail now",
+		"loop.risk":               "risk %s · %s",
+		"loop.gate.notrun":        "%s gate left out for a %s-risk change (quality.mutation_from)",
+		"loop.review.skipped":     "passive change, accepted without review: %s",
 	},
 	"es": {
 		"setup.new.java":          "instala y comprueba las herramientas: mvn test (JUnit, ArchUnit), mvn pmd:check",
@@ -227,5 +230,8 @@ var messages = map[string]map[string]string{
 		"loop.baseline.unnamed":   "el runner no puede nombrar los tests que fallan: cualquier fallo de la suite bloqueará",
 		"loop.baseline.nobuild":   "el proyecto no compila antes del loop: RED mostrará por qué",
 		"reject.new-failures":     "tests que pasaban antes del loop fallan ahora",
+		"loop.risk":               "riesgo %s · %s",
+		"loop.gate.notrun":        "puerta %s omitida para un cambio de riesgo %s (quality.mutation_from)",
+		"loop.review.skipped":     "cambio pasivo, aceptado sin revisión: %s",
 	},
 }

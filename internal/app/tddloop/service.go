@@ -21,6 +21,7 @@ import (
 	"specforge/internal/app/conversation"
 	"specforge/internal/app/layout"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
 	"specforge/internal/domain/tdd"
@@ -65,7 +66,8 @@ type Deps struct {
 	Workspace ports.Workspace
 	Files     ports.Files
 	Asker     *clarify.Asker
-	// VCS records each finished scenario as a commit; nil disables it.
+	// VCS measures each scenario's change and records it as a commit;
+	// nil measures files without git and commits nothing.
 	VCS    ports.VCS
 	Events Events
 	Log    *slog.Logger
@@ -88,8 +90,13 @@ type Options struct {
 	From     tdd.Phase
 
 	// Review "scenario" asks the developer to review every finished
-	// scenario (gate R2); "off" skips it.
+	// scenario (gate R2); "risk" only those of medium or high risk; "off"
+	// never.
 	Review string
+	// Risk classifies each scenario's change; MutationFrom is the lowest
+	// tier that runs the mutation gate.
+	Risk         risk.Rules
+	MutationFrom risk.Tier
 	// Commit records every finished scenario as one commit.
 	Commit bool
 
@@ -97,9 +104,10 @@ type Options struct {
 	MaxClarifications int
 	AgentTimeout      time.Duration
 	TestTimeout       time.Duration
-	Model             string
-	AgentEnv          []string
-	Strict            bool
+	// Models picks the agent's model for each phase.
+	Models   ports.ModelFor
+	AgentEnv []string
+	Strict   bool
 
 	// Legacy is the legacy repository of a rewrite, absolute: the agent
 	// reads it as the reference of the behaviour and may never change it.
@@ -124,6 +132,12 @@ func (o Options) withDefaults() Options {
 	}
 	if o.Language == "" {
 		o.Language = "en"
+	}
+	if o.Risk.High == nil {
+		o.Risk = risk.DefaultRules()
+	}
+	if o.MutationFrom == "" {
+		o.MutationFrom = risk.Passive
 	}
 	return o
 }

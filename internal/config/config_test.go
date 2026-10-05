@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"specforge/internal/domain/risk"
 	"strings"
 	"testing"
 	"time"
@@ -88,5 +89,51 @@ func TestUserConfigRoundTripIsPrivate(t *testing.T) {
 		if info, _ := os.Stat(d.UserFile()); info.Mode().Perm() != 0o600 {
 			t.Fatalf("mode = %o", info.Mode().Perm())
 		}
+	}
+}
+
+func TestModelForResolvesPerPhase(t *testing.T) {
+	p := Project{Model: "sonnet", Models: map[string]string{"review": "opus", "green": "haiku"}}
+	s, err := Resolve(User{Agent: "claude", Model: "user"}, p, Overrides{}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for phase, want := range map[string]string{"review": "opus", "green": "haiku", "red": "sonnet"} {
+		if got := s.ModelFor(phase); got != want {
+			t.Errorf("ModelFor(%s) = %q, want %q", phase, got, want)
+		}
+	}
+	s, _ = Resolve(User{Agent: "claude"}, p, Overrides{Model: "flag"}, true)
+	if s.ModelFor("review") != "flag" {
+		t.Error("--model overrides every phase")
+	}
+	if _, err := Resolve(User{Agent: "claude"}, Project{Models: map[string]string{"deploy": "x"}}, Overrides{}, true); err == nil || !strings.Contains(err.Error(), "models.deploy") {
+		t.Errorf("an unknown phase is an error: %v", err)
+	}
+}
+
+func TestRiskSettings(t *testing.T) {
+	s, err := Resolve(User{Agent: "claude"}, Project{}, Overrides{}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Risk.MaxLines != risk.DefaultMaxLines || s.Risk.Floor != risk.Passive || s.MutationFrom != risk.Medium {
+		t.Fatalf("defaults: %+v %s", s.Risk, s.MutationFrom)
+	}
+	p := Project{Review: "risk"}
+	p.Risk.Floor = "medium"
+	p.Risk.MaxLines = 100
+	p.Quality.MutationFrom = "high"
+	if s, err = Resolve(User{Agent: "claude"}, p, Overrides{}, true); err != nil || s.Risk.Floor != risk.Medium || s.Risk.MaxLines != 100 || s.MutationFrom != risk.High || s.Review != "risk" {
+		t.Fatalf("configured: %+v %v", s, err)
+	}
+	if s, _ = Resolve(User{Agent: "claude"}, p, Overrides{Strict: true}, true); s.Risk.Floor != risk.High {
+		t.Error("--strict raises every change to high")
+	}
+	bad := Project{}
+	bad.Risk.Floor = "extreme"
+	bad.Risk.HighPaths = []string{"("}
+	if _, err := Resolve(User{Agent: "claude"}, bad, Overrides{}, true); err == nil || !strings.Contains(err.Error(), "extreme") || !strings.Contains(err.Error(), "risk.high_paths") {
+		t.Fatalf("every invalid risk setting is reported: %v", err)
 	}
 }

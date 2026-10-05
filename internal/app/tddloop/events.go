@@ -2,6 +2,7 @@ package tddloop
 
 import (
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 )
@@ -39,6 +40,13 @@ type Events interface {
 	Rejected(reason Rejection, detail string)
 	Answered(question, answer string)
 	Gates(report quality.Report)
+	// Risk reports the risk assessment of a scenario's change.
+	Risk(sc tdd.ScenarioRef, a risk.Assessment)
+	// GateNotRun reports a gate left out for a change of this tier.
+	GateNotRun(gate string, tier risk.Tier)
+	// ReviewSkipped reports a scenario accepted without the developer's
+	// review because its change is passive (review: risk).
+	ReviewSkipped(sc tdd.ScenarioRef, a risk.Assessment)
 	Accepted(phase tdd.Phase, sc tdd.ScenarioRef)
 	Satisfied(sc tdd.ScenarioRef)
 	// Committed reports the commit that recorded a scenario; sha is ""
@@ -50,16 +58,19 @@ type Events interface {
 // NopEvents ignores every event.
 type NopEvents struct{}
 
-func (NopEvents) Started(*tdd.State, *spec.Document)  {}
-func (NopEvents) Amended([]string)                    {}
-func (NopEvents) Baseline(*tdd.Baseline, bool)        {}
-func (NopEvents) Phase(*tdd.State, tdd.ScenarioRef)   {}
-func (NopEvents) AgentWorking(tdd.Phase)              {}
-func (NopEvents) RunningTests(string)                 {}
-func (NopEvents) Rejected(Rejection, string)          {}
-func (NopEvents) Answered(string, string)             {}
-func (NopEvents) Gates(quality.Report)                {}
-func (NopEvents) Accepted(tdd.Phase, tdd.ScenarioRef) {}
-func (NopEvents) Satisfied(tdd.ScenarioRef)           {}
-func (NopEvents) Committed(tdd.ScenarioRef, string)   {}
-func (NopEvents) Finished(*tdd.State)                 {}
+func (NopEvents) Started(*tdd.State, *spec.Document)             {}
+func (NopEvents) Amended([]string)                               {}
+func (NopEvents) Baseline(*tdd.Baseline, bool)                   {}
+func (NopEvents) Phase(*tdd.State, tdd.ScenarioRef)              {}
+func (NopEvents) AgentWorking(tdd.Phase)                         {}
+func (NopEvents) RunningTests(string)                            {}
+func (NopEvents) Rejected(Rejection, string)                     {}
+func (NopEvents) Answered(string, string)                        {}
+func (NopEvents) Gates(quality.Report)                           {}
+func (NopEvents) Risk(tdd.ScenarioRef, risk.Assessment)          {}
+func (NopEvents) GateNotRun(string, risk.Tier)                   {}
+func (NopEvents) ReviewSkipped(tdd.ScenarioRef, risk.Assessment) {}
+func (NopEvents) Accepted(tdd.Phase, tdd.ScenarioRef)            {}
+func (NopEvents) Satisfied(tdd.ScenarioRef)                      {}
+func (NopEvents) Committed(tdd.ScenarioRef, string)              {}
+func (NopEvents) Finished(*tdd.State)                            {}

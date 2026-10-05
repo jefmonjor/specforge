@@ -35,6 +35,11 @@ type Options struct {
 	Now     time.Time
 }
 
+// processOrigins label the questions SpecForge asked about its own process
+// (reviews, verification, risk): already shown per scenario, they are not
+// product decisions.
+var processOrigins = []string{tddloop.OriginReview, tddloop.OriginVerify, tddloop.OriginRisk}
+
 var outOfScope = regexp.MustCompile(`(?i)out of scope|fuera de alcance`)
 
 // Build assembles the trace. The specification must be approved: a
@@ -81,7 +86,7 @@ func Build(files ports.Files, o Options) (delivery.Trace, error) {
 			answered[e.Question] = e.Answer != ""
 			// Reviews and verification checks are process, already shown
 			// per scenario; the decisions are the product answers.
-			if e.Answer != "" && e.Phase != tddloop.OriginReview && e.Phase != tddloop.OriginVerify {
+			if e.Answer != "" && !slices.Contains(processOrigins, e.Phase) {
 				t.Decisions = append(t.Decisions, e.Question+" → "+e.Answer)
 			}
 		}
@@ -167,6 +172,9 @@ func scenario(files ports.Files, lay layout.Layout, o Options, id string, sc spe
 		out.Status = delivery.Done
 	}
 	out.Files, out.Commit = ref.Files, ref.Commit
+	if a := ref.Risk; a != nil {
+		out.Risk = &delivery.Risk{Tier: string(a.Tier), Lines: a.Lines, Reasons: a.Reasons}
+	}
 	for _, f := range ref.Files {
 		if o.Profile != nil && !o.Profile.IsTestFile(f) {
 			continue

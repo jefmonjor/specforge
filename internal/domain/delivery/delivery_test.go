@@ -90,3 +90,11 @@ func TestKnownFailuresAreListedApart(t *testing.T) {
 		t.Errorf("a clean baseline is one line, not a section:\n%s", md)
 	}
 }
+
+func TestRiskIsShownPerScenario(t *testing.T) {
+	tr := sample()
+	tr.Scenarios[0].Risk = &Risk{Tier: "high", Lines: 40, Reasons: []string{"`auth/x.go` is a sensitive path"}}
+	if md := tr.Markdown("en"); !strings.Contains(md, "risk high: `auth/x.go` is a sensitive path") {
+		t.Errorf("missing the risk note:\n%s", md)
+	}
+}

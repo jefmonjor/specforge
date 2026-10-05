@@ -14,13 +14,16 @@ import (
 	"time"
 
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 )
 
 // Supported values.
 var (
 	Agents    = []string{"claude", "gemini"}
 	Languages = []string{"es", "en"}
-	Reviews   = []string{"scenario", "off"}
+	Reviews   = []string{"scenario", "risk", "off"}
+	// Phases are the steps of work a model can be chosen for.
+	Phases = []string{"interview", "plan", "legacy", "red", "green", "refactor", "review", "refute", "verify", "audit", "e2e"}
 )
 
 // ProjectFile is the committed per-repository configuration file.
@@ -39,13 +42,15 @@ type User struct {
 // Project is specforge.yaml. Pointer fields distinguish "not set" from an
 // explicit zero, which matters for thresholds such as 0% duplication.
 type Project struct {
-	Language    string `yaml:"language,omitempty"`
-	Agent       string `yaml:"agent,omitempty"`
-	Model       string `yaml:"model,omitempty"`
-	Stack       string `yaml:"stack,omitempty"`
-	MaxAttempts int    `yaml:"max_attempts,omitempty"`
-	Review      string `yaml:"review,omitempty"`
-	Commit      *bool  `yaml:"commit,omitempty"`
+	Language string `yaml:"language,omitempty"`
+	Agent    string `yaml:"agent,omitempty"`
+	Model    string `yaml:"model,omitempty"`
+	// Models picks a model per phase of work, over Model.
+	Models      map[string]string `yaml:"models,omitempty"`
+	Stack       string            `yaml:"stack,omitempty"`
+	MaxAttempts int               `yaml:"max_attempts,omitempty"`
+	Review      string            `yaml:"review,omitempty"`
+	Commit      *bool             `yaml:"commit,omitempty"`
 	Timeouts    struct {
 		Agent time.Duration `yaml:"agent,omitempty"`
 		Tests time.Duration `yaml:"tests,omitempty"`
@@ -54,8 +59,23 @@ type Project struct {
 		Strict                *bool    `yaml:"strict,omitempty"`
 		MaxDuplicationPercent *float64 `yaml:"max_duplication_percent,omitempty"`
 		MinMutationScore      *float64 `yaml:"min_mutation_score,omitempty"`
+		// MutationFrom is the lowest risk tier that runs the mutation gate.
+		MutationFrom string `yaml:"mutation_from,omitempty"`
 	} `yaml:"quality,omitempty"`
 	Migration Migration `yaml:"migration,omitempty"`
+	Risk      Risk      `yaml:"risk,omitempty"`
+}
+
+// Risk tunes how the risk of each scenario's change is classified.
+type Risk struct {
+	// MaxLines: a change larger than this is high risk (default 400).
+	MaxLines int `yaml:"max_lines,omitempty"`
+	// HighPaths and PassivePaths are regular expressions over the
+	// slash-separated path; when set they replace the defaults.
+	HighPaths    []string `yaml:"high_paths,omitempty"`
+	PassivePaths []string `yaml:"passive_paths,omitempty"`
+	// Floor is the lowest tier any change gets (default passive).
+	Floor string `yaml:"floor,omitempty"`
 }
 
 // Migration describes a rewrite of a legacy system: where the legacy code
@@ -102,7 +122,29 @@ type Settings struct {
 	TestTimeout  time.Duration
 	Quality      quality.Thresholds
 	Migration    Migration
+	modelFlag    string
+	// Models are the per-phase choices; ModelFor resolves them.
+	Models map[string]string
+	// Risk classifies each scenario's change; MutationFrom is the lowest
+	// tier that runs the mutation gate.
+	Risk         risk.Rules
+	MutationFrom risk.Tier
 }
+
+// ModelFor resolves the model of a phase: --model, then models.<phase>,
+// then model (project, then user). "" lets the agent decide.
+func (s Settings) ModelFor(phase string) string {
+	if s.modelFlag != "" {
+		return s.modelFlag
+	}
+	if m := strings.TrimSpace(s.Models[phase]); m != "" {
+		return m
+	}
+	return s.Model
+}
+
+// ModelChoice is ModelFor as the use cases take it.
+func (s Settings) ModelChoice() func(string) string { return s.ModelFor }
 
 // Defaults applied when no layer sets a value.
 const (
@@ -111,6 +153,9 @@ const (
 	DefaultReview       = "scenario"
 	DefaultAgentTimeout = 20 * time.Minute
 	DefaultTestTimeout  = 10 * time.Minute
+	// DefaultMutationFrom: mutation testing is slow; documentation-only
+	// changes do not pay for it.
+	DefaultMutationFrom = risk.Medium
 )
 
 // Resolve merges the layers and validates the result. requireAgent is false
@@ -128,6 +173,8 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		TestTimeout:  DefaultTestTimeout,
 		Quality:      quality.DefaultThresholds(),
 		Migration:    p.Migration,
+		Models:       p.Models,
+		modelFlag:    strings.TrimSpace(f.Model),
 	}
 	if s.Migration.JavaRelease > 0 && s.Migration.ForbiddenImports == nil {
 		s.Migration.ForbiddenImports = DefaultForbiddenImports
@@ -153,12 +200,30 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 	if f.Strict {
 		s.Quality.Strict = true
 	}
+	var errs []error
+	floor, err := risk.ParseTier(p.Risk.Floor)
+	errs = append(errs, err)
+	if s.Quality.Strict {
+		floor = risk.High // strict: every change gets every check
+	}
+	s.Risk, err = risk.NewRules(p.Risk.MaxLines, p.Risk.HighPaths, p.Risk.PassivePaths, floor)
+	errs = append(errs, err)
+	s.MutationFrom = DefaultMutationFrom
+	if p.Quality.MutationFrom != "" {
+		s.MutationFrom, err = risk.ParseTier(p.Quality.MutationFrom)
+		errs = append(errs, err)
+	}
+	for phase := range p.Models {
+		if !slices.Contains(Phases, phase) {
+			errs = append(errs, fmt.Errorf("models.%s: unknown phase (supported: %s)", phase, strings.Join(Phases, ", ")))
+		}
+	}
 
 	s.Review = strings.ToLower(s.Review)
 	s.Agent = strings.ToLower(s.Agent)
 	s.Language = strings.ToLower(s.Language)
 	s.Stack = strings.ToLower(s.Stack)
-	return s, s.validate(requireAgent)
+	return s, errors.Join(append(errs, s.validate(requireAgent))...)
 }
 
 func (s Settings) validate(requireAgent bool) error {

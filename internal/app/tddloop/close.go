@@ -15,6 +15,7 @@ import (
 // Review modes.
 const (
 	ReviewScenario = "scenario"
+	ReviewRisk     = "risk"
 	ReviewOff      = "off"
 )
 
@@ -22,7 +23,15 @@ const (
 // (gate R2) and it is recorded as one commit. A review can send the
 // scenario back to GREEN with a requested change, or to RED.
 func (s *Service) close(ctx context.Context, r *run, sc tdd.ScenarioRef, gates string) error {
-	if r.o.Review == ReviewScenario {
+	a, err := s.assess(ctx, r, true)
+	if err != nil {
+		return err
+	}
+	if !needsReview(r.o.Review, &a) && r.o.Review != ReviewOff {
+		r.st.Record("review", "not needed", "passive change: "+strings.Join(a.Reasons, "; "), s.d.Now())
+		s.d.Events.ReviewSkipped(sc, a)
+	}
+	if needsReview(r.o.Review, &a) {
 		back, note, err := s.review(ctx, r, sc, gates)
 		if err != nil {
 			return err

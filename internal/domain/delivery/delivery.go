@@ -42,6 +42,16 @@ type Scenario struct {
 	Gates       string   `json:"gates,omitempty"`
 	Rejections  int      `json:"rejections"`
 	ReviewNotes int      `json:"review_changes"`
+	// Risk is the tier of the scenario's change and why; nil when the loop
+	// did not assess it.
+	Risk *Risk `json:"risk,omitempty"`
+}
+
+// Risk is how much scrutiny a scenario's change got, and why.
+type Risk struct {
+	Tier    string   `json:"tier"`
+	Lines   int      `json:"lines"`
+	Reasons []string `json:"reasons"`
 }
 
 // Checks summarises the verifications that ran outside the loop.

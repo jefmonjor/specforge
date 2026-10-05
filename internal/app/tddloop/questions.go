@@ -18,12 +18,18 @@ var choices = map[string]map[string]choice{
 			text:    "Review scenario %d (%s): do you accept it? Type what should change to send it back to GREEN.",
 			options: []string{"Accept", "Back to RED: the test does not express the scenario"},
 		},
+		"raised": {
+			text: "The agent asked for more scrutiny of scenario %d",
+		},
 		"inexact": {
 			text:    "The %s runner gives no report, so SpecForge cannot tell why the test fails. Is this a valid RED (the test fails on its assertion)? The output is below.",
 			options: []string{"Yes: accept it", "No: ask the agent to fix the test"},
 		},
 	},
 	"es": {
+		"raised": {
+			text: "El agente pidió más escrutinio para el escenario %d",
+		},
 		"premature": {
 			text:    "El test del escenario %d pasó antes de existir implementación. ¿Este comportamiento ya está implementado?",
 			options: []string{"Sí: marcar el escenario como ya satisfecho", "No: pedir al agente un test más estricto", "Detener el ciclo"},

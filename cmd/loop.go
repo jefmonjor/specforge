@@ -108,7 +108,9 @@ The state is saved after every step: --resume continues where it stopped.`,
 				MaxAttempts:  p.settings.MaxAttempts,
 				AgentTimeout: p.settings.AgentTimeout,
 				TestTimeout:  p.settings.TestTimeout,
-				Model:        p.settings.Model,
+				Models:       p.settings.ModelChoice(),
+				Risk:         p.settings.Risk,
+				MutationFrom: p.settings.MutationFrom,
 				Strict:       p.settings.Quality.Strict,
 
 				Legacy:           legacyDir,
@@ -127,7 +129,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 	f.BoolVar(&o.Strict, "strict", false, "a quality gate that cannot run blocks instead of warning")
 	f.IntVar(&scenario, "scenario", 0, "redo this scenario number (keeps the others)")
 	f.StringVar(&from, "from", "", "with --scenario: start at red | green | refactor (default red)")
-	f.StringVar(&o.Review, "review", "", "scenario: review each finished scenario | off (default: specforge.yaml, else scenario)")
+	f.StringVar(&o.Review, "review", "", "scenario: review every finished scenario | risk: only medium and high risk | off (default: specforge.yaml, else scenario)")
 	f.BoolVar(&o.NoCommit, "no-commit", false, "do not record each finished scenario as a commit")
 	return c
 }

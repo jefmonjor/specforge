@@ -12,6 +12,7 @@ import (
 	"specforge/internal/app/prompts"
 	"specforge/internal/domain/lessons"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/ports"
 )
@@ -207,6 +208,9 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 	if p := r.st.PendingFor(); p != nil && p.Kind == tdd.PendingReview {
 		// Everything was verified already; only the review is missing.
 		return s.close(ctx, r, sc, p.Context)
+	}
+	if _, err := s.assess(ctx, r, false); err != nil {
+		return err
 	}
 	for {
 		pending, err := s.answerPending(ctx, r, sc)
@@ -415,8 +419,16 @@ func (s *Service) runTests(ctx context.Context, r *run, filter string) (tdd.Outc
 
 func (s *Service) runGates(ctx context.Context, r *run) (quality.Report, error) {
 	var report quality.Report
+	tier := risk.Medium
+	if sc, ok := r.st.Scenario(); ok && sc.Risk != nil {
+		tier = sc.Risk.Tier
+	}
 	for _, g := range s.d.Gates {
 		if !g.Applies(r.o.Profile) {
+			continue
+		}
+		if !gateRuns(g.Name(), tier, r.o.MutationFrom) {
+			s.d.Events.GateNotRun(g.Name(), tier)
 			continue
 		}
 		res, err := g.Check(ctx, r.o.Root, r.o.Profile)

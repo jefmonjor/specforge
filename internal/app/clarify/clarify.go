@@ -77,6 +77,16 @@ func (a *Asker) Ask(ctx context.Context, o Origin, q ports.Question) (string, er
 	return answer, nil
 }
 
+// Record writes a decision nobody had to be asked for, such as the agent
+// raising the risk of a change, so the log keeps every decision in one
+// place.
+func (a *Asker) Record(o Origin, q ports.Question, answer string) error {
+	if err := a.Files.AppendFile(o.DecisionsFile, []byte(a.entry(o, q, strings.TrimSpace(answer)))); err != nil {
+		return fmt.Errorf("recording the decision: %w", err)
+	}
+	return nil
+}
+
 // lookup searches the questions file for q. answer is what the developer
 // wrote in place of the placeholder (an option number becomes the option);
 // pending is true when q is there still unanswered.

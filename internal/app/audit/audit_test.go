@@ -69,7 +69,7 @@ func (p *prompter) Ask(context.Context, ports.Question) (string, error) {
 	return p.answer, nil
 }
 
-func service(agent ports.Agent, v ports.VCS, p ports.Prompter) *Service {
+func service(agent ports.Agent, v ports.DiffSource, p ports.Prompter) *Service {
 	now := func() time.Time { return time.Date(2026, 10, 4, 0, 0, 0, 0, time.UTC) }
 	return New(Deps{Agent: agent, VCS: v, Files: fsys.OS{}, Now: now,
 		Asker: &clarify.Asker{Prompter: p, Files: fsys.OS{}, Lang: "en", Now: now}})
