@@ -8,9 +8,9 @@ builds:
     flags: [-trimpath]
     ldflags:
       - -s -w
-      - -X specforge/internal/buildinfo.Version={{.Version}}
-      - -X specforge/internal/buildinfo.Commit={{.ShortCommit}}
-      - -X specforge/internal/buildinfo.Date={{.Date}}
+      - -X github.com/jefmonjor/specforge/v6/internal/buildinfo.Version={{.Version}}
+      - -X github.com/jefmonjor/specforge/v6/internal/buildinfo.Commit={{.ShortCommit}}
+      - -X github.com/jefmonjor/specforge/v6/internal/buildinfo.Date={{.Date}}
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     ignore:

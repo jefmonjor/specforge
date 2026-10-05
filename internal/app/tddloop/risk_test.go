@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/stack"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // mutationGate is a gate named like the real mutation gate.

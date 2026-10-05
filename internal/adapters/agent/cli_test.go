@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/logging"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/logging"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type fakeProc struct {

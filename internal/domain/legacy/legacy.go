@@ -12,7 +12,7 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 // maxScannedFiles bounds a scan; the inventory says when it was reached.

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"text/template"
 
-	"specforge/assets"
-	"specforge/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/assets"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
 )
 
 // Name of a prompt template.

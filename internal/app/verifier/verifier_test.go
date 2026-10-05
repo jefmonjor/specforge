@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/process"
-	"specforge/internal/adapters/scratch"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/scratch"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type agent struct {

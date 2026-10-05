@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/browser"
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/e2e"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/browser"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/e2e"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 const specMD = "# Reset\n\n```gherkin\nFeature: Reset\n  Scenario: Request a link\n    Given the reset page\n    When she submits her email\n    Then she sees \"Link sent\"\n```\n"

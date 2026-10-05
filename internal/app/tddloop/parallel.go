@@ -9,13 +9,13 @@ import (
 	"strings"
 	"sync"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/layout"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // batch returns the scenarios (indexes) that can run side by side from

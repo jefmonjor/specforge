@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // BlockedError reports a branch review whose findings block: severe ones

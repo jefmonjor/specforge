@@ -84,7 +84,13 @@ specforge version
 
 **Windows:** download `specforge-windows-amd64.exe`, rename it to `specforge.exe` and put it in a folder on your `PATH`. SpecForge never edits your `PATH` or registry.
 
-**From source** (the Go version in [`go.mod`](go.mod)):
+**With Go** (6.1.1 or later; the Go version in [`go.mod`](go.mod)):
+
+```bash
+go install github.com/jefmonjor/specforge/v6@latest
+```
+
+**From source:**
 
 ```bash
 git clone \

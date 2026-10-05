@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/domain/legacy"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/domain/legacy"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // gate is what every gate here implements: the check and its readiness.

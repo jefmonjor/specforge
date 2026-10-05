@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // choice is a localized question with fixed options.

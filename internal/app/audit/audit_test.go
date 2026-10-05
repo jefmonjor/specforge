@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/security"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/security"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 const (

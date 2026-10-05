@@ -1,0 +1,54 @@
+name: Bug report
+description: SpecForge did something it should not, or refused something it should accept.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. A security problem goes through [SECURITY.md](https://github.com/jefmonjor/specforge/blob/main/SECURITY.md), not here.
+        Before pasting logs or specifications, remove secrets, tokens and private code.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what you expected and what SpecForge did instead.
+      placeholder: |
+        specforge loop 0001
+        Expected: …
+        Got: …
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The terminal output, ideally with `--verbose`. The log file is in your user cache directory (`~/.cache/specforge/logs/specforge.log` on Linux); `--debug` adds detail to it.
+      render: text
+  - type: textarea
+    id: doctor
+    attributes:
+      label: specforge version and specforge doctor
+      description: Paste the output of both commands.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: agent
+    attributes:
+      label: Agent
+      description: Claude Code or Gemini CLI, with its version.
+      placeholder: claude 2.1.289
+    validations:
+      required: true
+  - type: input
+    id: stack
+    attributes:
+      label: Stack and test runner
+      placeholder: Go 1.26 · go test
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 26 arm64
+    validations:
+      required: true

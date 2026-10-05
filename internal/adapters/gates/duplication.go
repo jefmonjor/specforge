@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Duplication runs jscpd and compares the duplicated-lines percentage with

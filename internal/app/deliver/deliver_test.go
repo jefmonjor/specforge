@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"specforge/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
 )
 
 func TestTestNames(t *testing.T) {

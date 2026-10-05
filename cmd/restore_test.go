@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/adapters/vcs"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/vcs"
 )
 
 func TestRestoreListsAndBringsBackACheckpoint(t *testing.T) {

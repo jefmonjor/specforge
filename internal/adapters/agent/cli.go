@@ -13,9 +13,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"specforge/internal/adapters/logging"
-	"specforge/internal/adapters/process"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/logging"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // stdinInstruction is the positional prompt; the real prompt arrives on

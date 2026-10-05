@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 const maxSourceBytes = 200_000

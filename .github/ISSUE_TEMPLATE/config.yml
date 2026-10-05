@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a vulnerability
+    url: https://github.com/jefmonjor/specforge/security/advisories/new
+    about: Privately, as SECURITY.md explains. Never in a public issue.
+  - name: User guide
+    url: https://github.com/jefmonjor/specforge/blob/main/USER_GUIDE.md
+    about: Recipes, troubleshooting and every command.

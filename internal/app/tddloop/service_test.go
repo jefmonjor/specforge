@@ -3,14 +3,14 @@ package tddloop
 import (
 	"encoding/json"
 	"errors"
-	"specforge/internal/app/conversation"
+	"github.com/jefmonjor/specforge/v6/internal/app/conversation"
 	"strings"
 	"testing"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 func happyScenario(marker, testFile, implFile string) []reply {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 // startBaseline adopts the seed of a parallel loop's scenario, or takes

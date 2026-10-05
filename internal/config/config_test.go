@@ -5,10 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"specforge/internal/domain/risk"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
 )
 
 func TestResolveLayersFlagsOverProjectOverUser(t *testing.T) {

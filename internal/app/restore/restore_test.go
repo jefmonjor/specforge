@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type fake struct {

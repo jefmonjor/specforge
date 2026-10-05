@@ -19,7 +19,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // DefaultMaxBytes bounds a copy.

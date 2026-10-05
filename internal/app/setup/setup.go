@@ -10,12 +10,12 @@ import (
 	"strconv"
 	"strings"
 
-	"specforge/assets"
-	"specforge/internal/app/guardhook"
-	"specforge/internal/app/layout"
-	"specforge/internal/config"
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/assets"
+	"github.com/jefmonjor/specforge/v6/internal/app/guardhook"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Markers delimit the block SpecForge owns inside CLAUDE.md or GEMINI.md.

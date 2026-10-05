@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/process"
-	"specforge/internal/adapters/workspace"
-	"specforge/internal/app/clarify"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/workspace"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 const draft = "---\nid: \"0001\"\ntitle: \"Reset\"\nstatus: draft\n---\n\n# 0001 · Reset\n\n## 1. Intent\n\nTODO intent\n\n" +

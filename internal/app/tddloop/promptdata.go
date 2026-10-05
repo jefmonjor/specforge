@@ -3,10 +3,10 @@ package tddloop
 import (
 	"strings"
 
-	"specforge/internal/app/prompts"
-	"specforge/internal/domain/lessons"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/domain/lessons"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 const (

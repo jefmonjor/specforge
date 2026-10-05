@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // checkpointRefs is where checkpoints live: refs no branch, push or clone

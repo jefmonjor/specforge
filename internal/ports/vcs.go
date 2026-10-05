@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"specforge/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
 )
 
 // ErrNotARepository reports a project outside git.

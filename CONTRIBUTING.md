@@ -6,7 +6,7 @@ Thank you for your interest in contributing to **SpecForge**! We welcome bug rep
 
 ### 1. Reporting Bugs
 - Search existing issues to ensure the bug hasn't been reported.
-- Open a new issue with detailed reproduction steps, environment details (OS, Go version, Agent), and the command output.
+- Open a new issue with the bug report form: it asks for the command, its output, `specforge version` and `specforge doctor`.
 
 ### 2. Suggesting Features
 - Open a feature request issue describing the use case and expected behavior.
@@ -27,7 +27,9 @@ Thank you for your interest in contributing to **SpecForge**! We welcome bug rep
    make lint test
    ```
 5. Commit your changes following Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`).
-6. Push to your fork and submit a Pull Request.
+6. Push to your fork and submit a Pull Request; the template lists what reviewers check.
+
+Why SpecForge is built the way it is: [docs/history/](docs/history/).
 
 ## Contributor Licensing
 

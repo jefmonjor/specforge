@@ -5,17 +5,17 @@ import (
 	"strings"
 	"sync"
 
-	"specforge/internal/app/audit"
-	"specforge/internal/app/reviewer"
-	"specforge/internal/app/tddloop"
-	"specforge/internal/app/verifier"
-	"specforge/internal/domain/e2e"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/domain/verification"
+	"github.com/jefmonjor/specforge/v6/internal/app/audit"
+	"github.com/jefmonjor/specforge/v6/internal/app/reviewer"
+	"github.com/jefmonjor/specforge/v6/internal/app/tddloop"
+	"github.com/jefmonjor/specforge/v6/internal/app/verifier"
+	"github.com/jefmonjor/specforge/v6/internal/domain/e2e"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/verification"
 )
 
 // LoopEvents prints the TDD loop.

@@ -7,13 +7,13 @@ import (
 	"sort"
 	"strings"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/conversation"
-	"specforge/internal/app/docturn"
-	"specforge/internal/app/prompts"
-	"specforge/internal/app/protocol"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/conversation"
+	"github.com/jefmonjor/specforge/v6/internal/app/docturn"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/app/protocol"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // converse runs one agent turn under the response contract and turns a

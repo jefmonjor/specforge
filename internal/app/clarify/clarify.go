@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // PendingQuestionError reports a question that could not be asked.

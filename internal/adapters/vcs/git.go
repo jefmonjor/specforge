@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Git is the git-backed ports.VCS.

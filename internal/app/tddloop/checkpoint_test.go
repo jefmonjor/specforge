@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 type fakeCheckpoints struct {

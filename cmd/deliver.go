@@ -5,12 +5,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/vcs"
-	"specforge/internal/app/deliver"
-	"specforge/internal/config"
-	"specforge/internal/domain/delivery"
-	"specforge/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/vcs"
+	"github.com/jefmonjor/specforge/v6/internal/app/deliver"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/delivery"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
 )
 
 func (a *App) deliverCommand() *cobra.Command {

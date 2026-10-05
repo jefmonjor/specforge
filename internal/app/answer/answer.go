@@ -13,8 +13,8 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"specforge/assets"
-	"specforge/internal/jsontext"
+	"github.com/jefmonjor/specforge/v6/assets"
+	"github.com/jefmonjor/specforge/v6/internal/jsontext"
 )
 
 // Schema is a compiled JSON Schema from the embedded assets.

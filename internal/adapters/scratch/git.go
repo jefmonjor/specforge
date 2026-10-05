@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // repository is what a copy needs to know about the project's git.

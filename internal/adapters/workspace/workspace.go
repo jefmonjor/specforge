@@ -15,8 +15,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/domain/stack"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // maxWalkedFiles bounds a snapshot outside git.

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 func write(t *testing.T, root, rel, content string) {

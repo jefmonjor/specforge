@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
 )
 
 func TestNewData(t *testing.T) {

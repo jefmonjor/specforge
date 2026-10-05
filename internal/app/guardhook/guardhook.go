@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"specforge/internal/domain/guard"
+	"github.com/jefmonjor/specforge/v6/internal/domain/guard"
 )
 
 // Modes of the guard (guard.mode in specforge.yaml).

@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"time"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // maxCapturedBytes bounds how much of each stream is kept in memory. When a

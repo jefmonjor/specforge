@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
 )
 
 func files(spec ...string) []change.File {

@@ -9,7 +9,7 @@ import (
 	"errors"
 	"fmt"
 
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Latest names the newest checkpoint.

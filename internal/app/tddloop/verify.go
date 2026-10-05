@@ -7,12 +7,12 @@ import (
 	"slices"
 	"strings"
 
-	"specforge/internal/app/verifier"
-	"specforge/internal/domain/review"
-	"specforge/internal/domain/risk"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/domain/verification"
+	"github.com/jefmonjor/specforge/v6/internal/app/verifier"
+	"github.com/jefmonjor/specforge/v6/internal/domain/review"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/domain/verification"
 )
 
 // Verify modes (verify in specforge.yaml).

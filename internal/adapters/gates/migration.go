@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"specforge/internal/domain/legacy"
-	"specforge/internal/domain/quality"
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/legacy"
+	"github.com/jefmonjor/specforge/v6/internal/domain/quality"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 // Migration checks a rewrite against its target: the Java release the

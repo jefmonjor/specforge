@@ -3,13 +3,13 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/adapters/vcs"
-	"specforge/internal/app/audit"
-	"specforge/internal/app/clarify"
-	"specforge/internal/config"
-	"specforge/internal/domain/security"
-	"specforge/internal/ui"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/vcs"
+	"github.com/jefmonjor/specforge/v6/internal/app/audit"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/security"
+	"github.com/jefmonjor/specforge/v6/internal/ui"
 )
 
 func (a *App) auditCommand() *cobra.Command {

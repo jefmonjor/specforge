@@ -5,9 +5,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/adapters/vcs"
-	"specforge/internal/app/restore"
-	"specforge/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/vcs"
+	"github.com/jefmonjor/specforge/v6/internal/app/restore"
+	"github.com/jefmonjor/specforge/v6/internal/config"
 )
 
 func (a *App) restoreCommand() *cobra.Command {

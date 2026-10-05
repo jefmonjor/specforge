@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"specforge/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
 )
 
 // Hunk is a run of lines the change added or modified, on the new side of

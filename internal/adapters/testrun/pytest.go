@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // pytest exit codes (pytest.ExitCode).

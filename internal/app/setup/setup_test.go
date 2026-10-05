@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/fsys"
-	"specforge/internal/app/layout"
-	"specforge/internal/config"
-	"specforge/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
 )
 
 func TestRunIsIdempotentAndKeepsTheDevelopersContent(t *testing.T) {

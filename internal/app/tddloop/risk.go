@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"specforge/internal/app/protocol"
-	"specforge/internal/domain/change"
-	"specforge/internal/domain/risk"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/protocol"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/risk"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // assess classifies the scenario's change from what version control says

@@ -20,10 +20,10 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
-	"specforge/assets"
-	"specforge/internal/app/layout"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/assets"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ErrNoSpecs reports a project without specifications.

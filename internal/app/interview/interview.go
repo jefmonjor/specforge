@@ -18,14 +18,14 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/conversation"
-	"specforge/internal/app/layout"
-	"specforge/internal/app/prompts"
-	"specforge/internal/app/protocol"
-	"specforge/internal/domain/spec"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/conversation"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/app/protocol"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // DefaultMaxTurns bounds one interview run.

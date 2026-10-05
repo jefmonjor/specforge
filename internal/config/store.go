@@ -12,7 +12,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
-	"specforge/internal/adapters/fsys"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/fsys"
 )
 
 // HomeEnv overrides where SpecForge keeps its user files (config and logs).

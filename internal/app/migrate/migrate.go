@@ -19,14 +19,14 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/app/conversation"
-	"specforge/internal/app/docturn"
-	"specforge/internal/app/layout"
-	"specforge/internal/app/prompts"
-	"specforge/internal/domain/legacy"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/app/conversation"
+	"github.com/jefmonjor/specforge/v6/internal/app/docturn"
+	"github.com/jefmonjor/specforge/v6/internal/app/layout"
+	"github.com/jefmonjor/specforge/v6/internal/app/prompts"
+	"github.com/jefmonjor/specforge/v6/internal/domain/legacy"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Where the migration documents live, project-relative.

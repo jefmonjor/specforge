@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"specforge/internal/app/clarify"
-	"specforge/internal/domain/spec"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/app/clarify"
+	"github.com/jefmonjor/specforge/v6/internal/domain/spec"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // Clarify asks every open question of the specification, one at a time,

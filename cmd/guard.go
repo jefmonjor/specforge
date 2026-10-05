@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"specforge/internal/app/guardhook"
-	"specforge/internal/config"
+	"github.com/jefmonjor/specforge/v6/internal/app/guardhook"
+	"github.com/jefmonjor/specforge/v6/internal/config"
 )
 
 // exitError ends a command with a code and no diagnosis: the command

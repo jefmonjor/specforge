@@ -19,8 +19,8 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 
-	"specforge/internal/domain/e2e"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/domain/e2e"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // ErrNoBrowser reports that no Chrome-compatible browser was found.

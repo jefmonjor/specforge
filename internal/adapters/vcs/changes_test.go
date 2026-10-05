@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/domain/change"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 func TestChangesMeasuresTrackedAndUntrackedFiles(t *testing.T) {

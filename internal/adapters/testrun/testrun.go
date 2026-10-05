@@ -15,10 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"specforge/internal/adapters/process"
-	"specforge/internal/domain/stack"
-	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
+	"github.com/jefmonjor/specforge/v6/internal/adapters/process"
+	"github.com/jefmonjor/specforge/v6/internal/domain/stack"
+	"github.com/jefmonjor/specforge/v6/internal/domain/tdd"
+	"github.com/jefmonjor/specforge/v6/internal/ports"
 )
 
 // maxOutput bounds the failure text kept for prompts and reports.

@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"specforge/internal/domain/change"
+	"github.com/jefmonjor/specforge/v6/internal/domain/change"
 )
 
 // Tier is the level of scrutiny.
