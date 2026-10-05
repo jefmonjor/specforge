@@ -199,6 +199,18 @@ func TestAuditWithNoChanges(t *testing.T) {
 	}
 }
 
+func TestReviewWithAnUnknownBaseReportsNothing(t *testing.T) {
+	requireTool(t, "git")
+	h := newHarness(t)
+	h.write("main.go", "package main\n")
+	gitInit(t, h.root)
+	h.expect(0, "init", "--agent", "claude", "--language", "en")
+	h.expect(1, "review", "--base", "no-such-branch")
+	if !strings.Contains(h.err.String(), "is not a commit") || strings.Contains(h.out.String()+h.err.String(), "lens(es)") {
+		t.Fatalf("stdout:\n%s\nstderr:\n%s", h.out, h.err)
+	}
+}
+
 const readySpec = "# Password reset\n\n" +
 	"```gherkin\nFeature: Password reset\n\n" +
 	"  Scenario: Request a link\n    Given a registered user\n    When she asks for a reset\n    Then she gets a link\n```\n"

@@ -85,7 +85,9 @@ automatic correction outside the loop.`,
 			if ok, jerr := a.emit(res); ok {
 				return firstErr(jerr, err)
 			}
-			a.printBranchReview(p, opts, res)
+			if res.Base != "" { // the branch was read: say what the review found
+				a.printBranchReview(p, opts, res)
+			}
 			return err
 		},
 	}
