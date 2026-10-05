@@ -2,6 +2,7 @@ package tddloop
 
 import (
 	"errors"
+	"specforge/internal/app/conversation"
 	"strings"
 	"testing"
 
@@ -20,7 +21,7 @@ func happyScenario(marker, testFile, implFile string) []reply {
 func TestHappyPathRunsEveryScenarioThroughTheThreePhases(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"), happyScenario("SDD_0001_002", test2, "expiry.go")...)
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), red(1), green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), red(1), green(), green()}
 
 	st, err := h.run()
 	if err != nil {
@@ -29,7 +30,7 @@ func TestHappyPathRunsEveryScenarioThroughTheThreePhases(t *testing.T) {
 	if !st.Done() || !st.Scenarios[0].Done || !st.Scenarios[1].Done {
 		t.Fatalf("state = %+v", st)
 	}
-	wantFilters := []string{"SDD_0001_001", "SDD_0001_001", "", "SDD_0001_002", "SDD_0001_002", ""}
+	wantFilters := []string{"", "SDD_0001_001", "SDD_0001_001", "", "SDD_0001_002", "SDD_0001_002", ""}
 	if strings.Join(h.tests.filters, ",") != strings.Join(wantFilters, ",") {
 		t.Fatalf("filters = %q, want %q", h.tests.filters, wantFilters)
 	}
@@ -54,7 +55,7 @@ func TestRedThatDoesNotCompileIsRejectedAndRetried(t *testing.T) {
 		writes(map[string]string{test1: testFor("SDD_0001_001")}),
 		writes(map[string]string{test1: testFor("SDD_0001_001") + "// fixed\n", "reset.go": "package m\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{notCompiled(), red(1)}
+	h.tests.outcomes = []tdd.Outcome{baseline(), notCompiled(), red(1)}
 
 	// The script ends after RED, so the run stops when GREEN calls the agent.
 	_, err := h.run(func(o *Options) { o.MaxAttempts = 3 })
@@ -74,6 +75,7 @@ func TestRedThatDoesNotCompileIsRejectedAndRetried(t *testing.T) {
 
 func TestRedWithoutAnyTestFileIsRejected(t *testing.T) {
 	h := newHarness(t, specBody)
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	h.agent.turns = []reply{
 		writes(map[string]string{"reset.go": "package m\n"}),
 		writes(map[string]string{"reset2.go": "package m\n"}),
@@ -85,13 +87,14 @@ func TestRedWithoutAnyTestFileIsRejected(t *testing.T) {
 	if h.events.rejected[0] != RejectNoTest || h.events.rejected[1] != RejectNoTest {
 		t.Fatalf("rejected = %v", h.events.rejected)
 	}
-	if len(h.tests.filters) != 0 {
+	if len(h.tests.filters) != 1 { // the baseline only
 		t.Fatal("tests must not run when no test was written")
 	}
 }
 
 func TestRedWithoutMarkerIsRejected(t *testing.T) {
 	h := newHarness(t, specBody)
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	h.agent.turns = []reply{writes(map[string]string{test1: testFor("Something")})}
 	_, err := h.run(func(o *Options) { o.MaxAttempts = 1 })
 	if !errors.Is(err, tdd.ErrAttemptsExhausted) || h.events.rejected[0] != RejectNoMarker {
@@ -101,6 +104,7 @@ func TestRedWithoutMarkerIsRejected(t *testing.T) {
 
 func TestFalseClaimsAreRejected(t *testing.T) {
 	h := newHarness(t, specBody)
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	h.agent.turns = []reply{func(p *project, _ string) string {
 		p.write(test1, testFor("SDD_0001_001"))
 		return done(test1, "never_written.go")
@@ -116,7 +120,7 @@ func TestPrematureGreenAsksTheDeveloper(t *testing.T) {
 		h := newHarness(t, specBody)
 		h.agent.turns = append([]reply{writes(map[string]string{test1: testFor("SDD_0001_001")})},
 			happyScenario("SDD_0001_002", test2, "expiry.go")...)
-		h.tests.outcomes = []tdd.Outcome{green(), red(1), green(), green()}
+		h.tests.outcomes = []tdd.Outcome{baseline(), green(), red(1), green(), green()}
 		h.prompter.answers = []string{"Yes: mark the scenario as already satisfied"}
 
 		st, err := h.run()
@@ -133,7 +137,7 @@ func TestPrematureGreenAsksTheDeveloper(t *testing.T) {
 	t.Run("stop", func(t *testing.T) {
 		h := newHarness(t, specBody)
 		h.agent.turns = []reply{writes(map[string]string{test1: testFor("SDD_0001_001")})}
-		h.tests.outcomes = []tdd.Outcome{green()}
+		h.tests.outcomes = []tdd.Outcome{baseline(), green()}
 		h.prompter.answers = []string{"Stop the loop"}
 		if _, err := h.run(); !errors.Is(err, tdd.ErrPrematureGreen) {
 			t.Fatalf("want ErrPrematureGreen, got %v", err)
@@ -142,7 +146,7 @@ func TestPrematureGreenAsksTheDeveloper(t *testing.T) {
 	t.Run("no terminal", func(t *testing.T) {
 		h := newHarness(t, specBody)
 		h.agent.turns = []reply{writes(map[string]string{test1: testFor("SDD_0001_001")})}
-		h.tests.outcomes = []tdd.Outcome{green()}
+		h.tests.outcomes = []tdd.Outcome{baseline(), green()}
 		h.prompter.nonTTY = true
 		var pending *clarify.PendingQuestionError
 		if _, err := h.run(); !errors.Is(err, tdd.ErrPrematureGreen) || !errors.As(err, &pending) {
@@ -158,14 +162,14 @@ func TestGreenThatEditsATestStopsTheLoop(t *testing.T) {
 		// The classic cheat: delete the assertion instead of implementing.
 		writes(map[string]string{test1: "package m\nimport \"testing\"\nfunc TestSDD_0001_001_X(t *testing.T) {}\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{red(1)}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1)}
 
 	st, err := h.run()
 	var tamper *tdd.TamperingError
 	if !errors.As(err, &tamper) || tamper.Phase != tdd.PhaseGreen || tamper.Changed[0] != test1 {
 		t.Fatalf("want TamperingError on %s, got %v", test1, err)
 	}
-	if len(h.tests.filters) != 1 {
+	if len(h.tests.filters) != 2 { // baseline and RED
 		t.Fatal("tests must not run after tampering")
 	}
 	if st.Phase != tdd.PhaseGreen {
@@ -180,7 +184,7 @@ func TestGreenRunsOutOfAttempts(t *testing.T) {
 		writes(map[string]string{"reset.go": "package m\n// try 1\n"}),
 		writes(map[string]string{"reset.go": "package m\n// try 2\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{red(1), red(1), notCompiled()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), red(1), notCompiled()}
 
 	_, err := h.run(func(o *Options) { o.MaxAttempts = 2 })
 	if !errors.Is(err, tdd.ErrAttemptsExhausted) {
@@ -196,7 +200,7 @@ func TestRefactorFixesAFailingGate(t *testing.T) {
 	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"),
 		writes(map[string]string{"reset.go": "package m\n// deduplicated\n"}))
 	h.agent.turns = append(h.agent.turns, happyScenario("SDD_0001_002", test2, "expiry.go")...)
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), green(), red(1), green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), green(), red(1), green(), green()}
 	h.gate.results = []quality.Result{{Gate: "fake-gate", Status: quality.Failed, Summary: "4% duplicated"}}
 
 	if _, err := h.run(); err != nil {
@@ -210,7 +214,7 @@ func TestRefactorFixesAFailingGate(t *testing.T) {
 func TestStrictModeStopsOnSkippedGatesWithoutCallingTheAgent(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.agent.turns = happyScenario("SDD_0001_001", test1, "reset.go")
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green()}
 	h.gate.results = []quality.Result{{Gate: "fake-gate", Status: quality.Skipped, Summary: "jscpd not installed"}}
 
 	_, err := h.run(func(o *Options) { o.Strict = true })
@@ -233,7 +237,7 @@ func TestTheAgentCanAskInEveryPhase(t *testing.T) {
 		ask("Keep the helper exported?"),
 		writes(map[string]string{"reset.go": "package m\n// clean\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), {Compiled: true, Failed: 1, Output: "boom"}}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), {Compiled: true, Failed: 1, Output: "boom"}}
 	h.gate.results = []quality.Result{{Gate: "fake-gate", Status: quality.Failed, Summary: "dup"}}
 	h.prompter.answers = []string{"package m", "from request", "no"}
 
@@ -256,6 +260,7 @@ func TestAQuestionWithoutTerminalStopsWithAPendingQuestion(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.agent.turns = []reply{ask("Which package holds reset?")}
 	h.prompter.nonTTY = true
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	var pending *clarify.PendingQuestionError
 	if _, err := h.run(); !errors.As(err, &pending) {
 		t.Fatalf("want PendingQuestionError, got %v", err)
@@ -267,6 +272,7 @@ func TestAQuestionWithoutTerminalStopsWithAPendingQuestion(t *testing.T) {
 
 func TestMissingContractIsRetriedOnceThenFails(t *testing.T) {
 	h := newHarness(t, specBody)
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	prose := func(*project, string) string { return "I implemented everything." }
 	h.agent.turns = []reply{prose, prose}
 	if _, err := h.run(); err == nil || !strings.Contains(err.Error(), "JSON status object") {
@@ -279,6 +285,7 @@ func TestMissingContractIsRetriedOnceThenFails(t *testing.T) {
 
 func TestBlockedAgentStopsWithItsReason(t *testing.T) {
 	h := newHarness(t, specBody)
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	h.agent.turns = []reply{func(*project, string) string {
 		return `{"status":"blocked","reason":"go is not installed","suggested_action":"install Go 1.24"}`
 	}}
@@ -308,7 +315,7 @@ func TestUnsealedOrOpenSpecsNeverStart(t *testing.T) {
 func TestResumeContinuesAndRestartIsExplicit(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.agent.turns = []reply{writes(map[string]string{test1: testFor("SDD_0001_001"), "reset.go": "package m\n"})}
-	h.tests.outcomes = []tdd.Outcome{red(1)}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1)}
 	if _, err := h.run(); err == nil {
 		t.Fatal("the script ends at GREEN, the run must stop")
 	}
@@ -333,7 +340,7 @@ func TestResumeContinuesAndRestartIsExplicit(t *testing.T) {
 func TestResumeAfterAnAmendmentRedoesOnlyChangedScenarios(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.agent.turns = happyScenario("SDD_0001_001", test1, "reset.go")
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green()}
 	_, _ = h.run() // scenario 1 done, stops at scenario 2
 
 	amended := strings.Replace(specBody, `Then she sees "link expired"`, `Then she sees "the link has expired"`, 1)
@@ -355,5 +362,21 @@ func TestResumeWithoutStateFails(t *testing.T) {
 	h := newHarness(t, specBody)
 	if _, err := h.run(func(o *Options) { o.Resume = true }); !errors.Is(err, ErrNothingToResume) {
 		t.Fatalf("want ErrNothingToResume, got %v", err)
+	}
+}
+
+func TestAQuestionWithoutOptionsIsRefusedInTheLoop(t *testing.T) {
+	h := newHarness(t, specBody)
+	open := func(*project, string) string {
+		return "```json\n{\"status\":\"needs_clarification\",\"question\":\"Which files should I touch?\"}\n```"
+	}
+	h.agent.turns = []reply{open, open}
+	h.tests.outcomes = []tdd.Outcome{baseline()}
+	_, err := h.run()
+	if !errors.Is(err, conversation.ErrNoOptions) {
+		t.Fatalf("want ErrNoOptions, got %v", err)
+	}
+	if !strings.Contains(h.agent.prompts[1], "Derive the candidate answers yourself") || len(h.prompter.questions) != 0 {
+		t.Fatalf("the agent is told to derive options; the developer is never asked:\n%s", h.agent.prompts[1])
 	}
 }

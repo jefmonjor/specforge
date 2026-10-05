@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"strings"
 
+	"specforge/internal/domain/risk"
 	"specforge/internal/jsontext"
 )
 
@@ -38,6 +39,11 @@ type Response struct {
 	// Lesson is the rule that would have avoided a rejected attempt, in
 	// one sentence. SpecForge keeps it in specs/LESSONS.md.
 	Lesson string `json:"lesson,omitempty"`
+	// Risk raises the scrutiny of the change ("medium" or "high") and
+	// RiskReason says why. The agent can raise the computed tier, never
+	// lower it.
+	Risk       string `json:"risk,omitempty"`
+	RiskReason string `json:"risk_reason,omitempty"`
 
 	Question string   `json:"question,omitempty"`
 	Options  []string `json:"options,omitempty"`
@@ -74,7 +80,7 @@ func (r *Response) validate() error {
 		for i, f := range r.FilesWritten {
 			r.FilesWritten[i] = strings.TrimPrefix(strings.ReplaceAll(strings.TrimSpace(f), "\\", "/"), "./")
 		}
-		return nil
+		return r.validateRisk()
 	case NeedsClarification:
 		if strings.TrimSpace(r.Question) == "" {
 			return fmt.Errorf("status %q requires a question", r.Status)
@@ -88,4 +94,20 @@ func (r *Response) validate() error {
 	default:
 		return fmt.Errorf("unknown status %q", r.Status)
 	}
+}
+
+// validateRisk accepts a known tier with a reason. A tier without a reason
+// is not a valid contract: raising the scrutiny has to be explained.
+func (r *Response) validateRisk() error {
+	r.Risk = strings.ToLower(strings.TrimSpace(r.Risk))
+	if r.Risk == "" {
+		return nil
+	}
+	if _, err := risk.ParseTier(r.Risk); err != nil {
+		return err
+	}
+	if strings.TrimSpace(r.RiskReason) == "" {
+		return fmt.Errorf("risk %q requires a risk_reason", r.Risk)
+	}
+	return nil
 }

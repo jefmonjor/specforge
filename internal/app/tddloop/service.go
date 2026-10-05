@@ -20,7 +20,10 @@ import (
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/conversation"
 	"specforge/internal/app/layout"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/review"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
 	"specforge/internal/domain/tdd"
@@ -65,11 +68,25 @@ type Deps struct {
 	Workspace ports.Workspace
 	Files     ports.Files
 	Asker     *clarify.Asker
-	// VCS records each finished scenario as a commit; nil disables it.
-	VCS    ports.VCS
-	Events Events
-	Log    *slog.Logger
-	Now    func() time.Time
+	// VCS measures each scenario's change and records it as a commit;
+	// nil measures files without git and commits nothing.
+	VCS ports.VCS
+	// Reviewer runs the review lenses after REFACTOR; nil skips them.
+	Reviewer Reviewer
+	// Verifier checks the specification in a copy; nil skips it.
+	Verifier Verifier
+	// Scratch makes the sandboxes of a parallel loop; nil runs every
+	// scenario in turn.
+	Scratch ports.Scratch
+	Events  Events
+	Log     *slog.Logger
+	Now     func() time.Time
+}
+
+// Reviewer runs review lenses over a change and validates a correction.
+type Reviewer interface {
+	Review(ctx context.Context, req reviewer.Request) (reviewer.Result, error)
+	Validate(ctx context.Context, req reviewer.Request, fixed []review.Finding) (map[string]review.Check, error)
 }
 
 // Options select the specification and tune the loop.
@@ -88,18 +105,45 @@ type Options struct {
 	From     tdd.Phase
 
 	// Review "scenario" asks the developer to review every finished
-	// scenario (gate R2); "off" skips it.
+	// scenario (gate R2); "risk" only those of medium or high risk; "off"
+	// never.
 	Review string
+	// Risk classifies each scenario's change; MutationFrom is the lowest
+	// tier that runs the mutation gate.
+	Risk         risk.Rules
+	MutationFrom risk.Tier
 	// Commit records every finished scenario as one commit.
 	Commit bool
+	// Surfaces is what happens when the agent changes a file the approved
+	// plan does not name: "ask" (default), "strict" or "off".
+	Surfaces string
+	// LensesAuto picks the review lenses by risk; otherwise Lenses are the
+	// lenses of every scenario (none: no lens review).
+	LensesAuto bool
+	Lenses     []review.Lens
+	// Blind doubles the lenses of high-risk scenarios.
+	Blind bool
+	// Parallel is how many scenarios with disjoint plan surfaces may run
+	// side by side, each in its own sandbox (1: one at a time).
+	Parallel int
+	// Single runs only Scenario and stops: a scenario of a parallel loop.
+	Single bool
+	// Seed is the baseline a new loop starts from instead of running the
+	// suite again.
+	Seed *tdd.Baseline
+	// Verify is when the independent verifier runs: "high" (scenarios of
+	// high risk, the default), "always", "feature" (once, at the end) or
+	// "off".
+	Verify string
 
 	MaxAttempts       int
 	MaxClarifications int
 	AgentTimeout      time.Duration
 	TestTimeout       time.Duration
-	Model             string
-	AgentEnv          []string
-	Strict            bool
+	// Models picks the agent's model for each phase.
+	Models   ports.ModelFor
+	AgentEnv []string
+	Strict   bool
 
 	// Legacy is the legacy repository of a rewrite, absolute: the agent
 	// reads it as the reference of the behaviour and may never change it.
@@ -124,6 +168,18 @@ func (o Options) withDefaults() Options {
 	}
 	if o.Language == "" {
 		o.Language = "en"
+	}
+	if o.Risk.High == nil {
+		o.Risk = risk.DefaultRules()
+	}
+	if o.MutationFrom == "" {
+		o.MutationFrom = risk.Passive
+	}
+	if o.Surfaces == "" {
+		o.Surfaces = SurfacesAsk
+	}
+	if o.Verify == "" {
+		o.Verify = VerifyHigh
 	}
 	return o
 }
@@ -155,9 +211,17 @@ type run struct {
 	md     string
 	specID string
 	plan   string
+	// surfaces are the files the approved plan allows the agent to edit.
+	surfaces spec.Surfaces
 	// lesson is the latest lesson the agent offered in this phase.
 	lesson string
 	st     *tdd.State
+	// fresh is true when this invocation started a new loop: the baseline
+	// is taken before its first RED.
+	fresh bool
+	// sequential are scenarios a parallel batch could not finish: they run
+	// one at a time.
+	sequential map[int]bool
 }
 
 // Run executes the loop until every scenario is done or a step stops it.
@@ -182,10 +246,24 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 		}
 	}
 	s.d.Events.Started(r.st, r.doc)
+	if r.fresh {
+		if err := s.startBaseline(ctx, r); err != nil {
+			return r.st, errors.Join(err, s.save(r))
+		}
+	}
 
 	for !r.st.Done() {
 		if err := ctx.Err(); err != nil {
 			return r.st, errors.Join(err, s.save(r))
+		}
+		if r.o.Single && r.st.Current != r.o.Scenario-1 {
+			break // a parallel loop's scenario is finished
+		}
+		if batch := s.batch(r); len(batch) > 1 {
+			if err := s.runBatch(ctx, r, batch); err != nil {
+				return r.st, errors.Join(err, s.save(r))
+			}
+			continue
 		}
 		sc, _ := r.st.Scenario()
 		s.d.Events.Phase(r.st, sc)
@@ -198,10 +276,18 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 			err = s.green(ctx, r)
 		case tdd.PhaseRefactor:
 			err = s.refactor(ctx, r)
+		case tdd.PhaseReview:
+			err = s.reviewPhase(ctx, r)
 		}
 		if err != nil {
 			return r.st, errors.Join(err, s.save(r))
 		}
+	}
+	if r.o.Single {
+		return r.st, s.save(r)
+	}
+	if err := s.verifyFeature(ctx, r); err != nil {
+		return r.st, errors.Join(err, s.save(r))
 	}
 	s.d.Events.Finished(r.st)
 	return r.st, s.save(r)
@@ -250,6 +336,7 @@ func (s *Service) loadPlan(r *run) error {
 		return fmt.Errorf("%w: %s", ErrPlanOutdated, issues[0].Message)
 	}
 	r.plan = strings.TrimSpace(spec.StripSeal(content))
+	r.surfaces = spec.PlanSurfaces(r.plan)
 	return nil
 }
 
@@ -267,7 +354,7 @@ func (s *Service) loadState(r *run) error {
 	case err != nil && !errors.Is(err, errNoState):
 		return err
 	case r.o.Restart || (saved == nil && !r.o.Resume):
-		r.st = fresh
+		r.st, r.fresh = fresh, true
 		return s.save(r)
 	case saved == nil:
 		return ErrNothingToResume
@@ -330,7 +417,7 @@ func (s *Service) readState(path string) (*tdd.State, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("loop state %s is corrupt: %w", path, err)
 	}
-	if st.Version != tdd.StateVersion {
+	if !st.Upgrade() {
 		return nil, fmt.Errorf("loop state %s was written by an incompatible version: start over with --restart", path)
 	}
 	return &st, nil

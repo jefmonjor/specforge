@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Findings of one review lens",
+  "type": "object",
+  "required": ["lens", "findings", "evidence"],
+  "additionalProperties": false,
+  "properties": {
+    "lens": {"enum": ["risk", "reliability", "readability", "resilience"]},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "location", "claim", "evidence_class", "causal_disposition", "proof_refs"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "pattern": "^[A-Z]{2,5}-[0-9]{3}$"},
+          "severity": {"enum": ["BLOCKER", "CRITICAL", "WARNING", "SUGGESTION"]},
+          "location": {
+            "type": "object",
+            "required": ["path", "line"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {"type": "string", "minLength": 1},
+              "line": {"type": "integer", "minimum": 0}
+            }
+          },
+          "claim": {"type": "string", "minLength": 10},
+          "evidence_class": {"enum": ["deterministic", "inferential", "insufficient"]},
+          "causal_disposition": {"enum": ["introduced", "behavior-activated", "worsened", "pre-existing", "base-only", "unknown"]},
+          "proof_refs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "path"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {"enum": ["changed-hunk", "new-file"]},
+                "path": {"type": "string", "minLength": 1},
+                "line": {"type": "integer", "minimum": 0}
+              }
+            }
+          }
+        }
+      }
+    },
+    "evidence": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  }
+}

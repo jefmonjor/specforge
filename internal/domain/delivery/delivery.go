@@ -42,6 +42,49 @@ type Scenario struct {
 	Gates       string   `json:"gates,omitempty"`
 	Rejections  int      `json:"rejections"`
 	ReviewNotes int      `json:"review_changes"`
+	// Risk is the tier of the scenario's change and why; nil when the loop
+	// did not assess it.
+	Risk *Risk `json:"risk,omitempty"`
+	// Lines are the authored lines of the scenario's commit (lock files,
+	// vendored and golden files excluded).
+	Lines int `json:"lines"`
+	// Review is the lens review; nil when none ran.
+	Review *Review `json:"review,omitempty"`
+	// Verify is the independent verification; nil when none ran.
+	Verify *Verification `json:"verify,omitempty"`
+}
+
+// Verification summarises an independent verification.
+type Verification struct {
+	Met        int `json:"met"`
+	Unmet      int `json:"unmet"`
+	Unverified int `json:"unverified"`
+	// Open are requirements still broken, as "ID · command → observed".
+	Open []string `json:"open,omitempty"`
+	// Corrected were broken and corrected; FollowUps were accepted.
+	Corrected []string `json:"corrected,omitempty"`
+	FollowUps []string `json:"follow_ups,omitempty"`
+	Tests     []string `json:"regression_tests,omitempty"`
+	Skipped   string   `json:"skipped,omitempty"`
+}
+
+// Review summarises a lens review.
+type Review struct {
+	Lenses    []string `json:"lenses"`
+	Reported  int      `json:"reported"`
+	Corrected int      `json:"corrected"`
+	Discarded int      `json:"discarded"`
+	// FollowUps are left for later, each as "ID · path:line · claim".
+	FollowUps []string `json:"follow_ups,omitempty"`
+	// Open are findings still blocking (a branch review only).
+	Open []string `json:"open,omitempty"`
+}
+
+// Risk is how much scrutiny a scenario's change got, and why.
+type Risk struct {
+	Tier    string   `json:"tier"`
+	Lines   int      `json:"lines"`
+	Reasons []string `json:"reasons"`
 }
 
 // Checks summarises the verifications that ran outside the loop.
@@ -50,6 +93,11 @@ type Checks struct {
 	Security *Security `json:"security,omitempty"`
 	// E2E is nil when no E2E report exists for the specification.
 	E2E *E2E `json:"e2e,omitempty"`
+	// BranchReview is nil when `specforge review` did not run for it.
+	BranchReview *Review `json:"branch_review,omitempty"`
+	// Verify is the verification of the whole specification; nil when
+	// `specforge verify` (or verify: feature) did not run.
+	Verify *Verification `json:"verify,omitempty"`
 }
 
 // Security is the audit summary.
@@ -66,6 +114,13 @@ type E2E struct {
 	PassRate  float64 `json:"pass_rate"`
 }
 
+// Baseline is what already failed before the loop changed anything.
+type Baseline struct {
+	At       time.Time `json:"at"`
+	Command  string    `json:"command"`
+	Failures []string  `json:"failures"`
+}
+
 // Trace is the machine-readable delivery (trace.json).
 type Trace struct {
 	GeneratedAt time.Time  `json:"generated_at"`
@@ -79,6 +134,13 @@ type Trace struct {
 	Lessons     []string   `json:"lessons,omitempty"`
 	OutOfScope  string     `json:"out_of_scope,omitempty"`
 	Checks      Checks     `json:"checks"`
+	// Baseline is nil when the loop never ran or its runner cannot name
+	// failing tests.
+	Baseline *Baseline `json:"baseline,omitempty"`
+	// Budget is the size of a reviewable pull request, in authored lines;
+	// Slices are proposed when the delivery is larger.
+	Budget int     `json:"budget_lines"`
+	Slices []Slice `json:"slices,omitempty"`
 }
 
 // Count returns how many scenarios have status s.
@@ -92,8 +154,10 @@ func (t Trace) Count(s Status) int {
 	return n
 }
 
-// Complete reports whether every scenario is done or satisfied and no
-// question is waiting.
+// Complete reports whether every scenario is done or satisfied, no
+// question is waiting and no review finding is open.
 func (t Trace) Complete() bool {
-	return t.Count(Pending) == 0 && len(t.Pending) == 0 && len(t.Scenarios) > 0
+	open := t.Checks.BranchReview != nil && len(t.Checks.BranchReview.Open) > 0 ||
+		t.Checks.Verify != nil && len(t.Checks.Verify.Open) > 0
+	return t.Count(Pending) == 0 && len(t.Pending) == 0 && len(t.Scenarios) > 0 && !open
 }

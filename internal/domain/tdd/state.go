@@ -5,19 +5,31 @@ package tdd
 
 import (
 	"fmt"
+	"slices"
 	"time"
+
+	"specforge/internal/domain/review"
+	"specforge/internal/domain/risk"
+	"specforge/internal/domain/verification"
 )
 
-// StateVersion is bumped whenever State changes incompatibly.
-const StateVersion = 2
+// StateVersion is bumped whenever State changes. Older states that only
+// lack the newer fields are upgraded by Upgrade.
+const StateVersion = 3
+
+// oldestUpgradable is the first version Upgrade can read.
+const oldestUpgradable = 2
 
 // Phase is the step of the loop the current scenario is in.
 type Phase string
 
 const (
-	PhaseRed       Phase = "RED"
-	PhaseGreen     Phase = "GREEN"
-	PhaseRefactor  Phase = "REFACTOR"
+	PhaseRed      Phase = "RED"
+	PhaseGreen    Phase = "GREEN"
+	PhaseRefactor Phase = "REFACTOR"
+	// PhaseReview runs the review lenses over a scenario whose REFACTOR
+	// passed, and its one correction.
+	PhaseReview    Phase = "REVIEW"
 	PhaseCompleted Phase = "COMPLETED"
 )
 
@@ -36,6 +48,53 @@ type ScenarioRef struct {
 	// the commit that recorded it ("" when nothing was committed).
 	Files  []string `json:"files,omitempty"`
 	Commit string   `json:"commit,omitempty"`
+	// Risk is the latest assessment of the scenario's change. RaisedTo and
+	// RaisedWhy keep the agent's request for more scrutiny, which every
+	// later assessment applies again.
+	Risk      *risk.Assessment `json:"risk,omitempty"`
+	RaisedTo  risk.Tier        `json:"raised_to,omitempty"`
+	RaisedWhy string           `json:"raised_why,omitempty"`
+	// Review is the lens review of the scenario's change, kept so a resume
+	// never runs the lenses twice.
+	Review *ReviewRecord `json:"review,omitempty"`
+	// Verify is the independent verification of the scenario.
+	Verify *VerifyRecord `json:"verify,omitempty"`
+}
+
+// VerifyRecord is the independent verification of one scenario and what
+// came of it.
+type VerifyRecord struct {
+	Report verification.Report `json:"report"`
+	// Skipped says why the verifier did not run.
+	Skipped string `json:"skipped,omitempty"`
+	// Corrected are the blockers sent to the one correction; Recheck is
+	// the verification of those only, afterwards.
+	Corrected []string             `json:"corrected,omitempty"`
+	Recheck   *verification.Report `json:"recheck,omitempty"`
+	// FollowUps are blockers the developer accepted as they are.
+	FollowUps []string `json:"follow_ups,omitempty"`
+	// Tests are the regression tests the developer added; TestsDecided is
+	// set once they were offered.
+	Tests        []string `json:"tests,omitempty"`
+	TestsDecided bool     `json:"tests_decided,omitempty"`
+	Done         bool     `json:"done,omitempty"`
+}
+
+// ReviewRecord is the lens review of one scenario and what came of it.
+type ReviewRecord struct {
+	Lenses   []review.Lens  `json:"lenses"`
+	Reported int            `json:"reported"`
+	Verdict  review.Verdict `json:"verdict"`
+	// Correction: the findings sent to the one correction, its size in
+	// lines and the budget it had.
+	Corrected  []review.Finding        `json:"corrected,omitempty"`
+	Lines      int                     `json:"correction_lines,omitempty"`
+	Budget     int                     `json:"correction_budget,omitempty"`
+	Validation map[string]review.Check `json:"validation,omitempty"`
+	// FollowUps are findings left for later: pre-existing ones, and those
+	// the developer accepted (escalated or regressed).
+	FollowUps []review.Finding `json:"follow_ups,omitempty"`
+	Done      bool             `json:"done,omitempty"`
 }
 
 // Checkpoint records one completed step for the audit trail.
@@ -117,9 +176,19 @@ type State struct {
 	ReviewNote string `json:"review_note,omitempty"`
 	// Pending is the step a question interrupted when nobody could answer
 	// it. --resume answers it first and continues that same step.
-	Pending     *Pending     `json:"pending,omitempty"`
-	Checkpoints []Checkpoint `json:"checkpoints"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	Pending *Pending `json:"pending,omitempty"`
+	// Baseline lists the tests that already failed before the loop began.
+	// Nil when the runner cannot name failures, or for an upgraded state.
+	Baseline *Baseline `json:"baseline,omitempty"`
+	// Surfaces are files outside the approved plan that the developer
+	// accepted for this specification.
+	Surfaces []string `json:"surfaces,omitempty"`
+	// Refused maps each file outside the plan the developer refused to its
+	// fingerprint before the agent changed it ("" when it matched the last
+	// commit): the agent has to put it back.
+	Refused     map[string]string `json:"refused,omitempty"`
+	Checkpoints []Checkpoint      `json:"checkpoints"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // NewState starts a loop at RED of the first scenario not yet done.
@@ -161,10 +230,23 @@ func (s *State) Carry(old *State, now time.Time) []string {
 		pending = append(pending, s.Scenarios[i].Title)
 	}
 	s.Checkpoints = append(old.Checkpoints, s.Checkpoints...)
+	s.Baseline = old.Baseline
+	s.Surfaces, s.Refused = old.Surfaces, old.Refused
 	s.Current = -1
 	s.seek()
 	s.UpdatedAt = now
 	return pending
+}
+
+// Upgrade brings a state written by an older SpecForge to StateVersion.
+// The newer fields start empty (no baseline): nothing is invented. It
+// reports false for a state it cannot read.
+func (s *State) Upgrade() bool {
+	if s.Version < oldestUpgradable || s.Version > StateVersion {
+		return false
+	}
+	s.Version = StateVersion
+	return true
 }
 
 // Done reports whether every scenario went through the loop.
@@ -194,7 +276,7 @@ func (s *State) Advance(now time.Time) {
 	case PhaseGreen:
 		s.Phase = PhaseRefactor
 		s.LastFailure = ""
-	case PhaseRefactor:
+	case PhaseRefactor, PhaseReview:
 		s.nextScenario()
 	}
 	s.UpdatedAt = now
@@ -225,6 +307,19 @@ func (s *State) SendBack(phase Phase, note string, now time.Time) {
 	if phase == PhaseRed {
 		s.TestHashes = nil
 	}
+	if !s.Done() {
+		// A changed scenario is reviewed and verified again.
+		s.Scenarios[s.Current].Review, s.Scenarios[s.Current].Verify = nil, nil
+	}
+	s.UpdatedAt = now
+}
+
+// Reopen returns a corrected scenario to REFACTOR, keeping its review, so
+// the suite and the gates judge the correction before it is validated.
+func (s *State) Reopen(now time.Time) {
+	s.Phase = PhaseRefactor
+	s.Attempts = 0
+	s.Pending = nil
 	s.UpdatedAt = now
 }
 
@@ -236,15 +331,19 @@ func (s *State) Jump(index int, phase Phase, now time.Time) error {
 		return fmt.Errorf("there is no scenario %d (the specification has %d)", index, len(s.Scenarios))
 	}
 	switch phase {
-	case PhaseRed, PhaseGreen, PhaseRefactor:
+	case PhaseRed, PhaseGreen, PhaseRefactor, PhaseReview:
 	default:
-		return fmt.Errorf("cannot start a scenario at %q: use red, green or refactor", phase)
+		return fmt.Errorf("cannot start a scenario at %q: use red, green, refactor or review", phase)
 	}
 	s.Current = index - 1
 	s.Scenarios[s.Current].Done = false
 	s.Scenarios[s.Current].Satisfied = false
 	s.Scenarios[s.Current].Commit = ""
 	s.Scenarios[s.Current].Files = nil
+	s.Scenarios[s.Current].Risk = nil
+	s.Scenarios[s.Current].Review = nil
+	s.Scenarios[s.Current].Verify = nil
+	s.Scenarios[s.Current].RaisedTo, s.Scenarios[s.Current].RaisedWhy = "", ""
 	s.Phase = phase
 	s.Attempts = 0
 	s.Pending = nil
@@ -281,6 +380,59 @@ func (s *State) seek() {
 	s.Phase = PhaseCompleted
 }
 
+// Raise records the agent's request for more scrutiny of the current
+// scenario. Only a stricter tier than the one already requested counts.
+func (s *State) Raise(to risk.Tier, why string) bool {
+	if s.Done() || !to.AtLeast(risk.Medium) {
+		return false
+	}
+	sc := &s.Scenarios[s.Current]
+	if sc.RaisedTo != "" && sc.RaisedTo.AtLeast(to) {
+		return false
+	}
+	sc.RaisedTo, sc.RaisedWhy = to, why
+	return true
+}
+
+// Accept adds files outside the plan the developer accepted.
+func (s *State) Accept(paths ...string) {
+	for _, p := range paths {
+		if !slices.Contains(s.Surfaces, p) {
+			s.Surfaces = append(s.Surfaces, p)
+		}
+		delete(s.Refused, p)
+	}
+	slices.Sort(s.Surfaces)
+}
+
+// Refuse records a file outside the plan the developer refused, with its
+// fingerprint before the change. A file refused twice keeps the first one:
+// that is the content to go back to.
+func (s *State) Refuse(path, before string) {
+	if s.Refused == nil {
+		s.Refused = map[string]string{}
+	}
+	if _, ok := s.Refused[path]; !ok {
+		s.Refused[path] = before
+	}
+}
+
+// Unreverted checks the refused files against now (the fingerprints of the
+// files that differ from the last commit): those back to their content
+// leave the list; the others are returned, sorted.
+func (s *State) Unreverted(now map[string]string) []string {
+	var out []string
+	for p, before := range s.Refused {
+		if now[p] == before {
+			delete(s.Refused, p)
+			continue
+		}
+		out = append(out, p)
+	}
+	slices.Sort(out)
+	return out
+}
+
 // Fail records a failed attempt in the current phase.
 func (s *State) Fail(output string, now time.Time) {
 	s.Attempts++
@@ -304,6 +456,20 @@ func (s *State) AddFiles(paths ...string) {
 }
 
 // Record appends a checkpoint for the current scenario and phase.
+// Adopt takes over scenario i as another state left it (a scenario run on
+// its own, in a sandbox): everything it learned and its checkpoints, but
+// not done nor committed until this state closes it.
+func (s *State) Adopt(other *State, i int) {
+	ref := other.Scenarios[i]
+	ref.Done, ref.Commit = false, ""
+	s.Scenarios[i] = ref
+	for _, c := range other.Checkpoints {
+		if c.Scenario == ref.Index {
+			s.Checkpoints = append(s.Checkpoints, c)
+		}
+	}
+}
+
 func (s *State) Record(step, status, details string, now time.Time) {
 	s.Checkpoints = append(s.Checkpoints, Checkpoint{
 		At:       now,

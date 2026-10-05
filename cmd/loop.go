@@ -9,11 +9,15 @@ import (
 
 	"specforge/internal/adapters/fsys"
 	"specforge/internal/adapters/gates"
+	"specforge/internal/adapters/scratch"
 	"specforge/internal/adapters/testrun"
 	"specforge/internal/adapters/vcs"
 	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/guardhook"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/app/verifier"
 	"specforge/internal/config"
 	"specforge/internal/domain/legacy"
 	"specforge/internal/domain/tdd"
@@ -37,6 +41,13 @@ func (a *App) loopCommand() *cobra.Command {
   GREEN     the agent writes the code; the test files are fingerprinted and may
             not change; the scenario's test must pass
   REFACTOR  the whole suite and the quality gates of the stack must pass
+  REVIEW    review lenses read the scenario's diff (none for a passive change,
+            one for a medium one, four for a high one); every finding must
+            point at a changed line; what blocks gets one correction, judged
+            again by REFACTOR and validated on those findings only
+  VERIFY    for high-risk scenarios (verify: high), an independent verifier
+            probes the specification in a copy of the project and must give
+            a verdict, with the command and its output, for every invariant
 
 The agent may answer with a question instead of guessing: you answer it at
 the terminal and it is recorded in specs/NNNN-slug/decisions.md. Without a
@@ -81,15 +92,20 @@ The state is saved after every step: --resume continues where it stopped.`,
 			con := a.console()
 			files := fsys.OS{}
 			events := &ui.LoopEvents{C: con, Agent: ag.Name(), Stack: profile.Name()}
+			ws := workspace.New(proc)
+			sandboxes := scratch.New(proc, p.settings.VerifyMaxBytes)
 			svc := tddloop.New(tddloop.Deps{
 				Agent: ag,
 				Tests: testrun.New(proc),
 				Gates: append(gates.ForProfile(profile, proc, p.settings.Quality),
 					&gates.Migration{Target: legacy.Target{JavaRelease: p.settings.Migration.JavaRelease, ForbiddenImports: p.settings.Migration.ForbiddenImports}}),
-				Workspace: workspace.New(proc),
+				Workspace: ws,
 				Files:     files,
 				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
 				VCS:       vcs.New(proc),
+				Reviewer:  reviewer.New(reviewer.Deps{Agent: ag, Workspace: ws, Events: events}),
+				Verifier:  verifier.New(verifier.Deps{Agent: ag, Proc: proc, Scratch: sandboxes, Workspace: ws, Files: files, Events: events}),
+				Scratch:   sandboxes,
 				Events:    events,
 				Log:       a.log,
 				Now:       a.Now,
@@ -108,8 +124,18 @@ The state is saved after every step: --resume continues where it stopped.`,
 				MaxAttempts:  p.settings.MaxAttempts,
 				AgentTimeout: p.settings.AgentTimeout,
 				TestTimeout:  p.settings.TestTimeout,
-				Model:        p.settings.Model,
-				Strict:       p.settings.Quality.Strict,
+				Models:       p.settings.ModelChoice(),
+				Risk:         p.settings.Risk,
+				MutationFrom: p.settings.MutationFrom,
+				Surfaces:     p.settings.Surfaces,
+				LensesAuto:   p.settings.LensesAuto,
+				Lenses:       p.settings.Lenses,
+				Verify:       p.settings.Verify,
+				Blind:        p.settings.BlindReview,
+				Parallel:     p.settings.Parallel,
+				// The agents the loop runs cannot answer the guard's questions.
+				AgentEnv: []string{guardhook.LoopEnv + "=1"},
+				Strict:   p.settings.Quality.Strict,
 
 				Legacy:           legacyDir,
 				JavaRelease:      p.settings.Migration.JavaRelease,
@@ -127,7 +153,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 	f.BoolVar(&o.Strict, "strict", false, "a quality gate that cannot run blocks instead of warning")
 	f.IntVar(&scenario, "scenario", 0, "redo this scenario number (keeps the others)")
 	f.StringVar(&from, "from", "", "with --scenario: start at red | green | refactor (default red)")
-	f.StringVar(&o.Review, "review", "", "scenario: review each finished scenario | off (default: specforge.yaml, else scenario)")
+	f.StringVar(&o.Review, "review", "", "scenario: review every finished scenario | risk: only medium and high risk | off (default: specforge.yaml, else scenario)")
 	f.BoolVar(&o.NoCommit, "no-commit", false, "do not record each finished scenario as a commit")
 	return c
 }

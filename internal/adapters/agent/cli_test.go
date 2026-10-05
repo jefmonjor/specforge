@@ -51,22 +51,34 @@ func TestRunSendsThePromptThroughStdinNeverArgv(t *testing.T) {
 }
 
 func TestHeadlessFlagsAllowEditsAndModel(t *testing.T) {
-	claude := Claude.Headless("opus", nil)
+	claude := Claude.Headless(ports.AgentRequest{Model: "opus"})
 	if !slices.Contains(claude, "acceptEdits") || !slices.Contains(claude, "--model") || !slices.Contains(claude, "opus") || slices.Contains(claude, "--add-dir") {
 		t.Errorf("claude args = %v", claude)
 	}
-	gemini := Gemini.Headless("", nil)
+	gemini := Gemini.Headless(ports.AgentRequest{})
 	if !slices.Contains(gemini, "auto_edit") || slices.Contains(gemini, "-m") || slices.Contains(gemini, "--include-directories") {
 		t.Errorf("gemini args = %v", gemini)
 	}
 }
 
+func TestHeadlessCommandsOnlyWhenAsked(t *testing.T) {
+	if claude := Claude.Headless(ports.AgentRequest{}); slices.Contains(claude, "--allowedTools") {
+		t.Errorf("claude pre-approves tools by default: %v", claude)
+	}
+	if claude := Claude.Headless(ports.AgentRequest{Commands: true}); !slices.Contains(claude, "Bash") || !slices.Contains(claude, "acceptEdits") {
+		t.Errorf("claude commands args = %v", claude)
+	}
+	if gemini := Gemini.Headless(ports.AgentRequest{Commands: true}); !slices.Contains(gemini, "yolo") {
+		t.Errorf("gemini commands args = %v", gemini)
+	}
+}
+
 func TestHeadlessReadDirs(t *testing.T) {
-	claude := Claude.Headless("", []string{"/legacy/a", "/legacy/b"})
+	claude := Claude.Headless(ports.AgentRequest{ReadDirs: []string{"/legacy/a", "/legacy/b"}})
 	if got := strings.Join(claude[len(claude)-4:], " "); got != "--add-dir /legacy/a --add-dir /legacy/b" {
 		t.Errorf("claude args = %v", claude)
 	}
-	gemini := Gemini.Headless("", []string{"/legacy/a", "/legacy/b"})
+	gemini := Gemini.Headless(ports.AgentRequest{ReadDirs: []string{"/legacy/a", "/legacy/b"}})
 	if got := strings.Join(gemini[len(gemini)-2:], " "); got != "--include-directories /legacy/a,/legacy/b" {
 		t.Errorf("gemini args = %v", gemini)
 	}
@@ -77,6 +89,14 @@ func TestRunReportsNonZeroExit(t *testing.T) {
 	_, err := New(Claude, proc, logging.Discard()).Run(context.Background(), ports.AgentRequest{})
 	if err == nil || !strings.Contains(err.Error(), "quota exceeded") {
 		t.Fatalf("want exit error with stderr, got %v", err)
+	}
+}
+
+func TestRunReportsStdoutWhenStderrIsEmpty(t *testing.T) {
+	proc := &fakeProc{result: ports.CommandResult{ExitCode: 1, Stdout: "You've hit your usage limit"}}
+	_, err := New(Claude, proc, logging.Discard()).Run(context.Background(), ports.AgentRequest{})
+	if err == nil || !strings.Contains(err.Error(), "usage limit") {
+		t.Fatalf("the reason on stdout is reported: %v", err)
 	}
 }
 

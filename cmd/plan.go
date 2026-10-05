@@ -92,7 +92,7 @@ When plan.md exists the loop requires it approved and follows it.`,
 				Log:    a.log,
 			}, planning.Options{
 				Root: p.root, SpecPath: entry.Path, SpecID: entry.ID, Doc: doc, SpecText: string(text),
-				Profile: prof, Language: p.settings.Language, Model: p.settings.Model,
+				Profile: prof, Language: p.settings.Language, Model: p.settings.ModelFor("plan"),
 				AgentTimeout: p.settings.AgentTimeout, MaxAttempts: p.settings.MaxAttempts,
 				Legacy: legacyDir, JavaRelease: p.settings.Migration.JavaRelease, ForbiddenImports: p.settings.Migration.ForbiddenImports,
 			})
@@ -147,6 +147,7 @@ accepts the change.`,
 			} else {
 				con.OK(con.T("plan.approved", rel, approver, short(res.Hash)))
 			}
+			a.printAdvice(res.Advice)
 			con.Info(con.T("spec.next.approved", entry.ID))
 			return nil
 		},

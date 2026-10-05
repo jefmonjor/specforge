@@ -21,7 +21,7 @@ import (
 func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data prompts.Data) (protocol.Response, error) {
 	sc, _ := r.st.Scenario()
 	origin := s.origin(r, sc)
-	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Model, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
+	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Models.For(modelPhase(r.st.Phase)), Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
 		ReadDirs: docturn.Outside(r.o.Root, r.o.Legacy)}
 	touched, err := docturn.Watch(s.d.Workspace, req.ReadDirs)
 	if err != nil {
@@ -29,7 +29,10 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 	}
 	render := func(t conversation.Turn) (string, error) {
 		d := data
-		if t.Retry {
+		switch {
+		case t.MissingOptions:
+			d.Feedback = feedback(r.o.Language, RejectNoOptions)
+		case t.Retry:
 			d.Feedback = feedback(r.o.Language, RejectNoContract)
 		}
 		if t.Answer != "" {
@@ -47,7 +50,8 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 			return s.save(r)
 		},
 	}
-	resp, err := conversation.Talk(ctx, s.d.Agent, s.d.Asker, origin, r.o.MaxClarifications, req, render, hooks)
+	rules := conversation.Rules{MaxQuestions: r.o.MaxClarifications, RequireOptions: true}
+	resp, err := conversation.Talk(ctx, s.d.Agent, s.d.Asker, origin, rules, req, render, hooks)
 	// The legacy code is the reference: a turn that changed it is refused
 	// whatever else it did.
 	if changed, werr := touched(); werr != nil || len(changed) > 0 {
@@ -66,7 +70,16 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 	case resp.Status == protocol.Blocked:
 		return resp, &tdd.AgentBlockedError{Phase: r.st.Phase, Reason: resp.Reason, SuggestedAction: resp.SuggestedAction}
 	}
-	return resp, nil
+	return resp, s.raise(r, resp)
+}
+
+// modelPhase names the phase whose model an agent turn uses. The one
+// correction of a review is a GREEN turn: it writes production code.
+func modelPhase(p tdd.Phase) string {
+	if p == tdd.PhaseReview {
+		return "green"
+	}
+	return strings.ToLower(string(p))
 }
 
 // Phases of the questions SpecForge asks itself, as opposed to those the
@@ -75,7 +88,11 @@ func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data 
 const (
 	OriginReview = "REVIEW"
 	OriginVerify = "VERIFY"
+	OriginRisk   = "RISK"
 )
+
+// ProcessOrigins are the phases of SpecForge's own questions.
+var ProcessOrigins = []string{OriginReview, OriginVerify, OriginRisk}
 
 func (s *Service) origin(r *run, sc tdd.ScenarioRef) clarify.Origin {
 	return s.originAs(r, sc, string(r.st.Phase))

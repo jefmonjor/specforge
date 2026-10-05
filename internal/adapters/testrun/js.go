@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"specforge/internal/domain/tdd"
@@ -56,13 +57,14 @@ func (r *Runner) jsonJS(ctx context.Context, req ports.TestRequest, base []strin
 		// The runner crashed before writing a report: config or syntax error.
 		return tdd.Outcome{Compiled: false, Exact: true, Output: clip(res.Combined())}, nil
 	}
-	return parseJestReport(data), nil
+	return parseJestReport(data, req.Root), nil
 }
 
 // parseJestReport converts a Jest/Vitest JSON report. A test file that
 // failed with a message and no assertion results could not be loaded
-// (syntax, type or import error): the tests did not compile.
-func parseJestReport(data []byte) tdd.Outcome {
+// (syntax, type or import error): the tests did not compile. Failing tests
+// are named by their file, relative to root, and their full name.
+func parseJestReport(data []byte, root string) tdd.Outcome {
 	var rep jestReport
 	if err := json.Unmarshal(data, &rep); err != nil {
 		return tdd.Outcome{Compiled: false, Exact: false, Output: "unreadable test report: " + err.Error()}
@@ -81,6 +83,7 @@ func parseJestReport(data []byte) tdd.Outcome {
 				o.Passed++
 			case "failed":
 				o.Failed++
+				o.Failures = append(o.Failures, tdd.TestRef{Suite: relTo(root, file.Name), Name: a.FullName})
 				out.WriteString(a.FullName + "\n" + strings.Join(a.FailureMessages, "\n") + "\n\n")
 			default:
 				o.Skipped++
@@ -89,6 +92,19 @@ func parseJestReport(data []byte) tdd.Outcome {
 	}
 	o.Output = clip(out.String())
 	return o
+}
+
+// relTo returns path relative to root with forward slashes, or path as it
+// is when it is not under root.
+func relTo(root, path string) string {
+	if root == "" {
+		return filepath.ToSlash(path)
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return filepath.ToSlash(path)
+	}
+	return filepath.ToSlash(rel)
 }
 
 // npm runs `npm test` for projects without Jest or Vitest. Without a report

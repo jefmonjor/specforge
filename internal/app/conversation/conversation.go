@@ -18,13 +18,36 @@ import (
 // ErrTooManyQuestions: the agent keeps asking within one turn.
 var ErrTooManyQuestions = errors.New("the agent asked too many questions in a single step; the specification probably needs clarification")
 
+// ErrNoOptions: the agent asked an open question where it had to derive
+// the candidate answers itself. It is a broken contract.
+var ErrNoOptions = fmt.Errorf("%w: a question without options where options are required", protocol.ErrNoContract)
+
+// MinOptions is how many candidate answers a question must offer when
+// options are required: one option is not a choice.
+const MinOptions = 2
+
 // DefaultMaxQuestions bounds the questions of one turn.
 const DefaultMaxQuestions = 5
 
+// Rules bound a turn.
+type Rules struct {
+	// MaxQuestions bounds the questions of the turn (DefaultMaxQuestions
+	// when zero).
+	MaxQuestions int
+	// RequireOptions refuses a question without at least MinOptions
+	// options: about files, commands or technical alternatives, the agent
+	// derives the candidates and the developer picks. The interview, whose
+	// questions are about the business, leaves it off.
+	RequireOptions bool
+}
+
 // Turn tells the prompt renderer what happened so far in this turn.
 type Turn struct {
-	// Retry is true after an answer without the closing JSON.
+	// Retry is true after an answer that broke the contract.
 	Retry bool
+	// MissingOptions is true when that answer was a question without the
+	// options the rules require.
+	MissingOptions bool
 	// Question and Answer are set after the developer answered.
 	Question, Answer string
 }
@@ -42,8 +65,9 @@ type Hooks struct {
 // carries everything but the prompt. A blocked agent is returned as a
 // response with Status Blocked and a nil error; a question nobody can
 // answer now returns the response with a *clarify.PendingQuestionError.
-func Talk(ctx context.Context, agent ports.Agent, asker *clarify.Asker, origin clarify.Origin, maxQuestions int,
+func Talk(ctx context.Context, agent ports.Agent, asker *clarify.Asker, origin clarify.Origin, rules Rules,
 	req ports.AgentRequest, render func(Turn) (string, error), h Hooks) (protocol.Response, error) {
+	maxQuestions := rules.MaxQuestions
 	if maxQuestions <= 0 {
 		maxQuestions = DefaultMaxQuestions
 	}
@@ -64,17 +88,21 @@ func Talk(ctx context.Context, agent ports.Agent, asker *clarify.Asker, origin c
 		}
 
 		resp, err := protocol.Parse(out)
-		if err != nil {
+		missing := err == nil && rules.RequireOptions && resp.Status == protocol.NeedsClarification && len(resp.Options) < MinOptions
+		if err != nil || missing {
 			if turn.Retry {
+				if missing {
+					return resp, ErrNoOptions
+				}
 				return protocol.Response{}, err
 			}
-			turn.Retry = true
+			turn.Retry, turn.MissingOptions = true, missing
 			if h.Retried != nil {
 				h.Retried()
 			}
 			continue
 		}
-		turn.Retry = false
+		turn.Retry, turn.MissingOptions = false, false
 
 		switch resp.Status {
 		case protocol.Done, protocol.Blocked:

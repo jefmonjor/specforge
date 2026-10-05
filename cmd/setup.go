@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"specforge/internal/adapters/fsys"
+	"specforge/internal/adapters/process"
 	"specforge/internal/app/scaffold"
 	"specforge/internal/app/setup"
 	"specforge/internal/config"
@@ -19,15 +20,18 @@ func (a *App) setupCommand() *cobra.Command {
 		agents              []string
 		newKind, name, prev string
 		javaRelease         int
+		noGuard             bool
 	)
 	c := &cobra.Command{
 		Use:   "setup",
 		Short: "Prepare this repository (your code is never touched)",
-		Long: `setup writes three things and nothing else:
+		Long: `setup writes these files and nothing else:
 
   specforge.yaml        project settings, shared by the team (kept if it exists)
   CLAUDE.md/GEMINI.md   a managed block with the working rules and the coding
                         standard of your stack; the rest of the file is yours
+  .claude/settings.json the destructive-command guard as a pre-tool hook (or
+  .gemini/settings.json for Gemini CLI); the rest of the file is kept
   .gitignore            adds .specforge/, SpecForge's local working state
 
 Running it again only refreshes the managed block.
@@ -88,7 +92,12 @@ gets the migration section (see specforge legacy).`,
 				prof = &chosen
 			}
 
-			changes, err := setup.Run(fsys.OS{}, setup.Options{Layout: p.layout, Language: p.settings.Language, Agents: agents, Stack: prof, Legacy: filepath.ToSlash(prev), JavaRelease: javaRelease})
+			guardBinary := ""
+			if p.settings.GuardMode != "off" && !noGuard {
+				guardBinary = selfBinary()
+			}
+			changes, err := setup.Run(fsys.OS{}, setup.Options{Layout: p.layout, Language: p.settings.Language, Agents: agents, Stack: prof,
+				Legacy: filepath.ToSlash(prev), JavaRelease: javaRelease, GuardBinary: guardBinary})
 			for _, ch := range changes {
 				line := con.T("setup."+string(ch.Action)) + " · " + ch.Path
 				if ch.Action == setup.Unchanged {
@@ -118,5 +127,18 @@ gets the migration section (see specforge legacy).`,
 	c.Flags().StringVar(&name, "name", "", "with --new: the project name (default: the directory name)")
 	c.Flags().StringVar(&prev, "legacy", "", "the legacy repository this project rewrites (written to specforge.yaml)")
 	c.Flags().IntVar(&javaRelease, "java-release", 0, "with --legacy: the Java release the rewrite targets (default 21 with --new java)")
+	c.Flags().BoolVar(&noGuard, "no-guard", false, "do not install the destructive-command guard hook")
 	return c
+}
+
+// selfBinary is how the agents' hooks call SpecForge: by name when it is on
+// PATH, else by its absolute path.
+func selfBinary() string {
+	if path, err := process.Resolve("specforge"); err == nil && path != "" {
+		return "specforge"
+	}
+	if exe, err := os.Executable(); err == nil {
+		return exe
+	}
+	return "specforge"
 }

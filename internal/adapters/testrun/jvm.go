@@ -64,15 +64,14 @@ func jvmOutcome(res ports.CommandResult, compileMarkers []string, reports []stri
 			return tdd.Outcome{Compiled: false, Exact: true, Output: clip(combined)}
 		}
 	}
-	passed, failed, skipped, out, ok := junitTotals(reports)
+	o, ok := junitOutcome(reports)
 	if !ok {
 		// No report: the build failed before tests ran, or the filter
 		// matched nothing. Trust only what the exit code says.
-		o := tdd.Outcome{Compiled: true, Exact: false, Output: clip(combined)}
+		o = tdd.Outcome{Compiled: true, Exact: false, Output: clip(combined)}
 		if !res.Success() {
 			o.Failed = 1
 		}
-		return o
 	}
-	return tdd.Outcome{Compiled: true, Exact: true, Passed: passed, Failed: failed, Skipped: skipped, Output: clip(out)}
+	return o
 }

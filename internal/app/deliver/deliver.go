@@ -6,6 +6,7 @@
 package deliver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -16,14 +17,19 @@ import (
 
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/layout"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/app/verifier"
+	"specforge/internal/domain/change"
 	"specforge/internal/domain/delivery"
 	"specforge/internal/domain/e2e"
 	"specforge/internal/domain/lessons"
+	"specforge/internal/domain/review"
 	"specforge/internal/domain/security"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
 	"specforge/internal/domain/tdd"
+	"specforge/internal/domain/verification"
 	"specforge/internal/ports"
 )
 
@@ -33,13 +39,19 @@ type Options struct {
 	// Profile tells test files apart; nil when the project has no stack yet.
 	Profile *stack.Profile
 	Now     time.Time
+	// Budget is the size of a reviewable pull request in authored lines;
+	// zero proposes no slices.
+	Budget int
+	// SliceBodies also writes PR_BODY-1.md … PR_BODY-n.md, one per slice.
+	SliceBodies bool
 }
 
 var outOfScope = regexp.MustCompile(`(?i)out of scope|fuera de alcance`)
 
 // Build assembles the trace. The specification must be approved: a
-// delivery of something nobody approved would describe nothing.
-func Build(files ports.Files, o Options) (delivery.Trace, error) {
+// delivery of something nobody approved would describe nothing. measure
+// counts each scenario commit's lines; nil skips sizes and slices.
+func Build(ctx context.Context, files ports.Files, measure ports.Measurer, o Options) (delivery.Trace, error) {
 	lay := layout.Layout{Root: o.Root}
 	data, err := files.ReadFile(o.SpecPath)
 	if err != nil {
@@ -70,6 +82,7 @@ func Build(files ports.Files, o Options) (delivery.Trace, error) {
 	}
 
 	st := readState(files, lay.State(o.SpecPath))
+	t.Baseline = baselineOf(st)
 	for _, sc := range doc.Scenarios {
 		t.Scenarios = append(t.Scenarios, scenario(files, lay, o, id, sc, st))
 	}
@@ -80,7 +93,7 @@ func Build(files ports.Files, o Options) (delivery.Trace, error) {
 			answered[e.Question] = e.Answer != ""
 			// Reviews and verification checks are process, already shown
 			// per scenario; the decisions are the product answers.
-			if e.Answer != "" && e.Phase != tddloop.OriginReview && e.Phase != tddloop.OriginVerify {
+			if e.Answer != "" && !slices.Contains(tddloop.ProcessOrigins, e.Phase) {
 				t.Decisions = append(t.Decisions, e.Question+" → "+e.Answer)
 			}
 		}
@@ -102,7 +115,34 @@ func Build(files ports.Files, o Options) (delivery.Trace, error) {
 		}
 	}
 	t.Checks = checks(files, o, lay)
+	if err := size(ctx, measure, o, &t); err != nil {
+		return t, err
+	}
 	return t, nil
+}
+
+// size measures the authored lines of each scenario's commit and, over the
+// budget, proposes slices.
+func size(ctx context.Context, measure ports.Measurer, o Options, t *delivery.Trace) error {
+	if measure == nil {
+		return nil
+	}
+	for i := range t.Scenarios {
+		sc := &t.Scenarios[i]
+		if sc.Commit == "" {
+			continue
+		}
+		files, err := measure.CommitChanges(ctx, o.Root, sc.Commit)
+		if err != nil {
+			return fmt.Errorf("measuring the commit of scenario %d (%s): %w", sc.Index, sc.Commit, err)
+		}
+		sc.Lines = change.Total(change.Authored(files))
+	}
+	t.Budget = o.Budget
+	if t.OverBudget() {
+		t.Slices = delivery.Slices(t.Scenarios, t.Budget)
+	}
+	return nil
 }
 
 func approvalOf(path, content string) delivery.Approval {
@@ -131,6 +171,17 @@ func readState(files ports.Files, path string) *tdd.State {
 	return &st
 }
 
+func baselineOf(st *tdd.State) *delivery.Baseline {
+	if st == nil || st.Baseline == nil {
+		return nil
+	}
+	b := &delivery.Baseline{At: st.Baseline.At, Command: st.Baseline.Command, Failures: []string{}}
+	for _, f := range st.Baseline.Failures {
+		b.Failures = append(b.Failures, f.String())
+	}
+	return b
+}
+
 // scenario traces one scenario. The loop state is matched by content
 // fingerprint, so progress recorded for an older version of a changed
 // scenario never counts.
@@ -155,6 +206,17 @@ func scenario(files ports.Files, lay layout.Layout, o Options, id string, sc spe
 		out.Status = delivery.Done
 	}
 	out.Files, out.Commit = ref.Files, ref.Commit
+	if a := ref.Risk; a != nil {
+		out.Risk = &delivery.Risk{Tier: string(a.Tier), Lines: a.Lines, Reasons: a.Reasons}
+	}
+	if v := ref.Verify; v != nil {
+		out.Verify = verificationOf(v.Report, v.Skipped)
+		out.Verify.Corrected, out.Verify.FollowUps, out.Verify.Tests = v.Corrected, v.FollowUps, v.Tests
+		out.Verify.Open = nil // corrected or accepted in the loop
+	}
+	if rec := ref.Review; rec != nil && len(rec.Lenses) > 0 {
+		out.Review = reviewOf(rec.Lenses, rec.Reported, len(rec.Corrected), rec.Verdict, rec.FollowUps, nil)
+	}
 	for _, f := range ref.Files {
 		if o.Profile != nil && !o.Profile.IsTestFile(f) {
 			continue
@@ -207,8 +269,66 @@ func testNames(files ports.Files, path, marker string) []string {
 	return names
 }
 
+// verificationOf summarises a verifier's report.
+func verificationOf(r verification.Report, skipped string) *delivery.Verification {
+	v := &delivery.Verification{Met: r.Count(verification.Met), Unmet: r.Count(verification.Unmet), Unverified: r.Count(verification.Unverified), Skipped: skipped}
+	for _, b := range r.Blockers {
+		v.Open = append(v.Open, fmt.Sprintf("%s · `%s` → `%s` (expected %s)", b.ID, b.Command, b.Observed, b.Expected))
+	}
+	return v
+}
+
+// featureVerification reads the verification of the whole specification.
+func featureVerification(files ports.Files, path string) *delivery.Verification {
+	data, err := files.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var res verifier.Result
+	if json.Unmarshal(data, &res) != nil {
+		return nil
+	}
+	return verificationOf(res.Report, res.Skipped)
+}
+
+// reviewOf summarises a review for the delivery.
+func reviewOf(lenses []review.Lens, reported, corrected int, v review.Verdict, followUps, open []review.Finding) *delivery.Review {
+	r := &delivery.Review{Reported: reported, Corrected: corrected, Discarded: len(v.Discarded)}
+	for _, l := range lenses {
+		r.Lenses = append(r.Lenses, string(l))
+	}
+	for _, f := range followUps {
+		r.FollowUps = append(r.FollowUps, findingLine(f))
+	}
+	for _, f := range open {
+		r.Open = append(r.Open, findingLine(f))
+	}
+	return r
+}
+
+func findingLine(f review.Finding) string {
+	return fmt.Sprintf("%s · `%s:%d` · %s", f.ID, f.Location.Path, f.Location.Line, f.Claim)
+}
+
+// branchReview reads the report of `specforge review` for the
+// specification, when there is one.
+func branchReview(files ports.Files, path string) *delivery.Review {
+	data, err := files.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var r reviewer.BranchResult
+	if json.Unmarshal(data, &r) != nil {
+		return nil
+	}
+	v := r.Verdict
+	return reviewOf(r.Lenses, r.Reported, 0, v, v.FollowUps, append(slices.Clone(v.Blocking), v.Escalated...))
+}
+
 func checks(files ports.Files, o Options, lay layout.Layout) delivery.Checks {
 	var c delivery.Checks
+	c.BranchReview = branchReview(files, lay.BranchReview(o.SpecPath))
+	c.Verify = featureVerification(files, lay.FeatureVerify(o.SpecPath))
 	if data, err := files.ReadFile(filepath.Join(o.Root, "docs", "security", "findings.json")); err == nil {
 		var r security.Report
 		if json.Unmarshal(data, &r) == nil {
@@ -260,8 +380,16 @@ func Write(files ports.Files, o Options, t delivery.Trace) ([]string, error) {
 		filepath.Join(dir, "trace.json"):  append(trace, '\n'),
 		filepath.Join(dir, "PR_BODY.md"):  []byte(t.PRBody(o.Language, template)),
 	}
+	names := []string{"DELIVERY.md", "trace.json", "PR_BODY.md"}
+	if o.SliceBodies {
+		for _, sl := range t.Slices {
+			name := fmt.Sprintf("PR_BODY-%d.md", sl.N)
+			out[filepath.Join(dir, name)] = []byte(t.Sub(sl).PRBody(o.Language, template))
+			names = append(names, name)
+		}
+	}
 	var paths []string
-	for _, name := range []string{"DELIVERY.md", "trace.json", "PR_BODY.md"} {
+	for _, name := range names {
 		p := filepath.Join(dir, name)
 		if err := files.WriteFile(p, out[p]); err != nil {
 			return paths, fmt.Errorf("writing %s: %w", name, err)

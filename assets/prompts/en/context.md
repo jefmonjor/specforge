@@ -12,6 +12,12 @@ This is a rewrite: the behaviour comes from the legacy code at `{{.Legacy}}`, an
 ## Approved technical plan (follow it; ask before departing from it)
 {{.Plan}}
 {{end}}
+{{- if .Surfaces}}
+## Allowed edit surfaces
+Change only these files (a path ending in `/` allows everything under it). SpecForge checks every file you change; anything else goes to the developer, who may refuse it. If the task needs another file, ask.
+{{range .Surfaces}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Glossary}}
 ## Ubiquitous language (use these names in code)
 {{.Glossary}}
@@ -24,6 +30,12 @@ This is a rewrite: the behaviour comes from the legacy code at `{{.Legacy}}`, an
 ## Decisions already taken by the developer (do not ask again)
 {{.Decisions}}
 {{end}}
+{{- if .Known}}
+## Known failures on this branch (not yours to fix)
+These tests already failed before this loop started. Do not try to fix them, do not delete or skip them; SpecForge does not count them against you.
+{{range .Known}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Lessons}}
 ## Lessons from earlier scenarios
 {{.Lessons}}

@@ -1,5 +1,7 @@
 # SpecForge 6 · Plan: proporcionalidad, revisión verificable y seguridad operativa
 
+> **Estado: ejecutado.** Los doce puntos están implementados y probados con Claude Code; el detalle de lo hecho y de lo que encontraron las pruebas reales está en [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) (Fase 6). Diferencias con este diseño: la guardia vive en `app/guardhook` sin puerto propio (es JSON sobre `ports.Files`); el puerto `VCS` se dividió en `DiffSource`, `Recorder` y `Measurer`; los escenarios en paralelo usan sandboxes (copias con su propio git) en lugar de `git worktree`, porque así incluyen el trabajo sin commit, y sus logs vuelven anexándose, nunca copiados; el verificador de un escenario responde por las invariantes que el escenario nombra, y `verify: feature` por todas.
+
 > Continúa [IMPROVEMENT_PLAN.md](IMPROVEMENT_PLAN.md) (Fases 0–5). Nace del análisis de [gentle-shell](https://github.com/Gentleman-Programming/gentle-shell) (v4.0.0, 4 de octubre de 2026): 803 ficheros, 64k líneas de TypeScript, 4.428 tests, prompts de orquestación muy trabajados y una revisión por lentes que vive en un binario Go externo. De ahí salen doce ideas. Este plan dice cómo integrarlas **sin perder lo que nos distingue**: SpecForge comprueba lo que la IA hace; no se fía de lo que dice.
 
 - [0. Principio rector y reglas del plan](#0-principio-rector-y-reglas-del-plan)

@@ -10,7 +10,6 @@
 package audit
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,9 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/santhosh-tekuri/jsonschema/v6"
-
 	"specforge/assets"
+	"specforge/internal/app/answer"
 	"specforge/internal/app/clarify"
 	"specforge/internal/domain/security"
 	"specforge/internal/jsontext"
@@ -56,7 +54,7 @@ type Options struct {
 // Deps are the collaborators of the audit.
 type Deps struct {
 	Agent  ports.Agent
-	VCS    ports.VCS
+	VCS    ports.DiffSource
 	Files  ports.Files
 	Lister func(root string) ([]string, error) // fallback when root is not a git repository
 	Asker  *clarify.Asker
@@ -128,7 +126,7 @@ func (nopEvents) Retried(string)            {}
 
 type method struct {
 	recon, hunting, validation, attackClasses string
-	schema                                    *jsonschema.Schema
+	schema                                    *answer.Schema
 }
 
 func loadMethod() (method, error) {
@@ -151,21 +149,8 @@ func loadMethod() (method, error) {
 	if m.attackClasses, err = read("ATTACK-CLASSES.md"); err != nil {
 		errs = append(errs, err)
 	}
-	schemaBytes, err := fs.ReadFile(assets.FS, "audit/report-schema.json")
-	if err != nil {
+	if m.schema, err = answer.Load("audit/report-schema.json"); err != nil {
 		errs = append(errs, err)
-	} else {
-		doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(schemaBytes))
-		if err != nil {
-			errs = append(errs, err)
-		} else {
-			c := jsonschema.NewCompiler()
-			if err := c.AddResource("report-schema.json", doc); err != nil {
-				errs = append(errs, err)
-			} else if m.schema, err = c.Compile("report-schema.json"); err != nil {
-				errs = append(errs, err)
-			}
-		}
 	}
 	return m, errors.Join(errs...)
 }
@@ -282,9 +267,8 @@ func (s *Service) step(ctx context.Context, o Options, name, prompt string, ok f
 	return nil, &StepError{Step: name, Output: excerpt(out)}
 }
 
-func validReport(schema *jsonschema.Schema, raw json.RawMessage) (*security.Report, bool) {
-	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
-	if err != nil || schema.Validate(inst) != nil {
+func validReport(schema *answer.Schema, raw json.RawMessage) (*security.Report, bool) {
+	if !schema.Valid(raw) {
 		return nil, false
 	}
 	var r security.Report

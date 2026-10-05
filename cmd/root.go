@@ -18,12 +18,15 @@ loop against an approved specification, and verifies every step itself.
   specforge init                     choose your agent and language (once)
   specforge setup                    prepare this repository
   specforge setup --new java         or start a new project (java, react, python, go)
+  specforge doctor                   check the agent, git, test runner and gate tools
   specforge spec new "<title>"       start a specification from the template
   specforge spec interview 0001      complete it with the agent
   specforge spec approve 0001        lint, record the approver and seal it
   specforge plan 0001                draft where the code goes; then plan approve
   specforge loop 0001                Red → Green → Refactor, review, one commit per scenario
   specforge deliver 0001             DELIVERY.md, trace.json and PR_BODY.md
+  specforge review                   the review lenses over your branch (read only)
+  specforge verify 0001              an independent check of the specification
   specforge audit                    adversarial security review of your branch
   specforge e2e 0001 --url <url>     verify the scenarios in a real browser
 
@@ -56,11 +59,15 @@ awaits your answer · 130 interrupted.`,
 	root.AddCommand(
 		a.initCommand(),
 		a.setupCommand(),
+		a.doctorCommand(),
 		a.specCommand(),
 		a.legacyCommand(),
 		a.planCommand(),
 		a.loopCommand(),
 		a.deliverCommand(),
+		a.reviewCommand(),
+		a.verifyCommand(),
+		a.guardCommand(),
 		a.auditCommand(),
 		a.e2eCommand(),
 		a.versionCommand(),

@@ -29,9 +29,12 @@
 
 - ✋ **It asks instead of guessing.** Every answer ends with a JSON contract: done, a question for you, or blocked.
 - 🔒 **Specs are sealed.** Edit an approved spec and the loop stops until you approve it again.
-- 🧪 **Real tests, real results.** A RED test must compile and fail; GREEN may not touch it.
+- 🧪 **Real tests, real results.** A RED test must compile and fail; GREEN may not touch it. Tests that were already broken are named, kept apart and never blamed on the agent.
+- ⚖️ **Review in proportion, every finding proved.** A change's risk comes from what git says it touched. Review lenses scale with it, and a finding that does not point at a changed line is discarded.
+- 🔍 **An independent verifier.** For risky work, a second agent probes the specification itself in a copy of your project, and every failure comes with the command that reproduces it.
+- 🛡 **A guard on the agent's shell.** `git reset --hard`, `rm -rf`, `DROP TABLE` and friends are blocked before they run.
 - 🏛 **Legacy rewrites without invention.** The old code is read-only and every source the agent cites is opened.
-- 📦 **Traceable hand-over.** Each scenario is linked to its test, its commit and its gates.
+- 📦 **Traceable hand-over.** Each scenario is linked to its test, its commit, its gates, its risk and its review.
 
 ## 🚀 Quickstart
 
@@ -78,6 +81,7 @@ specforge init
 ```bash
 cd my-project
 specforge setup
+specforge doctor
 specforge spec new "Password reset"
 specforge spec interview 0001
 specforge spec approve 0001
@@ -87,13 +91,14 @@ specforge loop 0001
 specforge deliver 0001
 ```
 
-- **`setup`** writes `specforge.yaml`, your stack's rules in `CLAUDE.md` or `GEMINI.md`, and `.specforge/` in `.gitignore`. Your code is never touched.
+- **`setup`** writes `specforge.yaml`, your stack's rules in `CLAUDE.md` or `GEMINI.md`, the destructive-command guard as your agent's hook, and `.specforge/` in `.gitignore`. Your code is never touched.
+- **`doctor`** checks the agent, git, your test runner and every gate's tool, and says how to install what is missing.
 - **`spec new`** creates `specs/0001-password-reset.md` from the template.
 - **`spec interview`** has the agent ask you one question at a time and write each answer into that file. You can also just edit it by hand.
 - **`spec approve`** refuses while a `TODO` or an open question is left, then records you as approver and seals the file.
 - **`plan`** has the agent write `plan.md`: where the code goes and one test per scenario. Edit it if you like, then **`plan approve`**.
-- **`loop`** runs Red → Green → Refactor for each scenario, then asks for your review and makes one commit per scenario.
-- **`deliver`** writes `DELIVERY.md`, `trace.json` and `PR_BODY.md` from what SpecForge recorded.
+- **`loop`** runs Red → Green → Refactor for each scenario, reviews it in proportion to its risk, then asks for your review and makes one commit per scenario.
+- **`deliver`** writes `DELIVERY.md`, `trace.json` and `PR_BODY.md` from what SpecForge recorded, and proposes stacked slices when the work is too big for one review.
 
 ### Three ways in
 
@@ -184,7 +189,9 @@ flowchart TD
     P --> R["🔴 RED<br/>a test that fails"]
     R --> G["🟢 GREEN<br/>minimum code"]
     G --> F["🔵 REFACTOR<br/>suite + quality gates"]
-    F --> V{"👀 your review"}
+    F --> L["🔎 REVIEW<br/>lenses by risk · verifier"]
+    L -- "one correction" --> F
+    L --> V{"👀 your review"}
     V -- "change it" --> G
     V -- "accept" --> C["commit<br/>feat(SDD_…)"]
     C -- "next scenario" --> R
@@ -199,7 +206,12 @@ For each stage, what SpecForge checks itself:
 | **Plan** | Only `plan.md` changed; every scenario has a planned test; you approved it. |
 | **🔴 Red** | A test named with the scenario's marker (`SDD_0001_003`) exists, compiles, runs and **fails on an assertion**. One that passes too early goes to you. |
 | **🟢 Green** | The tests are byte-for-byte as RED left them, and they pass. Failures are fed back, up to 3 attempts. |
-| **🔵 Refactor** | The whole suite passes and no quality gate blocks. A gate whose tool is missing shows ⚠ *skipped*, never ✓. |
+| **🔵 Refactor** | The whole suite passes, except tests that already failed before the loop (named from the runner's report), and no quality gate blocks. A gate whose tool is missing shows ⚠ *skipped*, never ✓. |
+| **⚖️ Risk** | Passive, medium or high, from the paths and lines git says the scenario touched. The agent can raise it with a reason, never lower it. |
+| **🔎 Review lenses** | None for a passive change, one for a medium one, four for a high one. Each lens is read-only and its JSON must validate; a finding whose proof is not a changed line is discarded; inferential ones go to a refuter. What blocks gets **one** correction, within a line budget, then a check of those findings only. |
+| **🔍 Verifier** | For high risk: a verdict for the scenario and every invariant it names, probed in a disposable copy of the project, the only place an agent may run commands without asking. Every failure comes with its command and output, and SpecForge runs the command again before believing it. Your project must stay untouched. |
+| **🗺️ Plan surfaces** | Every file the agent changes is in the approved plan, or you are asked. A refused file must be put back. |
+| **⏩ Side by side** | With `loop.parallel`, scenarios whose plan files do not overlap run at once, each in its own sandbox. Their work comes back in order, the whole suite runs over the combination, and each one still gets your review and its own commit. |
 | **👀 Review** | You accept, say what should change, or send it back to RED. Then one commit per scenario. |
 | **❓ Questions** | Asked at the terminal, or written to `questions.md` with exit code 5 in CI. Your answer is reused in every later prompt. |
 
@@ -216,7 +228,7 @@ Everything lives in your repository, next to your code (`0001-slug` stands for e
 - ❓ **Questions waiting for you** · `specs/0001-slug/questions.md`<br>
   Written when nobody was at a terminal. Replace `_awaiting an answer_` and run the same command again.
 - ⚙️ **Project settings** · `specforge.yaml`<br>
-  Stack, review, commits, timeouts, gate thresholds, migration.
+  Stack, review, commits, models per phase, risk rules, lenses, verifier, plan surfaces, delivery budget, parallel scenarios, the guard, gate thresholds, migration. `setup` writes it with every key commented.
 - 🤖 **Your agent's instructions** · `CLAUDE.md`, `GEMINI.md`<br>
   Write anything outside the SpecForge block; `setup` refreshes only the block.
 - 📚 **Lessons** · `specs/LESSONS.md`<br>
@@ -233,11 +245,14 @@ And in `specs/0001-slug/`:
 - `approvals.md`: every approval and what changed in it.
 - `decisions.md`: every question and answer, reused in later prompts.
 - `interview.jsonl`: the interview transcript.
+- `review/SDD_…json` and `verify/SDD_…json`: each scenario's lens review and verification, with every discarded finding and why.
 - `DELIVERY.md`, `trace.json`, `PR_BODY.md`: the hand-over, rewritten by each `deliver`.
+
+`setup` also adds the guard to `.claude/settings.json` or `.gemini/settings.json`, keeping the rest of the file.
 
 The loop state for `--resume` lives in `.specforge/`, which `setup` adds to `.gitignore`.
 
-**How do I…** change an approved spec, add a scenario, redo one, answer a question in CI? See the [recipes](USER_GUIDE.md#15-recipes).
+**How do I…** change an approved spec, add a scenario, redo one, answer a question in CI? See the [recipes](USER_GUIDE.md#18-recipes).
 
 ### Anatomy of a specification
 
@@ -262,7 +277,7 @@ Feature: Password reset
   newer link invalidate the old one?
 ````
 
-Each Gherkin scenario becomes one test, one RED → GREEN → REFACTOR and one commit. Keep it to **one behaviour per scenario**: one `When`, at least one `Then`, in business words. Every invariant deserves a scenario that tries to break it. Write what you do not know as `[NEEDS CLARIFICATION]`, and `spec clarify` asks you for each one. The [user guide](USER_GUIDE.md#5-specifications-spec) has the whole template and the lint rules.
+Each Gherkin scenario becomes one test, one RED → GREEN → REFACTOR and one commit. Keep it to **one behaviour per scenario**: one `When`, at least one `Then`, in business words. Every invariant deserves a scenario that tries to break it. Write what you do not know as `[NEEDS CLARIFICATION]`, and `spec clarify` asks you for each one. The [user guide](USER_GUIDE.md#6-specifications-spec) has the whole template and the lint rules.
 
 ## 🏛 Rewriting a legacy system
 
@@ -284,7 +299,7 @@ migration:
   java_release: 21
 ```
 
-The full walkthrough is in the [user guide](USER_GUIDE.md#13-legacy-rewrites-legacy-spec-from-legacy), and a real run in [docs/DEMO.md](docs/DEMO.md#7-a-legacy-rewrite-java-6--21).
+The full walkthrough is in the [user guide](USER_GUIDE.md#15-legacy-rewrites-legacy-spec-from-legacy), and a real run in [docs/DEMO.md](docs/DEMO.md#7-a-legacy-rewrite-java-6--21).
 
 ## 🧱 Quality gates
 
@@ -297,7 +312,7 @@ REFACTOR runs every gate that applies to your stack. A gate that cannot run is *
 | **Java** | PMD (Maven) · jscpd · migration · ArchUnit in the suite |
 | **Python** | Ruff · jscpd |
 
-Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.yaml`. Node tools run with `npx --no-install`, so nothing is downloaded during the loop.
+Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.yaml`. Mutation testing is slow, so it runs from medium risk up (`quality.mutation_from`). Node tools run with `npx --no-install`, so nothing is downloaded during the loop.
 
 ### 🧰 Starting from scratch
 
@@ -318,7 +333,8 @@ Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.
 | Command | Does |
 | :--- | :--- |
 | `init` | Picks your agent and language, once per machine. |
-| `setup` | Prepares a repository. `--new <stack>` starts a project; `--legacy <path>` makes it a rewrite. |
+| `setup` | Prepares a repository and installs the guard. `--new <stack>` starts a project; `--legacy <path>` makes it a rewrite; `--no-guard`. |
+| `doctor` | Checks the machine and the project, with install hints. Exit 4 when something required is missing. |
 | `spec new` | A numbered specification from the template. |
 | `spec interview` | Completes it, one question per turn. `--chat` hands the terminal to the agent instead. |
 | `spec clarify` | Asks each open question and writes the decision in its place. |
@@ -329,8 +345,11 @@ Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.
 | `legacy scan` | The legacy inventory, measured. |
 | `legacy map` | The legacy capability map, every source checked. |
 | `plan` · `plan approve` | The technical plan and its approval. |
-| `loop` | Red → Green → Refactor. `--resume`, `--restart`, `--scenario N --from green`, `--review off`, `--no-commit`, `--strict`. |
-| `deliver` | The hand-over: report, trace and PR body. |
+| `loop` | Red → Green → Refactor → review. `--resume`, `--restart`, `--scenario N --from green`, `--review scenario\|risk\|off`, `--no-commit`, `--strict`. |
+| `deliver` | The hand-over: report, trace and PR body. `--slices` writes one PR body per proposed slice. |
+| `review` | The review lenses over your whole branch, read-only. A documentation-only branch needs none. |
+| `verify` | The independent verifier over a whole specification. |
+| `guard` | The destructive-command guard, run by your agent's hook. `--selftest` proves it blocks. |
 | `audit` | Adversarial security review of your branch; fails closed. |
 | `e2e` | Checks each scenario in a real Chrome, Chromium or Edge, with a screenshot per step. |
 | `version` | Version, commit and build date. |
@@ -345,7 +364,7 @@ Global flags: `--non-interactive` · `--json` · `--quiet` · `--verbose` · `--
 | :---: | :--- |
 | `0` | Done |
 | `1` | Unexpected error or bad usage |
-| `2` | A gate said no: tests, quality, security, E2E, a blocked agent |
+| `2` | A gate said no: tests, quality, review, verifier, security, E2E, a refused file, a blocked agent; the guard blocking a command |
 | `3` | The spec or the loop state needs attention |
 | `4` | A tool or setting is missing |
 | `5` | A question awaits your answer |
@@ -360,11 +379,13 @@ SpecForge applies to itself the architecture it asks of your code: a pure domain
 ```text
 cmd/         CLI, composition root
 internal/
-  domain/    pure: spec, tdd, stack,
-             quality, legacy, …
+  domain/    pure: spec, tdd, risk,
+             review, guard, change,
+             verification, legacy, …
   app/       use cases: tddloop,
-             specs, planning,
-             migrate, deliver, …
+             reviewer, verifier,
+             doctor, guardhook,
+             planning, deliver, …
   ports/     what use cases need
   adapters/  agent CLI, runners,
              gates, git, browser
@@ -380,14 +401,19 @@ Releases are built by [GoReleaser](.goreleaser.yaml) when a `v*` tag is pushed.
 
 ## 📍 Status
 
-SpecForge 5 keeps the v4 core and its one rule, **verify, don't trust**, and brings back what v3 did well: legacy migration and ready-made projects. CI runs `gofmt`, `go vet`, golangci-lint, `go mod tidy`, the race detector with a 70 % coverage floor, and builds for Linux, macOS and Windows.
+SpecForge 6 keeps the one rule, **verify, don't trust**, and makes the checking proportional: cheap for documentation, thorough for the code that handles money, secrets and permissions. CI runs `gofmt`, `go vet`, golangci-lint, `go mod tidy`, the race detector with a 75 % coverage floor, and builds for Linux, macOS and Windows.
 
 - [x] Verified loop, sealed specs, questions with resume
 - [x] Plan, per-scenario review and commits, traceable delivery
 - [x] Turn-based interview, fail-closed audit, browser checks
 - [x] Legacy rewrites with verified sources; migration gate
 - [x] Scaffolds for Java 21, React, Python and Go
-- [ ] **Next, v6:** change-risk and proportional review, lens-based review with cited proof, independent verifier, destructive-command guard · [docs/V6_PLAN.md](docs/V6_PLAN.md)
+- [x] Known failures as evidence; risk tiers; a model per phase; `doctor`
+- [x] Edit surfaces from the plan; delivery budget and stacked slices
+- [x] Review lenses with proof checked against the diff; refuter; one correction
+- [x] Independent verifier in a copy; destructive-command guard
+- [x] Blind double review; scenarios side by side · [docs/V6_PLAN.md](docs/V6_PLAN.md)
+- [x] Proven end to end with Claude Code: baseline, risk, lenses, two scenarios side by side, the verifier and the guard · [docs/DEMO.md](docs/DEMO.md#8-specforge-6-risk-lenses-verifier-parallel-guard)
 
 The reasoning behind every item is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bugs are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 

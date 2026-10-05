@@ -69,5 +69,7 @@ type Files interface {
 	WritePrivate(path string, data []byte) error
 	// AppendFile appends data, creating the file and its parents.
 	AppendFile(path string, data []byte) error
+	// Remove deletes a file; a file that does not exist is not an error.
+	Remove(path string) error
 	Exists(path string) bool
 }

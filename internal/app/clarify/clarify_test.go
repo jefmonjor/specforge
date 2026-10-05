@@ -147,3 +147,12 @@ func TestEntries(t *testing.T) {
 		t.Fatalf("entries %+v", got)
 	}
 }
+
+func TestWithoutDropsOnlyThePhasesNamed(t *testing.T) {
+	log := "### t · RISK · scenario 2\n\n- **Answer:** high\n\n" +
+		"### t · GREEN · scenario 2\n\n- **Answer:** UTC\n\n" +
+		"### t · VERIFY\n\n- **Answer:** Add them\n"
+	if got := Without(log, "RISK", "VERIFY"); got != "### t · GREEN · scenario 2\n\n- **Answer:** UTC\n\n" {
+		t.Fatalf("got %q", got)
+	}
+}

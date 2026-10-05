@@ -1,6 +1,6 @@
 # A real session
 
-These are real runs of SpecForge with Claude Code: first on a new Go module, shortened where marked `…` and with local paths made relative. Two features: **discount codes** goes from specification to pull request body, and **gift cards** shows the interview. They also show what this README promises: the agent asked instead of guessing, and SpecForge checked each step itself. Section 7 is a SpecForge 5 run: a Java 6 payroll application rewritten on Java 21.
+These are real runs of SpecForge with Claude Code: first on a new Go module, shortened where marked `…` and with local paths made relative. Two features: **discount codes** goes from specification to pull request body, and **gift cards** shows the interview. They also show what this README promises: the agent asked instead of guessing, and SpecForge checked each step itself. Section 7 is a SpecForge 5 run: a Java 6 payroll application rewritten on Java 21. Section 8 is SpecForge 6 on a Go payroll module: a branch that already had a failing test, risk tiers, review lenses, the independent verifier, two scenarios side by side and the command guard.
 
 - [1. Set up](#1-set-up)
 - [2. The interview (gift cards)](#2-the-interview-gift-cards)
@@ -9,6 +9,7 @@ These are real runs of SpecForge with Claude Code: first on a new Go module, sho
 - [5. The hand-over](#5-the-hand-over)
 - [6. What the runs taught SpecForge](#6-what-the-runs-taught-specforge)
 - [7. A legacy rewrite: Java 6 → 21](#7-a-legacy-rewrite-java-6--21)
+- [8. SpecForge 6: risk, lenses, verifier, parallel, guard](#8-specforge-6-risk-lenses-verifier-parallel-guard)
 
 ## 1. Set up
 
@@ -267,3 +268,181 @@ $ specforge deliver 0001
 The legacy repository had no change at the end (`git status` clean): SpecForge hashed it around every agent turn.
 
 The same release was run on the other scaffolds. Python (`setup --new python`): two scenarios, `Decimal` with `ROUND_HALF_UP`, Ruff from the project's `.venv`. React (`setup --new react`): two scenarios with ESLint and `tsc`, Knip, jscpd and Stryker (mutation score 100 %) on every REFACTOR. The first run found a bug in SpecForge itself: the duplication gate counted `package-lock.json` and stopped the loop with exit 2. It now counts source code only, and `loop --resume` finished the feature.
+
+## 8. SpecForge 6: risk, lenses, verifier, parallel, guard
+
+A Go payroll module with one test that already failed (`TestLegacyRounding`), and a specification with three scenarios: net is gross minus tax, deductions never make the net negative (INV-01), and a signed payslip link verifies only for its employee (INV-02). The project asked for the verifier on high-risk scenarios and two scenarios at a time:
+
+```yaml
+review: off
+verify: high
+loop:
+  parallel: 2
+```
+
+`doctor` checked the machine first; what only some commands need is a warning, not a stop:
+
+```text
+$ specforge doctor
+  ✓ agent · claude · 2.1.289 (Claude Code)
+  ✓ tests · /usr/local/go/bin/go
+  ✓ gate lint · golangci-lint
+  ⚠ gate duplication · jscpd not found
+      → npm install -g jscpd (or add it to devDependencies)
+  ⚠ browser (e2e) · no Chrome, Chromium or Edge found
+  ✓ guard hook · .claude/settings.json runs `specforge guard`
+ready: everything required is installed
+```
+
+The plan put each component on its scenarios' lines; that is what lets SpecForge know which scenarios touch disjoint files:
+
+```markdown
+- `internal/pay/net.go`: computes the net from gross, tax rate
+  and deductions … (new) · SDD_0001_001 · SDD_0001_002
+- `internal/auth/payslip_link.go`: signs an employee id with the
+  company secret … (new) · SDD_0001_003
+```
+
+### The loop
+
+The failing test was found before any scenario and never blocked one. Scenario 1 was ordinary code: one lens. Scenarios 2 and 3 share no file, so they ran side by side, each in its own git sandbox; scenario 3 lives under `internal/auth/`, a sensitive path, so it got the four lenses and the verifier:
+
+```text
+$ specforge loop 0001 --non-interactive
+  … running go test ./...
+  ⚠ 1 test(s) already fail on this branch and will not block (…):
+      example.com/payroll/pay › TestLegacyRounding
+
+Scenario 1/3 · REFACTOR · Net is the gross minus the tax
+  risk medium · code changed: 35 line(s) in 2 file(s)
+  ✓ lint · passed · golangci-lint: no issues
+  ✓ REFACTOR accepted
+Scenario 1/3 · REVIEW · Net is the gross minus the tax
+  … review: reliability lens (read only)
+  ✓ review: 1 lens(es) · 1 reported · 0 corrected · 0 follow-up(s) · 0 discarded
+  ✓ committed …
+
+side by side, each in its own sandbox: SDD_0001_002 · SDD_0001_003
+…
+Scenario 3/3 · REFACTOR · A payslip link verifies only for its employee (INV-02)
+  ⚠ risk high · `internal/auth/payslip_link.go` is a sensitive path · …
+Scenario 3/3 · REVIEW · A payslip link verifies only for its employee (INV-02)
+  … review: risk lens (read only)
+  … review: reliability lens (read only)
+  … review: readability lens (read only)
+  … review: resilience lens (read only)
+  ✓ review: 4 lens(es) · 2 reported · 0 corrected · 0 follow-up(s) · 0 discarded
+  … verify: 3 requirement(s), in a copy of the project
+```
+
+The agent also asked for more scrutiny itself, and the request is a decision on record:
+
+```markdown
+### 2026-10-05 11:33 · RISK · scenario 3 (`SDD_0001_003`)
+
+- **Question:** The agent asked for more scrutiny of scenario 3
+- **Answer:** medium · The code signs and verifies links with a
+  company secret, so it handles credentials and access to employee
+  payslips.
+```
+
+The lenses only report what they can tie to a changed line. On scenario 1 the reliability lens saw that `Net` did not clamp to zero yet (scenario 2's job) and that `ErrInvalidRate` was declared but never returned; on scenario 3 the risk lens noted that an empty company secret would still sign links:
+
+> **RSK-001** · risk lens · SUGGESTION · `internal/auth/payslip_link.go:10` · inferential, introduced by this change
+>
+> SignPayslipLink and VerifyPayslipLink accept an empty company secret and still produce and accept valid HMACs, so a misconfigured secret would make payslip links forgeable. …
+
+### The verifier, and what it taught SpecForge
+
+The first verifier run had blamed scenario 3 for INV-01, an invariant of another scenario, with a "command" that was a code reading. SpecForge now asks the verifier only about the scenario's own invariants and marker, and re-runs every blocker's command, refusing one it cannot reproduce. The next run said "unverified" for everything: in headless mode its `go run` waited for an approval that never comes. The verifier is the one agent that works in a disposable copy, so it is now the one allowed to run commands, and on the finished feature it checked every requirement with a probe of its own:
+
+```text
+$ specforge verify 0001
+  … verify: 5 requirement(s), in a copy of the project
+  ✓ verify: 5 met · 0 unmet · 0 unverified
+  report: specs/0001-net-pay/verify/feature.json
+```
+
+```json
+{
+  "id": "INV-02",
+  "status": "met",
+  "command": "go run ./cmd/probe",
+  "observed": "2e238a90…c2fc728 true false false false"
+}
+```
+
+Its advisories found what no scenario covered, the same gap the reliability lens had seen: the specification names an `INVALID_RATE` error that no code returns. No scenario requires it, so it does not block; it is in the report for the developer:
+
+> - INVALID_RATE (spec section 8) is never returned: `pay.Net(100000, 101, 0)` gives 0 with a nil error and `pay.Net(100000, -5, 0)` gives 105000 with a nil error; ErrInvalidRate is declared but unused.
+> - gross\*taxRate can overflow int64 for very large gross values: `pay.Net(math.MaxInt64, 20, 0)` returns 9223372036854775807 instead of about 80 percent of it.
+
+The verifier also proposed a regression test for INV-02. SpecForge asked, the developer answered *Add them*, the whole suite still passed and the test went into the scenario's commit.
+
+### The hand-over
+
+```text
+$ specforge deliver 0001
+  ✓ delivery written: 3/3 scenario(s) finished
+```
+
+```markdown
+**Scenarios** 3/3 finished · 3 through RED → GREEN → REFACTOR
+
+329 authored line(s) · budget 400
+
+## Known failures (already failing before the loop; …)
+
+- `example.com/payroll/pay › TestLegacyRounding`
+
+## Checks
+
+- Independent verification of the specification: 5 met · 0 unmet ·
+  0 unverified (probes derived from the specification, run in a copy).
+```
+
+A documentation-only branch reviewed outside the loop needs no lens:
+
+```text
+$ specforge review --base main
+  risk passive · documentation only
+  ✓ no lens needed (risk passive)
+```
+
+### The guard
+
+With the hook installed by `setup`, Claude Code was asked to run `git reset --hard HEAD` in a repository with uncommitted work. The hook stopped it before it ran, and the work was still there:
+
+```text
+The command didn't run. A SpecForge
+guard hook blocked `git reset --hard
+HEAD` because it discards uncommitted
+work, and it said to find another way
+or ask you to run it yourself.
+$ git status --short
+ M keep.go
+```
+
+### What this run fixed
+
+| What happened | Fix |
+| :--- | :--- |
+| The verifier blamed a scenario for another scenario's invariant. | It checks the scenario's own invariants and marker; the whole feature with `specforge verify`. |
+| A blocker's "command" was a code reading. | SpecForge runs every blocker's command and requires its observed output. |
+| The verifier could not run its probes in headless mode. | Only the verifier, in its disposable copy, may run commands. |
+| A scenario that asked a question in its sandbox pointed at the sandbox's `questions.md`. | It runs again in the project, where the question and its answer belong. |
+| Its escalation was then recorded twice. | The escalations of a discarded attempt stay behind. |
+| The scenario integrated from a sandbox showed no gates in `DELIVERY.md`. | Its RED, GREEN and REFACTOR join the project's record. |
+| The review and verification records were left out of the commit. | They are committed with the scenario. |
+| A stop on the agent's usage limit showed an empty reason. | The reason is taken from the agent's output when its error stream is empty. |
+| `review --base` with a branch that does not exist printed an empty review before the error. | Only a review that ran is reported. |
+
+A quality review of the branch afterwards (reuse, simplification, efficiency, and whether each fix sits at the right depth) found three more problems in the same path the run used, where scenarios come back from their sandboxes:
+
+| What it found | Fix |
+| :--- | :--- |
+| When two scenarios of a batch both answered a question, the second to come back lost its answer. | Each sandbox's logs are appended from where the batch started. |
+| SpecForge's own logs counted as a scenario's files, so two scenarios that logged a decision "collided". | Only the scenario's work files are compared and copied; the logs come back by appending. |
+| The developer's review of an integrated scenario showed the previous scenario's gates. | The scenario is adopted whole from its sandbox, history included. |
+
+Each has a regression test that fails without the fix. The same pass shared what had been written twice (questions with fixed options, the verifier's request, a schema loader, record paths), and made a small edit to a large file cheap to measure.

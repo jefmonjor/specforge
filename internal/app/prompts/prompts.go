@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"specforge/assets"
+	"specforge/internal/domain/review"
 )
 
 // Name of a prompt template.
@@ -28,6 +29,15 @@ const (
 	LegacyMap Name = "legacy_map"
 	// FromLegacy drafts a specification from the legacy code.
 	FromLegacy Name = "from_legacy"
+	// Review is one read-only review lens; Refute tries to refute its
+	// inferential findings; Validate checks a correction of them.
+	Review   Name = "review"
+	Refute   Name = "refute"
+	Validate Name = "validate"
+	// Correct is the one correction of the findings that block.
+	Correct Name = "correct"
+	// Verify is the independent verifier, in a copy of the project.
+	Verify Name = "verify"
 )
 
 // File is a file shown to the agent as context.
@@ -74,6 +84,15 @@ type Data struct {
 	Answer           string
 	Attempt          int
 	MaxAttempts      int
+	// Known are the tests that failed before the loop began: not the
+	// agent's to fix.
+	Known []string
+	// Surfaces are the files the approved plan allows the agent to edit
+	// (a trailing slash allows a whole directory).
+	Surfaces []string
+	// Findings to correct, and how many lines the correction may change.
+	Findings []review.Finding
+	Budget   int
 
 	// Migration: the legacy repository (read-only), its inventory, the
 	// capability map, the capability a specification is drafted for, the
@@ -120,6 +139,44 @@ type InterviewData struct {
 	ID, Title, SpecPath string
 	// Context lists the other specifications, one per line.
 	Context string
+}
+
+// ReviewData is what the review, refute and validate prompts reference.
+type ReviewData struct {
+	Lens   review.Lens
+	Prefix string
+	Stack  string
+
+	SpecTitle  string
+	Marker     string
+	Scenario   string
+	Invariants string
+	Plan       string
+	Diff       string
+	Findings   []review.Finding
+	Feedback   string
+}
+
+// VerifyData is what the verify prompt references.
+type VerifyData struct {
+	Stack, SpecTitle string
+	// Spec is the specification's text; Required the IDs to answer for.
+	Spec     string
+	Required []string
+	// BaseDir is the copy of the project before the change, if any.
+	BaseDir  string
+	Feedback string
+}
+
+// RenderVerify renders the verifier's prompt.
+func RenderVerify(lang string, d VerifyData) (string, error) {
+	return renderStandalone(lang, Verify, d)
+}
+
+// RenderReview renders a review, refute or validate prompt. They end with
+// their own JSON contract, validated against a schema.
+func RenderReview(lang string, name Name, d ReviewData) (string, error) {
+	return renderStandalone(lang, name, d)
 }
 
 // RenderE2E renders the E2E prompt.

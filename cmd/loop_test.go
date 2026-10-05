@@ -57,6 +57,9 @@ func loopProject(t *testing.T) *harness {
 	return h
 }
 
+// cleanLens is a review lens that finds nothing.
+var cleanLens = rule{when: "# Task: REVIEW · reliability lens", reply: "```json\n{\"lens\":\"reliability\",\"findings\":[],\"evidence\":[\"read the diff\"]}\n```"}
+
 func TestLoopRunsRedGreenRefactor(t *testing.T) {
 	h := loopProject(t)
 	h.agent.rules = []rule{
@@ -67,6 +70,7 @@ func TestLoopRunsRedGreenRefactor(t *testing.T) {
 		{when: "# Task: GREEN", files: map[string]string{
 			"reset/reset.go": "package reset\n\nfunc Link(user string) string { return \"https://example.com/reset/\" + user }\n",
 		}, reply: done("reset/reset.go")},
+		cleanLens,
 	}
 	// R2: without a terminal the review is a question in questions.md.
 	h.expect(5, "loop")
@@ -74,8 +78,11 @@ func TestLoopRunsRedGreenRefactor(t *testing.T) {
 		t.Fatalf("questions.md:\n%s", h.read("specs/0001-reset/questions.md"))
 	}
 	calls := len(h.agent.prompts)
-	if calls != 2 {
-		t.Fatalf("want one RED and one GREEN call, got %d", calls)
+	if calls != 3 || !strings.Contains(h.agent.prompts[2], "# Task: REVIEW · reliability lens") {
+		t.Fatalf("want RED, GREEN and the reliability lens, got %d calls", calls)
+	}
+	if !strings.Contains(h.read("specs/0001-reset/review/SDD_0001_001.json"), `"reliability"`) {
+		t.Fatal("the lens review is kept next to the specification")
 	}
 	if got := h.read("reset/reset.go"); !strings.Contains(got, "https://example.com/reset/") {
 		t.Fatalf("implementation:\n%s", got)
@@ -161,6 +168,7 @@ func TestDeliverTracesTheFinishedLoop(t *testing.T) {
 		{when: "# Task: GREEN", files: map[string]string{
 			"reset/reset.go": "package reset\n\nfunc Link(user string) string { return \"https://example.com/reset/\" + user }\n",
 		}, reply: done("reset/reset.go")},
+		cleanLens,
 	}
 	h.tty, h.stdin = true, "Accept\n"
 	h.expect(0, "loop")

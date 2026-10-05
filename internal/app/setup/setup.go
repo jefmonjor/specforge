@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"specforge/assets"
+	"specforge/internal/app/guardhook"
 	"specforge/internal/app/layout"
 	"specforge/internal/config"
 	"specforge/internal/domain/stack"
@@ -40,6 +41,9 @@ type Options struct {
 	// repository (path as written in specforge.yaml) targeting JavaRelease.
 	Legacy      string
 	JavaRelease int
+	// GuardBinary, when set, installs the destructive-command guard as each
+	// agent's pre-tool hook, run as `<GuardBinary> guard --hook <agent>`.
+	GuardBinary string
 }
 
 // Action is what happened to one file.
@@ -88,6 +92,18 @@ func Run(files ports.Files, o Options) ([]Change, error) {
 		a, err := upsertBlock(files, o.Layout.Abs(name), block)
 		if err := record(name, a, err); err != nil {
 			return changes, err
+		}
+	}
+	if o.GuardBinary != "" {
+		for _, agent := range o.Agents {
+			changed, err := guardhook.Install(files, o.Layout, agent, o.GuardBinary)
+			a := Unchanged
+			if changed {
+				a = Updated
+			}
+			if err := record(guardhook.Settings[agent], a, err); err != nil {
+				return changes, err
+			}
 		}
 	}
 	a, err = ensureLine(files, o.Layout.Abs(".gitignore"), ".specforge/")
@@ -200,15 +216,36 @@ func ProjectConfig(lang string, p *stack.Profile, legacy string, javaRelease int
 		stackLine,
 		"# agent: claude         # claude | gemini; usually each developer's choice (`specforge init`)",
 		"# max_attempts: 3       # GREEN attempts per scenario",
-		"# review: scenario      # scenario: you review each finished scenario | off",
+		"# review: scenario      # scenario: you review each finished scenario | risk: only medium and high | off",
 		"# commit: true          # one commit per finished scenario",
+		"# model: \"\"             # the agent's model; models.<phase> overrides it per phase:",
+		"# models:               # interview plan legacy red green refactor review review2 refute verify audit e2e",
+		"#   review: claude-opus-5-5",
 		"# timeouts:",
 		"#   agent: 20m",
 		"#   tests: 10m",
 		"# quality:",
-		"#   strict: false                # true: a gate that cannot run blocks instead of warning",
+		"#   strict: false                # true: a gate that cannot run blocks, and every change is high risk",
 		"#   max_duplication_percent: 0   # jscpd",
 		"#   min_mutation_score: 80       # Stryker",
+		"#   mutation_from: medium        # lowest risk tier that runs the mutation gate",
+		"# risk:                          # how each scenario's change is classified",
+		"#   max_lines: 400               # larger changes are high risk",
+		"#   floor: passive               # the lowest tier any change gets",
+		"#   high_paths: [...]            # regular expressions; default: auth, security, tokens, payments, migrations, CI, build files…",
+		"# lenses: auto                   # review lenses after REFACTOR: auto (by risk) | off | [risk, reliability, readability, resilience]",
+		"# blind_review: false            # high risk: run the lenses twice, independently",
+		"# verify: high                   # independent verifier: high | always | feature | off",
+		"# verify_max_mb: 500             # largest project the verifier copies",
+		"# plan:",
+		"#   surfaces: ask                # a file outside the approved plan: ask | strict | off",
+		"# delivery:",
+		"#   budget_lines: 400            # deliver proposes stacked slices above it",
+		"# loop:",
+		"#   parallel: 1                  # scenarios with disjoint plan surfaces run side by side",
+		"# guard:                         # the destructive-command guard (the agents' pre-tool hook)",
+		"#   mode: block                  # block | confirm | off",
+		"#   allow: []                    # command patterns let through, * matches anything",
 		migrationConfig(legacy, javaRelease),
 	}, "\n")
 }

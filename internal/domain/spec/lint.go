@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -157,6 +158,30 @@ func sections(markdown string) []Issue {
 	return out
 }
 
+// InvariantIDs returns the invariants the specification defines (INV-01,
+// INV-02…), in order.
+func InvariantIDs(markdown string) []string {
+	var ids []string
+	for _, line := range strings.Split(Section(markdown, InvariantsTitle), "\n") {
+		if m := invariantEntry.FindStringSubmatch(line); m != nil && !slices.Contains(ids, m[1]) {
+			ids = append(ids, m[1])
+		}
+	}
+	return ids
+}
+
+// InvariantRefs returns the invariants text mentions (a scenario's title
+// and steps), in order, without duplicates.
+func InvariantRefs(text string) []string {
+	var ids []string
+	for _, id := range invariantID.FindAllString(text, -1) {
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // invariants advises on invariants that nothing else in the specification
 // mentions: an invariant without a scenario is a rule nobody tests.
 func invariants(markdown string) []Issue {
@@ -194,6 +219,10 @@ func invariants(markdown string) []Issue {
 // RulePlanMarker reports a scenario the plan does not place.
 const RulePlanMarker Rule = "plan-marker"
 
+// RulePlanComponent warns about a component line that names no file: the
+// loop cannot tell whether a change is inside the plan.
+const RulePlanComponent Rule = "plan-component"
+
 // LintPlan checks a technical plan against its specification: every
 // scenario marker must appear (so each scenario has a planned test) and no
 // placeholder may be left.
@@ -206,6 +235,9 @@ func LintPlan(plan string, markers []string) []Issue {
 		if !strings.Contains(plan, m) {
 			issues = append(issues, Issue{Rule: RulePlanMarker, Message: "no planned test for " + m, Blocking: true})
 		}
+	}
+	for _, line := range unparsedComponents(plan) {
+		issues = append(issues, Issue{Rule: RulePlanComponent, Message: "component without a file path in backticks: " + line})
 	}
 	return issues
 }

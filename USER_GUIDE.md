@@ -2,32 +2,35 @@
 
 SpecForge drives a coding agent ([Claude Code](https://docs.anthropic.com/en/docs/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli)) through a test-first loop against a specification you approved, and checks every step itself instead of trusting the agent's word.
 
-This guide covers every command, every file SpecForge writes, what you edit by hand, and every exit code. New here? Read sections 1 to 7 once, then keep [Your files](#14-your-files-what-to-edit) and [Recipes](#15-recipes) at hand.
+This guide covers every command, every file SpecForge writes, what you edit by hand, and every exit code. New here? Read sections 1 to 9 once, then keep [Your files](#17-your-files-what-to-edit) and [Recipes](#18-recipes) at hand.
 
 **Start**
 - [1. How it works](#1-how-it-works)
 - [2. Install](#2-install)
 - [3. Configure once: `init`](#3-configure-once-init)
 - [4. Prepare a repository: `setup`](#4-prepare-a-repository-setup)
+- [5. Check the machine: `doctor`](#5-check-the-machine-doctor)
 
 **Daily work**
-- [5. Specifications: `spec`](#5-specifications-spec)
-- [6. The plan: `plan`](#6-the-plan-plan)
-- [7. The loop: `loop`](#7-the-loop-loop)
-- [8. Questions instead of guesses](#8-questions-instead-of-guesses)
-- [9. Quality gates](#9-quality-gates)
-- [10. Security audit: `audit`](#10-security-audit-audit)
-- [11. Browser verification: `e2e`](#11-browser-verification-e2e)
-- [12. Hand-over: `deliver`](#12-hand-over-deliver)
-- [13. Legacy rewrites: `legacy`, `spec from-legacy`](#13-legacy-rewrites-legacy-spec-from-legacy)
+- [6. Specifications: `spec`](#6-specifications-spec)
+- [7. The plan: `plan`](#7-the-plan-plan)
+- [8. The loop: `loop`](#8-the-loop-loop)
+- [9. Risk, review and verification](#9-risk-review-and-verification)
+- [10. Questions instead of guesses](#10-questions-instead-of-guesses)
+- [11. Quality gates](#11-quality-gates)
+- [12. Security audit: `audit`](#12-security-audit-audit)
+- [13. Browser verification: `e2e`](#13-browser-verification-e2e)
+- [14. Hand-over: `deliver`](#14-hand-over-deliver)
+- [15. Legacy rewrites: `legacy`, `spec from-legacy`](#15-legacy-rewrites-legacy-spec-from-legacy)
+- [16. The destructive-command guard: `guard`](#16-the-destructive-command-guard-guard)
 
 **Reference**
-- [14. Your files: what to edit](#14-your-files-what-to-edit)
-- [15. Recipes](#15-recipes)
-- [16. Configuration reference](#16-configuration-reference)
-- [17. Exit codes](#17-exit-codes)
-- [18. Troubleshooting](#18-troubleshooting)
-- [19. Architecture](#19-architecture)
+- [17. Your files: what to edit](#17-your-files-what-to-edit)
+- [18. Recipes](#18-recipes)
+- [19. Configuration reference](#19-configuration-reference)
+- [20. Exit codes](#20-exit-codes)
+- [21. Troubleshooting](#21-troubleshooting)
+- [22. Architecture](#22-architecture)
 
 ---
 
@@ -41,6 +44,7 @@ spec new
        └ plan, plan approve    (R1)
          └ loop, per scenario:
              RED → GREEN → REFACTOR
+             → lenses by risk, verifier
              → your review     (R2)
              → one commit
            └ audit, e2e
@@ -51,7 +55,9 @@ spec new
 - **Approval** is a human gate. It refuses while a `TODO` or an open question is left, records who approved and when, and seals the content with a SHA-256 hash. The loop only runs an approved, unchanged specification.
 - The **plan** says where the code goes, with one planned test per scenario. You review and approve it before any code exists; the loop follows it.
 - The **loop** takes one scenario at a time. The agent writes code; SpecForge runs the tests, compares the files on disk before and after each turn, fingerprints the test files after RED and runs the quality gates.
+- After REFACTOR, each scenario is **reviewed in proportion to its risk**: review lenses whose findings must point at changed lines, and, for risky work, an independent verifier that probes the specification in a copy of the project.
 - When the agent lacks information it **asks** instead of guessing. You answer once; the answer is recorded and reused.
+- A **guard** installed as your agent's hook blocks destructive shell commands before they run.
 
 ## 2. Install
 
@@ -91,7 +97,7 @@ You also need:
 - `git`;
 - your stack's test runner (`go`, `mvn`/`gradle`, `npm`, `pytest`).
 
-The quality gates use more tools when they are installed: see [section 9](#9-quality-gates).
+The quality gates use more tools when they are installed: see [section 11](#11-quality-gates).
 
 ## 3. Configure once: `init`
 
@@ -120,10 +126,11 @@ specforge setup
 
 Options: `--agents claude,gemini` writes the rules for both agents; `--stack node` picks the stack when several are detected.
 
-`setup` writes three things and never touches your code:
+`setup` writes these files and never touches your code:
 
 - **`specforge.yaml`**: project settings shared by the team, every default commented. Kept as it is on a second run.
 - **`CLAUDE.md` / `GEMINI.md`**: a block between `<!-- specforge:begin … -->` and `<!-- specforge:end -->` with the working rules (ask, don't invent; tests are the contract; craft) and your stack's coding standard. Both agents read these files at every session. A second run refreshes the block; the rest of the file is yours.
+- **`.claude/settings.json`** or **`.gemini/settings.json`**: the [destructive-command guard](#16-the-destructive-command-guard-guard) as the agent's pre-tool hook, merged into what is there. `--no-guard` or `guard.mode: off` skips it.
 - **`.gitignore`**: adds `.specforge/`, the local loop state.
 
 The stack is detected from `go.mod`, `pom.xml`, `build.gradle(.kts)`, `package.json` (Vitest, Jest or `npm test`) or `pyproject.toml`/`requirements.txt`/`setup.py`. With several, SpecForge asks which one to drive, or fails in CI until you set `stack:`.
@@ -155,7 +162,40 @@ python3 -m venv .venv          # python
 
 Python projects use the `.venv`'s pytest and Ruff; Maven and Gradle projects use `mvnw`/`gradlew` when present.
 
-## 5. Specifications: `spec`
+## 5. Check the machine: `doctor`
+
+```bash
+specforge doctor
+specforge doctor --json
+```
+
+`doctor` changes nothing. It checks, one line each:
+
+- **configuration**: `specforge.yaml` and your user settings are valid (an unknown key or value is reported here instead of stopping);
+- **agent**: the configured CLI is on your `PATH`, with its version;
+- **git**: installed, and `user.name` set when the loop commits;
+- **tests**: your stack's runner, preferring the project's wrapper (`mvnw`, `gradlew`) or `.venv`;
+- **gates**: each quality gate's tool (golangci-lint, Ruff, PMD in the build, jscpd, Knip, Stryker);
+- **legacy**: the legacy repository of a rewrite exists;
+- **browser**: Chrome, Chromium or Edge for `e2e`;
+- **guard hook**: installed in your agent's settings.
+
+✓ is ready, ⚠ works with a caveat, ✗ is missing; every ⚠ and ✗ comes with the command that fixes it. The exit code is **4** when something required is missing, **0** otherwise.
+
+```text
+  ✓ agent · claude 2.1.289
+  ✓ git · git version 2.43.0
+  ✓ tests · /usr/local/go/bin/go
+  ✓ gate lint · golangci-lint
+  ⚠ gate duplication · jscpd not
+    found
+      → npm install -g jscpd
+  ✓ guard hook ·
+    .claude/settings.json runs
+    `specforge guard`
+```
+
+## 6. Specifications: `spec`
 
 ```bash
 specforge spec new "Password reset"
@@ -192,7 +232,7 @@ A specification is named by its number (`1`, `0001`), a file-name prefix (`0001-
 11. **Assumptions**: what is taken for granted, and who confirmed it.
 12. **Open questions**: `- [NEEDS CLARIFICATION]: …`, empty before approval.
 
-A specification drafted from legacy code adds `13. Legacy sources` ([section 13](#13-legacy-rewrites-legacy-spec-from-legacy)).
+A specification drafted from legacy code adds `13. Legacy sources` ([section 15](#15-legacy-rewrites-legacy-spec-from-legacy)).
 
 ### Writing good scenarios
 
@@ -287,7 +327,7 @@ Edit the file, then approve it again. Until you do, it is `changed` and the loop
 
 Every approval is appended to `specs/0001-slug/approvals.md` with the date, the approver, the seal and each scenario marked `ADDED`, `MODIFIED`, `UNCHANGED` or `REMOVED` compared with the previous approval. `approve` prints the changes, and the loop redoes only the scenarios whose text changed.
 
-## 6. The plan: `plan`
+## 7. The plan: `plan`
 
 ```bash
 specforge plan 0001
@@ -297,7 +337,7 @@ specforge plan approve 0001
 `plan` asks your agent where the code goes before any code exists. It writes `specs/0001-slug/plan.md` with:
 
 - the approach, in a few sentences;
-- one line per file to create or change;
+- one line per file to create or change, the path in backticks, ending with the markers of the scenarios it serves when it does not serve them all;
 - a table with **one planned test per scenario** (by marker);
 - the interfaces the domain needs and what implements them;
 - the risks.
@@ -306,9 +346,9 @@ The agent sees the approved specification and the list of project files. It may 
 
 **Read the plan and edit it as you like**, then approve it (gate R1): approval checks that every scenario marker is there and no `TODO` is left, records you and seals the file. Running `plan` again revises the current draft instead of starting over.
 
-The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario, and every prompt carries it. A specification amended with a new scenario needs the plan updated and approved again.
+The plan is optional. When `plan.md` exists, the loop requires it approved, unchanged and placing every scenario, and every prompt carries it. Its files become the agent's [edit surfaces](#edit-surfaces-from-the-plan), and its scenario markers decide which scenarios may run [side by side](#scenarios-side-by-side). Approval warns about a component line without a path in backticks. A specification amended with a new scenario needs the plan updated and approved again.
 
-## 7. The loop: `loop`
+## 8. The loop: `loop`
 
 ```bash
 specforge loop 0001
@@ -326,8 +366,9 @@ For each scenario, in order:
 
 - **🔴 RED.** The agent writes the test for this scenario, named with its marker (`SDD_0001_003`), plus the stubs it needs to compile. SpecForge accepts it only when a test file carrying the marker changed, the files the agent lists really changed, and the filtered test run compiles, runs at least one test and fails. A test that passes before any implementation is reported to you: either the behaviour exists already (mark the scenario satisfied) or the test is wrong.
 - **🟢 GREEN.** The agent writes the minimum code. Accepted only when the test files are byte-for-byte as RED left them (otherwise the loop stops: *test tampering*) and the marker's tests pass. Failures are fed back, up to `max_attempts` (default 3).
-- **🔵 REFACTOR.** The whole suite runs and so do the quality gates. The agent is only called when something blocks, and fixes it without touching tests.
-- **👀 REVIEW** (gate R2). You see the files the scenario changed and the gates. **Accept**, type **what should change** (back to GREEN with your note; the tests stay) or send it **back to RED** (the test does not express the scenario). Without a terminal the review is a question in `questions.md` (exit 5). `review: off` skips it.
+- **🔵 REFACTOR.** The whole suite runs and so do the quality gates. Tests that [already failed before the loop](#known-failures) do not block. The agent is only called when something blocks, and fixes it without touching tests.
+- **🔎 REVIEW and VERIFY.** The scenario's [risk](#risk-tiers) is measured; the [review lenses](#review-lenses) and, for high risk, the [independent verifier](#the-independent-verifier) check it. What they prove broken gets one correction, judged again by REFACTOR.
+- **👀 Your review** (gate R2). You see the files the scenario changed and the gates. **Accept**, type **what should change** (back to GREEN with your note; the tests stay) or send it **back to RED** (the test does not express the scenario). Without a terminal the review is a question in `questions.md` (exit 5). `review: risk` asks only for medium and high-risk scenarios; `review: off` skips it.
 - **COMMIT.** The scenario's files and the decisions log become one commit, `feat(SDD_0001_003): <title>`. Nothing else you staged is touched; hooks and signing run as usual. Off with `commit: false` or `--no-commit`; skipped outside git.
 
 When a test with the scenario's marker already exists (an earlier run stopped before RED was accepted, or you wrote it yourself), RED runs it before calling the agent. A test that compiles and fails is accepted as it is; a passing test goes to you as above; one that does not compile goes to the agent with the output. A scenario you mark as already satisfied is committed as `test(SDD_…)` with its test.
@@ -340,7 +381,100 @@ When a test with the scenario's marker already exists (an earlier run stopped be
 
 **Test runners.** The marker filter uses `go test -json -run`, Maven `-Dtest`, Gradle `--tests`, `vitest run -t`, `jest -t` or `pytest -k`. Results are read from the runner's machine-readable report (test2json, Surefire/JUnit XML, Vitest/Jest JSON, pytest JUnit XML), so "did not compile", "nothing ran" and "an assertion failed" are told apart. With plain `npm test` the filter is not exact and SpecForge asks you to confirm the RED.
 
-## 8. Questions instead of guesses
+## 9. Risk, review and verification
+
+After REFACTOR, every scenario gets the scrutiny its change deserves, measured, not guessed.
+
+### Known failures
+
+A new loop runs the whole suite once before its first RED. The tests that already fail there are the **baseline**: named from the runner's report, shown to you, listed for the agent as *not yours to fix*, and kept out of REFACTOR's verdict. A test that did not fail before and fails now blocks as usual; a known one that starts passing leaves the baseline, so it cannot break again unnoticed. A runner without names (plain `npm test`) keeps every failure blocking. `DELIVERY.md` lists the known failures apart.
+
+### Risk tiers
+
+Each scenario's change is classified from what git says it touched (its files' added and deleted lines; lock files and vendored code do not count):
+
+- **high**: a sensitive path (`auth`, `security`, `secret`, `token`, `password`, `payment`, `billing`, `permission`, `process`, `exec`, `migration`, `infra`, `deploy`, `ci`, CI workflows, `go.mod`, `package.json`, `pom.xml` and the other build files), or more than 400 changed lines;
+- **passive**: documentation only;
+- **medium**: everything else.
+
+The reasons are printed and kept. The agent can **raise** the tier with `"risk": "high"` and a `"risk_reason"` in its answer (recorded as a decision), never lower it. `--strict` makes every change high. Tune it in `specforge.yaml`:
+
+```yaml
+risk:
+  max_lines: 400
+  floor: passive
+  high_paths: ["(^|/)ledger/"]
+```
+
+The tier decides the rest: how many review lenses run, whether the verifier runs, whether the slow mutation gate runs (`quality.mutation_from`, default `medium`) and, with `review: risk`, whether you are asked to review the scenario at all.
+
+### Review lenses
+
+Lenses are read-only agent turns over the scenario's diff, each with one angle:
+
+- **risk**: security, data, money, permissions, process execution;
+- **reliability**: correctness against the specification and its invariants;
+- **readability**: names from the ubiquitous language, structure, duplication;
+- **resilience**: timeouts, retries, partial writes, concurrency, leaks.
+
+A passive change gets none, a medium one gets one (risk when a path is sensitive, else reliability), a high one gets all four. `lenses: off` or a list in `specforge.yaml` overrides it.
+
+Every finding has a severity, how the lens knows (`deterministic`, `inferential`, `insufficient`), whether the change caused it (`introduced`, `behavior-activated`, `worsened`, `pre-existing`, `base-only`, `unknown`) and **proof references** to lines of the change. SpecForge checks each answer and each proof itself:
+
+- an answer that does not validate against the schema gets one retry, then the review fails closed (exit 2);
+- a lens that changes a file is refused;
+- a finding whose proof is not a line the change added or modified, or a file it created, is **discarded**, with the reason, in the record;
+- only a BLOCKER or CRITICAL the change caused, with evidence, blocks; pre-existing ones become follow-ups; one whose cause is unknown goes to you;
+- an inferential blocker goes to an independent **refuter** first: only a confirmed one blocks.
+
+What blocks gets **one correction**: a GREEN-model turn with the findings, the tests untouched, the plan's surfaces checked, and a budget of half the scenario's changed lines (200 at most), counted line by line. A larger correction is a redesign and goes to you. REFACTOR then judges the corrected code, and a **validation** turn checks only the corrected findings. A regression goes to you; there is never a second automatic correction.
+
+With `blind_review: true`, a high-risk change runs every lens twice, independently (`models.review2` for the second pass). What both passes prove on the same hunk skips the refuter; what only one found has to survive it.
+
+Everything is kept in `specs/0001-slug/review/SDD_….json`, and `--resume` never runs the lenses twice.
+
+**A whole branch.** `specforge review [spec] [--base ref] [--lens risk]` runs the same lenses and checks over your branch, for code that did not come out of the loop. It never corrects anything: exit 2 when a finding blocks or needs your judgement. With a specification, the report goes to `specs/0001-slug/review/branch.json` and `deliver` shows it. A documentation-only branch needs no lens, and `review` says so.
+
+### The independent verifier
+
+The writer's test can pin a bug: a test written from the code agrees with the code. The verifier checks the **specification** instead. In a disposable copy of your project (dependency directories linked, plus a copy of the last commit to compare old behaviour), an agent derives its own probes from every invariant and scenario and runs them. It is the only agent allowed to run shell commands without asking, because nothing it does there is kept; the guard still applies.
+
+SpecForge requires:
+
+- a verdict, `met`, `unmet` or `unverified`, for **every** invariant and scenario asked;
+- for every broken one, the **exact command** and the output it **observed**; SpecForge runs the command again and refuses a failure it cannot reproduce;
+- your real project unchanged, fingerprinted before and after;
+- an answer valid for its schema (one retry, then fail closed).
+
+`verify: high` (the default) runs it for high-risk scenarios, `always` for every one, `feature` once over the whole specification at the end, `off` never. What it shows broken gets the one correction, REFACTOR judges it, and only those requirements are verified again; what stays broken goes to you. The regression tests it proposes are offered: added only as new test files inside the project, with the whole suite still passing. A project larger than `verify_max_mb` (500) is skipped, with the reason.
+
+`specforge verify 0001` runs it over a whole specification on demand: exit 2 with the command that reproduces each broken requirement, the report in `specs/0001-slug/verify/feature.json`.
+
+### Edit surfaces from the plan
+
+With an approved plan, the files the agent may change are its components (paths in backticks), its planned test files, and anything under the directory of a new component; every RED, GREEN and REFACTOR prompt lists them. After each turn, a file outside them goes to you (`plan.surfaces: ask`): accept it for this specification, or refuse it and the agent has to put it back, which the next turns check by fingerprint. A scenario still carrying a refused file is never committed. `strict` refuses without asking; `off` does not check. SpecForge's own records and lock files are never outside the plan.
+
+### Scenarios side by side
+
+With `loop.parallel: 2` (or more), consecutive scenarios whose plan surfaces do not overlap run at the same time, each in its own **sandbox**: a copy of the project made into a fresh git repository. A component line that names scenario markers (`· SDD_0001_002`) belongs to those; one that names none is shared by all, so an unmarked plan never runs anything in parallel.
+
+In its sandbox each scenario goes through RED, GREEN, REFACTOR and the review. Questions reach you one at a time. Then the work comes back in order: a file another scenario of the batch also wrote sends that scenario back to run on its own; the whole suite runs once over the combination (the **seam check**), and if it fails every file goes back as it was and the scenarios run again one by one. Only then does each scenario get your review and its own commit, in turn.
+
+The scenarios share the specification's logs. What each one adds to `decisions.md`, `questions.md` and `LESSONS.md` in its sandbox is appended to the project's, never copied over it, so no scenario loses another's answers. A scenario that stops in its sandbox (a question nobody can answer there, a collision, a failed seam check) runs again on its own right after the batch: your product answers from the first attempt still count, but its process decisions (risk, review, verification) stay behind with the attempt.
+
+### A model per phase
+
+```yaml
+model: claude-sonnet-5-5
+models:
+  plan: claude-opus-5-5
+  green: claude-haiku-4-5
+  review: claude-opus-5-5
+```
+
+Phases: `interview`, `plan`, `legacy`, `red`, `green`, `refactor`, `review`, `review2`, `refute`, `verify`, `audit`, `e2e`. The review's correction uses `green`'s model. `--model` overrides every phase.
+
+## 10. Questions instead of guesses
 
 Every prompt ends with a response contract. The agent answers:
 
@@ -370,7 +504,7 @@ Replace `_awaiting an answer_` with your answer (or an option number) and run th
 
 The managed block in `CLAUDE.md`/`GEMINI.md` carries the same rule: if anything needed is not in the specification, the decisions log, the code or the prompt, do not assume it.
 
-## 9. Quality gates
+## 11. Quality gates
 
 REFACTOR runs the gates that apply to the stack. Each reads its tool's machine-readable report and compares a number with a threshold. A tool that is missing or crashes is **skipped**, shown with ⚠, never as a pass. With `quality.strict: true` or `--strict`, a skipped gate blocks.
 
@@ -381,7 +515,7 @@ REFACTOR runs the gates that apply to the stack. Each reads its tool's machine-r
   - Python: `ruff check`, the `.venv`'s first.
 - **Duplication**, all stacks: jscpd over source code only (lock files, JSON, Markdown, tests and reports are not counted). Threshold `max_duplication_percent`, default 0.
 - **Dead code**, Node: Knip.
-- **Mutation**, Node: Stryker, when configured. Threshold `min_mutation_score`, default 80.
+- **Mutation**, Node: Stryker, when configured. Threshold `min_mutation_score`, default 80. It is slow, so it runs only from `quality.mutation_from` risk up (default `medium`).
 - **Migration**, Java: when `migration.java_release` or `forbidden_imports` is set, the release the build declares and every `import` in the Java sources. It needs no tool, so it never skips, and names file and line:
 
 ```text
@@ -392,7 +526,7 @@ src/main/java/…/Payroll.java:3:
 
 Node tools run with `npx --no-install`: nothing is downloaded during the loop.
 
-## 10. Security audit: `audit`
+## 12. Security audit: `audit`
 
 ```bash
 specforge audit
@@ -412,7 +546,7 @@ Every answer must match the embedded JSON schema. An invalid answer gets one ret
 
 The base ref is validated as a commit and passed after `--end-of-options`, so it can never be read as a git option. Reports go to `docs/security/` (`REPORT.md`, `findings.json`, `coverage-ledger.json`) with owner-only permissions.
 
-## 11. Browser verification: `e2e`
+## 13. Browser verification: `e2e`
 
 ```bash
 specforge e2e 0001 \
@@ -428,7 +562,7 @@ Before each action SpecForge checks that the selector exists on the page and tha
 
 Each step saves a screenshot. Results go to `docs/e2e/<spec>/` (`report.json`, `REPORT.md`, `scenario-NN/step-MM.png`). The command exits with code 2 when the pass rate is below `--min-pass-rate` (default 100). `--max-steps` bounds the actions per scenario (default 15). `--insecure` accepts invalid TLS certificates for local test servers; it is off by default. Only approved specifications run.
 
-## 12. Hand-over: `deliver`
+## 14. Hand-over: `deliver`
 
 ```bash
 specforge deliver 0001
@@ -438,15 +572,17 @@ gh pr create --body-file \
 
 `deliver` writes three files next to the specification, built only from what SpecForge recorded, never from the agent's word:
 
-- **`DELIVERY.md`**, for people: who approved the specification and the plan, and when. One row per scenario with its tests (file and test names carrying the marker), its commit, its gates (✓ passed · ⚠ skipped · ✗ failed) and notes (already satisfied, changes requested in review, rejected attempts). Then the decisions taken, the questions still open, the lessons, the audit and E2E results, and what is out of scope.
+- **`DELIVERY.md`**, for people: who approved the specification and the plan, and when. One row per scenario with its tests (file and test names carrying the marker), its commit, its gates (✓ passed · ⚠ skipped · ✗ failed) and notes: its risk and why, its size in lines, its lens review and verification, changes requested in review, rejected attempts. Then the known failures, the review follow-ups, the decisions taken, the questions still open, the lessons, the branch review, the verification, the audit and E2E results, and what is out of scope.
 - **`trace.json`**, for tools: the same data, machine-readable.
 - **`PR_BODY.md`**, for the pull request: a summary, the scenario table, the decisions, the checks and what is not done. When the repository has a pull request template (`.github/pull_request_template.md` and the other places GitHub looks), its headings are kept and the summary goes under the first one.
+
+**Size and slices.** Each scenario's authored lines are counted from its commit (lock, vendored and golden files excluded). Above `delivery.budget_lines` (400), `DELIVERY.md` and `PR_BODY.md` propose **stacked slices**: consecutive scenarios that fit the budget, each with the command to create its branch. `deliver --slices` also writes `PR_BODY-1.md` … `PR_BODY-n.md`. A scenario larger than the budget is flagged, never cut.
 
 A delivery is honest about gaps: unfinished scenarios, open questions and checks that did not run are listed, and an incomplete delivery says so in its first line. Reviews and SpecForge's own verification questions are shown per scenario, apart from your product decisions.
 
 The loop state lives in `.specforge/`, so run `deliver` where the loop ran. Commit `trace.json` to keep the trace.
 
-## 13. Legacy rewrites: `legacy`, `spec from-legacy`
+## 15. Legacy rewrites: `legacy`, `spec from-legacy`
 
 Rewriting a legacy system (a Java 6 servlet application on Java 21, for example) happens in a **new project next to the old one**. The legacy repository is evidence, not a workspace: the agent may read it, and SpecForge hashes it before and after every agent turn (map, specification, plan and every loop phase) and refuses any change.
 
@@ -509,7 +645,39 @@ What the code does that nobody can explain (a rule applied in one place and not 
 
 During `plan` and `loop` the agent receives the legacy path, the sources section and the target release, and reads the cited code to reproduce the behaviour. The migration gate checks the result.
 
-## 14. Your files: what to edit
+## 16. The destructive-command guard: `guard`
+
+Agents run shell commands. The guard reads each one before it runs and blocks what destroys work:
+
+- recursive deletes (`rm -r`, `find -delete`, `find -exec rm`), `mkfs`, `shred`, `dd` onto a device;
+- git commands that discard work or rewrite history: `reset --hard`, `clean -f`, `push --force` (and `+branch`, `:branch`, `--delete`), `branch -D`, `stash drop`/`clear`, `checkout .`, `restore`, `filter-branch`, `reflog expire`;
+- SQL that drops or empties data: `DROP`, `TRUNCATE`, `DELETE` or `UPDATE` without `WHERE` (comments ignored), MongoDB `drop()` and `deleteMany({})`, Redis `FLUSHALL`;
+- commands that touch secrets: `.env`, `.ssh/`, `*.pem`, `id_rsa`, `credentials`, `.netrc`.
+
+It sees through `sudo`, `env`, variable assignments, `xargs`, `timeout`, `nohup`, `sh -c`, `$( )` and backticks. Deleting `/`, `~`, the project or a system directory is **never** allowed, whatever the settings.
+
+`setup` installs it as your agent's pre-tool hook, in `.claude/settings.json` (Claude Code) or `.gemini/settings.json` (Gemini CLI), keeping the rest of the file; `--no-guard` skips it. When it blocks, the agent sees the reason and has to find another way:
+
+```text
+The command didn't run. A SpecForge
+guard hook blocked `git reset --hard
+HEAD` because it discards uncommitted
+work, and it said to find another way
+or ask you to run it yourself.
+```
+
+```yaml
+guard:
+  mode: block
+  allow:
+    - "git push --force-with-lease *"
+```
+
+`block` (default) refuses; `confirm` lets Claude Code ask you, and still blocks inside the loop, where nobody can answer; `off` lets everything through but the hard denies. `allow` takes command patterns, `*` matching anything. An unreadable hook request, or an invalid `specforge.yaml`, blocks: the guard never fails open. `specforge guard --selftest` proves it blocks; `doctor` checks it is installed.
+
+It is lexical recognition, not a sandbox: scripts, programs and variable expansions are not inspected. For real containment, run the agent in a container. The loop verifies its work with or without the guard.
+
+## 17. Your files: what to edit
 
 Everything SpecForge uses lives in your repository, next to your code. `0001-slug` stands for each specification's number and name.
 
@@ -518,7 +686,7 @@ Everything SpecForge uses lives in your repository, next to your code. `0001-slu
 - 📝 **`specs/0001-slug.md`**: the specification. Edit it freely before approving. To change an approved one, edit it and run `spec approve` again.
 - 🗺️ **`specs/0001-slug/plan.md`**: the plan. After `plan`, edit what you like, then `plan approve`.
 - ❓ **`specs/0001-slug/questions.md`**: questions waiting for you when nobody was at a terminal. Replace `_awaiting an answer_` and run the same command again.
-- ⚙️ **`specforge.yaml`**: project settings ([section 16](#16-configuration-reference)).
+- ⚙️ **`specforge.yaml`**: project settings ([section 19](#19-configuration-reference)).
 - 🤖 **`CLAUDE.md`, `GEMINI.md`**: your agent's instructions. Write anything outside the SpecForge block; `setup` refreshes only the block.
 - 📚 **`specs/LESSONS.md`**: lessons the agent wrote after a failed attempt. Prune or reword them.
 - 🏛 **`docs/legacy/CAPABILITIES.md`**: the legacy capability map.
@@ -532,7 +700,9 @@ Read them; don't edit them by hand.
 - **`specs/0001-slug/approvals.md`**: every approval and what changed in it.
 - **`specs/0001-slug/decisions.md`**: every question and answer, reused in later prompts.
 - **`specs/0001-slug/interview.jsonl`**: the interview transcript.
+- **`specs/0001-slug/review/SDD_….json`** and **`verify/SDD_….json`**: each scenario's lens review and verification, discarded findings and their reasons included. `review/branch.json` and `verify/feature.json` come from `specforge review` and `specforge verify`.
 - **`specs/0001-slug/DELIVERY.md`, `trace.json`, `PR_BODY.md`**: the hand-over, rewritten by each `deliver`.
+- **`.claude/settings.json`**, **`.gemini/settings.json`**: the guard hook entry; the rest of each file is yours.
 - **`docs/legacy/INVENTORY.md`**: the legacy inventory, rewritten by each scan.
 - **`docs/legacy/decisions.md`, `questions.md`**: questions asked while mapping the legacy code.
 - **`docs/security/`**: audit reports, owner-only permissions.
@@ -545,7 +715,7 @@ Read them; don't edit them by hand.
 
 Commit everything else: the specifications, plans, logs and the delivery are the project's history.
 
-## 15. Recipes
+## 18. Recipes
 
 **Change an approved specification.** Edit `specs/0001-slug.md`, then:
 
@@ -583,15 +753,29 @@ specforge loop --resume
 
 **Use another agent or model once.** `--agent gemini` or `--model <name>` on `spec interview`, `plan`, `loop`, `audit`, `e2e`, `legacy map` and `spec from-legacy`.
 
-**Run in CI.** Add `--non-interactive`. Questions go to `questions.md` with exit code 5; every other outcome has its own [exit code](#17-exit-codes). `--json` prints data and errors as JSON.
+**Run in CI.** Add `--non-interactive`. Questions go to `questions.md` with exit code 5; every other outcome has its own [exit code](#20-exit-codes). `--json` prints data and errors as JSON.
 
 **See exactly what the agent received.** Add `--trace-io` and read the log file.
 
-**Make a missing tool block.** `--strict`, or `quality.strict: true`.
+**Make a missing tool block.** `--strict`, or `quality.strict: true`. Strict also makes every change high risk.
+
+**Check a new machine.** `specforge doctor`; every ⚠ and ✗ says what to install.
+
+**Accept a file outside the plan.** Answer *Accept them* when asked; it joins the specification's surfaces. To stop being asked, add it to the plan's components and approve the plan again.
+
+**Review only risky scenarios yourself.** `review: risk` in `specforge.yaml`.
+
+**Force the verifier, or turn it off.** `verify: always` or `verify: off`; `specforge verify 0001` runs it once over the whole specification.
+
+**Let one command through the guard.** Add its pattern to `guard.allow`, for example `"git push --force-with-lease origin claude/*"`.
+
+**Run scenarios side by side.** End each component line of the plan with the markers it serves, approve the plan, and set `loop.parallel: 2`.
+
+**Split a big delivery.** `specforge deliver 0001 --slices`, then one pull request per `PR_BODY-n.md`, in order.
 
 **Open a pull request.** `specforge deliver 0001`, then `gh pr create --body-file specs/0001-slug/PR_BODY.md`.
 
-## 16. Configuration reference
+## 19. Configuration reference
 
 Values resolve in this order: command-line flag, then `specforge.yaml`, then your user configuration, then the default. Every key is optional.
 
@@ -608,7 +792,8 @@ agent: claude
 model: ""
 # attempts per phase
 max_attempts: 3
-# scenario: review each one (R2) | off
+# scenario: review each one (R2)
+# | risk: only medium and high | off
 review: scenario
 # one commit per finished scenario
 commit: true
@@ -616,11 +801,46 @@ timeouts:
   agent: 20m
   tests: 10m
 quality:
-  # true: a skipped gate blocks
+  # true: a skipped gate blocks, and
+  # every change is high risk
   strict: false
   max_duplication_percent: 0
   min_mutation_score: 80
-# only for a rewrite (section 13)
+  # lowest risk that runs mutation
+  mutation_from: medium
+# a model per phase, over `model`
+models:
+  review: claude-opus-5-5
+risk:
+  # larger changes are high risk
+  max_lines: 400
+  # lowest tier any change gets
+  floor: passive
+  # regular expressions; when set
+  # they replace the defaults
+  high_paths: ["(^|/)ledger/"]
+  passive_paths: ["\\.md$"]
+# auto (by risk) | off | a list
+lenses: auto
+# high risk: every lens twice
+blind_review: false
+# high | always | feature | off
+verify: high
+verify_max_mb: 500
+plan:
+  # outside the plan: ask | strict | off
+  surfaces: ask
+delivery:
+  # slices are proposed above it
+  budget_lines: 400
+loop:
+  # disjoint scenarios side by side
+  parallel: 1
+guard:
+  # block | confirm | off
+  mode: block
+  allow: []
+# only for a rewrite (section 15)
 migration:
   legacy: ../old-system
   java_release: 21
@@ -640,19 +860,19 @@ Unknown keys are an error, so a typo never silently leaves a default in place.
 - `--debug`: debug records in the log.
 - `--trace-io`: every prompt and answer in the log.
 
-## 17. Exit codes
+## 20. Exit codes
 
 - **0**: done.
 - **1**: unexpected error or bad usage.
-- **2**: a gate said no: tests, quality, security findings, E2E pass rate, a legacy document that was not accepted, or the agent is blocked.
+- **2**: a gate said no: tests, quality, a review finding or a correction you stopped, the verifier, a refused file not put back, security findings, E2E pass rate, a legacy document that was not accepted, or the agent is blocked. The guard also blocks a command with exit 2, which your agent sees.
 - **3**: the specification or the loop state needs attention: not approved, changed after approval, lint issues, ambiguous or missing, test tampering, a loop in progress.
-- **4**: a tool, browser or setting is missing: agent CLI, test runner, configuration, legacy repository.
+- **4**: a tool, browser or setting is missing: agent CLI, test runner, configuration, legacy repository; `doctor` found something required missing.
 - **5**: a question awaits your answer (no terminal).
 - **130**: interrupted with Ctrl-C; the state saved so far is valid.
 
 Every failure prints what happened, why and what to do next.
 
-## 18. Troubleshooting
+## 21. Troubleshooting
 
 - **What did the agent receive and answer?** Re-run with `--trace-io` and read the log file.
 - **The agent claims files it did not write.** The attempt is rejected and the agent is told which ones; that is the loop working. Repeated rejections exhaust `max_attempts` (exit 2).
@@ -662,8 +882,12 @@ Every failure prints what happened, why and what to do next.
 - **"The agent changed the legacy code".** Restore the legacy repository (`git checkout .` there) and run the command again; the agent may only read it.
 - **A legacy document keeps coming back.** The diagnosis lists each citation that did not resolve, and the agent gets the same list. Citations are relative to the legacy repository.
 - **`deliver` says 0 scenarios finished.** The loop state is local: run `deliver` in the clone where the loop ran.
+- **A review finding was discarded.** Its proof did not point at a line the change added or modified: the record in `review/SDD_….json` says which reference failed.
+- **"A review step failed closed".** The lens, refuter or verifier never returned valid JSON. Run again; if it repeats, try another model with `models.review` or `models.verify`.
+- **"A refused file was not put back".** Restore it (`git checkout -- <file>`) and `loop --resume`.
+- **The guard blocks a command you need.** Run it yourself, or add its pattern to `guard.allow`.
 
-## 19. Architecture
+## 22. Architecture
 
 SpecForge follows the architecture it asks of your code: the domain is pure, use cases depend on small ports, adapters do the I/O and `cmd/` only wires them.
 
@@ -672,13 +896,26 @@ cmd/            CLI, composition root,
                 exit codes
 internal/
   domain/       pure, no I/O:
-    spec/       Gherkin, seal, lint
+    spec/       Gherkin, seal, lint,
+                plan surfaces
+    risk/       tiers from paths, lines
+    review/     diff hunks, findings,
+                proof, blind merge
+    verification/ the verifier's report
+    guard/      destructive commands
+    change/     lines per file
     legacy/     inventory, citations,
                 migration conformance
     tdd/ stack/ quality/ lessons/
     delivery/ security/ e2e/
   app/          use cases:
-    tddloop/    the TDD loop
+    tddloop/    the TDD loop, review,
+                verify, parallel batches
+    reviewer/   review lenses, refuter
+    verifier/   the verifier in a copy
+    doctor/     environment checks
+    guardhook/  the guard as a hook
+    answer/     schema-checked answers
     specs/      spec lifecycle
     planning/   the plan
     interview/  the interview
@@ -691,7 +928,8 @@ internal/
   ports/        what use cases need
   adapters/     agent CLI, processes,
                 runners, gates, git,
-                browser, files, logs
+                scratch copies, browser,
+                files, logs
   config/ ui/   settings, terminal UI
 assets/         prompts, rules,
                 standards, templates,

@@ -15,6 +15,7 @@ import (
 // Review modes.
 const (
 	ReviewScenario = "scenario"
+	ReviewRisk     = "risk"
 	ReviewOff      = "off"
 )
 
@@ -22,7 +23,15 @@ const (
 // (gate R2) and it is recorded as one commit. A review can send the
 // scenario back to GREEN with a requested change, or to RED.
 func (s *Service) close(ctx context.Context, r *run, sc tdd.ScenarioRef, gates string) error {
-	if r.o.Review == ReviewScenario {
+	a, err := s.assess(ctx, r, true)
+	if err != nil {
+		return err
+	}
+	if !needsReview(r.o.Review, &a) && r.o.Review != ReviewOff {
+		r.st.Record("review", "not needed", "passive change: "+strings.Join(a.Reasons, "; "), s.d.Now())
+		s.d.Events.ReviewSkipped(sc, a)
+	}
+	if needsReview(r.o.Review, &a) {
 		back, note, err := s.review(ctx, r, sc, gates)
 		if err != nil {
 			return err
@@ -42,7 +51,10 @@ func (s *Service) close(ctx context.Context, r *run, sc tdd.ScenarioRef, gates s
 		r.st.Record("review", "accepted", "", s.d.Now())
 	}
 
-	files := slices.Sorted(slices.Values(r.st.FilesWritten))
+	files, err := s.scenarioFiles(ctx, r)
+	if err != nil {
+		return err
+	}
 	sha, err := s.commit(ctx, r, sc, files, "feat")
 	if err != nil {
 		return err
@@ -87,8 +99,10 @@ func (s *Service) commit(ctx context.Context, r *run, sc tdd.ScenarioRef, files 
 	if !r.o.Commit || s.d.VCS == nil || len(files) == 0 {
 		return "", nil
 	}
-	// The decisions and questions taken for the scenario travel with it.
-	for _, doc := range []string{r.lay.Decisions(r.o.SpecPath), r.lay.Questions(r.o.SpecPath)} {
+	// The decisions and questions taken for the scenario, and its review
+	// and verification records, travel with it.
+	for _, doc := range []string{r.lay.Decisions(r.o.SpecPath), r.lay.Questions(r.o.SpecPath),
+		r.lay.ReviewRecord(r.o.SpecPath, sc.Marker), r.lay.VerifyRecord(r.o.SpecPath, sc.Marker)} {
 		if rel := r.lay.Rel(doc); s.d.Files.Exists(doc) && !slices.Contains(files, rel) {
 			files = append(files, rel)
 		}

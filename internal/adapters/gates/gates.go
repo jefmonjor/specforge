@@ -22,14 +22,8 @@ import (
 
 // ForProfile returns the gates that apply to p, in execution order.
 func ForProfile(p stack.Profile, proc ports.CommandRunner, t quality.Thresholds) []ports.Gate {
-	all := []ports.Gate{
-		&Lint{proc: proc},
-		&Duplication{proc: proc, max: t.MaxDuplicationPercent},
-		&DeadCode{proc: proc},
-		&Mutation{proc: proc, min: t.MinMutationScore},
-	}
 	var out []ports.Gate
-	for _, g := range all {
+	for _, g := range all(proc, t) {
 		if g.Applies(p) {
 			out = append(out, g)
 		}

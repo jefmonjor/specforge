@@ -56,17 +56,26 @@ var _ ports.Browser = (*Chrome)(nil)
 //go:embed snapshot.js
 var snapshotJS string
 
+// Find returns the browser Launch would start: CHROME_PATH, else the
+// first Chrome, Chromium or Edge installed in a usual place.
+func Find() (string, error) {
+	if path := os.Getenv("CHROME_PATH"); path != "" {
+		return path, nil
+	}
+	if path := discover(); path != "" {
+		return path, nil
+	}
+	return "", ErrNoBrowser
+}
+
 // Launch starts the browser. Cancelling ctx kills it.
 func Launch(ctx context.Context, o Options) (*Chrome, error) {
 	path := o.ExecPath
 	if path == "" {
-		path = os.Getenv("CHROME_PATH")
-	}
-	if path == "" {
-		path = discover()
-	}
-	if path == "" {
-		return nil, ErrNoBrowser
+		var err error
+		if path, err = Find(); err != nil {
+			return nil, err
+		}
 	}
 	if o.ActionTimeout <= 0 {
 		o.ActionTimeout = 15 * time.Second

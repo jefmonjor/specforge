@@ -77,6 +77,16 @@ func (a *Asker) Ask(ctx context.Context, o Origin, q ports.Question) (string, er
 	return answer, nil
 }
 
+// Record writes a decision nobody had to be asked for, such as the agent
+// raising the risk of a change, so the log keeps every decision in one
+// place.
+func (a *Asker) Record(o Origin, q ports.Question, answer string) error {
+	if err := a.Files.AppendFile(o.DecisionsFile, []byte(a.entry(o, q, strings.TrimSpace(answer)))); err != nil {
+		return fmt.Errorf("recording the decision: %w", err)
+	}
+	return nil
+}
+
 // lookup searches the questions file for q. answer is what the developer
 // wrote in place of the placeholder (an option number becomes the option);
 // pending is true when q is there still unanswered.
@@ -193,18 +203,42 @@ type Entry struct {
 	Answer   string // "" while unanswered
 }
 
+// heading parses an entry's "### <time> · <phase> · …" line.
+func heading(line string) (text, phase string, ok bool) {
+	h, ok := strings.CutPrefix(line, "### ")
+	if !ok {
+		return "", "", false
+	}
+	text = strings.TrimSpace(h)
+	if parts := strings.Split(text, " · "); len(parts) > 1 {
+		phase = parts[1]
+	}
+	return text, phase, true
+}
+
+// Without drops from a log written by Asker the entries of phases.
+func Without(log string, phases ...string) string {
+	var kept strings.Builder
+	drop := false
+	for _, line := range strings.SplitAfter(log, "\n") {
+		if _, phase, ok := heading(strings.TrimRight(line, "\r\n")); ok {
+			drop = slices.Contains(phases, phase)
+		}
+		if !drop {
+			kept.WriteString(line)
+		}
+	}
+	return kept.String()
+}
+
 // Entries parses a decisions or questions log written by Asker, in any
 // language.
 func Entries(log string) []Entry {
 	var out []Entry
 	var cur *Entry
 	for _, line := range strings.Split(strings.ReplaceAll(log, "\r\n", "\n"), "\n") {
-		if h, ok := strings.CutPrefix(line, "### "); ok {
-			e := Entry{Heading: strings.TrimSpace(h)}
-			if parts := strings.Split(e.Heading, " · "); len(parts) > 1 {
-				e.Phase = parts[1]
-			}
-			out = append(out, e)
+		if h, phase, ok := heading(line); ok {
+			out = append(out, Entry{Heading: h, Phase: phase})
 			cur = &out[len(out)-1]
 			continue
 		}

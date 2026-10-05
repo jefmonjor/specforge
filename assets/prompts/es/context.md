@@ -12,6 +12,12 @@ Esto es una reescritura: el comportamiento sale del código legacy en `{{.Legacy
 ## Plan técnico aprobado (síguelo; pregunta antes de apartarte de él)
 {{.Plan}}
 {{end}}
+{{- if .Surfaces}}
+## Ficheros que puedes editar
+Cambia solo estos ficheros (una ruta terminada en `/` permite todo lo que haya debajo). SpecForge comprueba cada fichero que cambias; cualquier otro va al desarrollador, que puede rechazarlo. Si la tarea necesita otro fichero, pregunta.
+{{range .Surfaces}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Glossary}}
 ## Lenguaje ubicuo (usa estos nombres en el código)
 {{.Glossary}}
@@ -24,6 +30,12 @@ Esto es una reescritura: el comportamiento sale del código legacy en `{{.Legacy
 ## Decisiones ya tomadas por el desarrollador (no vuelvas a preguntarlas)
 {{.Decisions}}
 {{end}}
+{{- if .Known}}
+## Fallos conocidos en esta rama (no son tuyos)
+Estos tests ya fallaban antes de empezar el loop. No intentes arreglarlos, ni borrarlos ni saltarlos; SpecForge no te los cuenta.
+{{range .Known}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Lessons}}
 ## Lecciones de escenarios anteriores
 {{.Lessons}}

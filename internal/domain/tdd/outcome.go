@@ -9,6 +9,9 @@ type Outcome struct {
 	Passed   int
 	Failed   int
 	Skipped  int
+	// Failures names the tests that failed, when the report has names.
+	// Failed can be larger: a runner may count what it cannot name.
+	Failures []TestRef
 	// Exact is false when the runner offers no machine-readable report and
 	// the verdict comes from the exit code alone.
 	Exact bool

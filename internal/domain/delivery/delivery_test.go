@@ -69,3 +69,69 @@ func TestPRBodyKeepsTheRepositoryTemplate(t *testing.T) {
 		t.Fatalf("plain body:\n%s", plain)
 	}
 }
+
+func TestKnownFailuresAreListedApart(t *testing.T) {
+	tr := sample()
+	tr.Baseline = &Baseline{Command: "go test ./...", Failures: []string{"pay › TestLegacyRounding"}}
+	md := tr.Markdown("en")
+	for _, want := range []string{
+		"## Known failures (already failing before the loop; not counted against it)\n\n- `pay › TestLegacyRounding`",
+		"Baseline: 1 test(s) already failed before the loop (`go test ./...`)",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+	if !strings.Contains(tr.PRBody("es", ""), "Línea base: 1 test(s) ya fallaban") {
+		t.Error("the PR body states the baseline too")
+	}
+	tr.Baseline.Failures = nil
+	if md := tr.Markdown("en"); strings.Contains(md, "Known failures") || !strings.Contains(md, "the whole suite passed before the loop") {
+		t.Errorf("a clean baseline is one line, not a section:\n%s", md)
+	}
+}
+
+func TestRiskIsShownPerScenario(t *testing.T) {
+	tr := sample()
+	tr.Scenarios[0].Risk = &Risk{Tier: "high", Lines: 40, Reasons: []string{"`auth/x.go` is a sensitive path"}}
+	if md := tr.Markdown("en"); !strings.Contains(md, "risk high: `auth/x.go` is a sensitive path") {
+		t.Errorf("missing the risk note:\n%s", md)
+	}
+}
+
+func TestReviewIsShownPerScenarioWithItsFollowUps(t *testing.T) {
+	tr := sample()
+	tr.Scenarios[0].Review = &Review{Lenses: []string{"risk", "reliability", "readability", "resilience"}, Reported: 5, Corrected: 2, Discarded: 1,
+		FollowUps: []string{"REL-004 · `pay/net.go:9` · rounding was already wrong"}}
+	tr.Checks.BranchReview = &Review{Lenses: []string{"reliability"}, Reported: 1, Open: []string{"REL-001 · `a.go:3` · x"}}
+	md := tr.Markdown("en")
+	for _, want := range []string{
+		"review: 4 lens(es) · 2 corrected · 1 follow-up(s) · 1 discarded",
+		"## Review follow-ups (not blocking: pre-existing, or accepted by the developer)\n\n- SDD_0001_001 · REL-004 · `pay/net.go:9` · rounding was already wrong\n",
+		"## ⚠ Review findings still open (they block)\n\n- REL-001 · `a.go:3` · x",
+		"⚠ This delivery is incomplete",
+		"Branch review: 1 lens(es) · 1 reported · 1 still open",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+}
+
+func TestVerificationIsShown(t *testing.T) {
+	tr := sample()
+	tr.Scenarios[0].Verify = &Verification{Met: 3, Unmet: 1, FollowUps: []string{"INV-02"}}
+	tr.Checks.Verify = &Verification{Met: 4, Unmet: 1, Open: []string{"INV-03 · `go run . -5` → `net: -5` (expected error)"}}
+	md := tr.Markdown("en")
+	for _, want := range []string{
+		"verify: 3 met · 1 unmet · 0 unverified",
+		"SDD_0001_001 · INV-02 · still broken after its correction (verify)",
+		"## ⚠ Requirements the verifier showed broken\n\n- INV-03",
+		"Independent verification of the specification: 4 met · 1 unmet",
+		"⚠ This delivery is incomplete",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+}

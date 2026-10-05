@@ -1,6 +1,7 @@
 package tdd
 
 import (
+	"specforge/internal/domain/risk"
 	"testing"
 	"time"
 )
@@ -175,5 +176,65 @@ func TestSendBackAndJump(t *testing.T) {
 	s.Advance(now) // REFACTOR → done (scenario 2 is still done)
 	if !s.Done() {
 		t.Fatalf("after redoing scenario 1 the loop is done: %+v", s)
+	}
+}
+
+func TestUpgradeReadsTheLastVersionOnly(t *testing.T) {
+	for v, ok := range map[int]bool{1: false, 2: true, StateVersion: true, StateVersion + 1: false} {
+		s := &State{Version: v}
+		if got := s.Upgrade(); got != ok {
+			t.Fatalf("Upgrade(v%d) = %v, want %v", v, got, ok)
+		}
+		if ok && s.Version != StateVersion {
+			t.Fatalf("Upgrade(v%d) left version %d", v, s.Version)
+		}
+	}
+}
+
+func TestCarryKeepsTheBaseline(t *testing.T) {
+	now := time.Now()
+	old := NewState("s.md", "0001", "h1", []ScenarioRef{{Index: 1, Fingerprint: "a"}}, now)
+	old.Baseline = &Baseline{Failures: []TestRef{{Name: "TestBroken"}}}
+	fresh := NewState("s.md", "0001", "h2", []ScenarioRef{{Index: 1, Fingerprint: "b"}}, now)
+	fresh.Carry(old, now)
+	if !fresh.Baseline.Has(TestRef{Name: "TestBroken"}) {
+		t.Fatal("an amended specification keeps the baseline of the branch")
+	}
+}
+
+func TestRaiseKeepsTheStrictestRequest(t *testing.T) {
+	s := twoScenarios()
+	if s.Raise(risk.Passive, "no") {
+		t.Fatal("asking for passive raises nothing")
+	}
+	if !s.Raise(risk.Medium, "touches the API") || !s.Raise(risk.High, "touches tokens") {
+		t.Fatal("stricter requests are kept")
+	}
+	if s.Raise(risk.Medium, "less") {
+		t.Fatal("a lower request never replaces a higher one")
+	}
+	if sc, _ := s.Scenario(); sc.RaisedTo != risk.High || sc.RaisedWhy != "touches tokens" {
+		t.Fatalf("scenario = %+v", sc)
+	}
+	if err := s.Jump(1, PhaseRed, t0); err != nil || s.Scenarios[0].RaisedTo != "" {
+		t.Fatalf("redoing a scenario forgets its risk: %+v %v", s.Scenarios[0], err)
+	}
+}
+
+func TestAcceptedAndRefusedSurfaces(t *testing.T) {
+	s := twoScenarios()
+	s.Refuse("go.mod", "")
+	s.Refuse("README.md", "h1")
+	s.Refuse("README.md", "h2") // the first fingerprint is the one to go back to
+	if got := s.Unreverted(map[string]string{"go.mod": "x", "README.md": "h2"}); len(got) != 2 {
+		t.Fatalf("both still changed: %v", got)
+	}
+	if got := s.Unreverted(map[string]string{"README.md": "h1"}); len(got) != 0 || len(s.Refused) != 0 {
+		t.Fatalf("both put back (go.mod no longer differs from the last commit): %v %v", got, s.Refused)
+	}
+	s.Refuse("docs/a.md", "")
+	s.Accept("docs/a.md", "docs/a.md")
+	if len(s.Surfaces) != 1 || len(s.Refused) != 0 {
+		t.Fatalf("accepting a refused file clears it, once: %v %v", s.Surfaces, s.Refused)
 	}
 }

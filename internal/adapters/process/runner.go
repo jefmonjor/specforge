@@ -122,6 +122,19 @@ func Available(name string) bool {
 	return err == nil
 }
 
+// NodeBin finds a tool installed in the project's node_modules/.bin.
+func NodeBin(root, tool string) (string, bool) {
+	name := tool
+	if runtime.GOOS == "windows" {
+		name += ".cmd"
+	}
+	p := filepath.Join(root, "node_modules", ".bin", name)
+	if _, err := os.Stat(p); err == nil {
+		return p, true
+	}
+	return "", false
+}
+
 // VenvBin returns the executable name from the project's virtual
 // environment (.venv or venv at root), so a Python project runs the pytest
 // and ruff it pins instead of whatever is on PATH.

@@ -12,6 +12,7 @@ import (
 	"specforge/internal/app/prompts"
 	"specforge/internal/domain/lessons"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/ports"
 )
@@ -51,6 +52,24 @@ func (s *Service) red(ctx context.Context, r *run) error {
 	}
 }
 
+// turnOf gets the agent's attempt in GREEN or REFACTOR: a fresh turn, the
+// continuation of a turn a question interrupted, or (for a question
+// SpecForge asked while verifying) the interrupted turn as it was left.
+func (s *Service) turnOf(ctx context.Context, r *run, sc tdd.ScenarioRef, name prompts.Name, data prompts.Data) (turn, error) {
+	pending, err := s.answerPending(ctx, r, sc)
+	if err != nil {
+		return turn{}, err
+	}
+	switch {
+	case pending != nil && pending.Kind == tdd.PendingVerify:
+		return s.observe(ctx, r, pending)
+	case pending != nil:
+		s.withAnswer(r, sc, &data, pending)
+		return s.agentStep(ctx, r, name, data, pending.Workspace)
+	}
+	return s.agentStep(ctx, r, name, data, nil)
+}
+
 // redTurn gets the agent's RED attempt: a fresh turn, the continuation of
 // a turn a question interrupted, or (for a question SpecForge asked while
 // verifying) the interrupted turn as it was left on disk. testsBefore are
@@ -86,6 +105,12 @@ func (s *Service) redTurn(ctx context.Context, r *run, sc tdd.ScenarioRef, data 
 func (s *Service) verifyRed(ctx context.Context, r *run, sc tdd.ScenarioRef, t turn, testsBefore map[string]string) (done bool, feedback string, err error) {
 	if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
 		return false, s.reject(r, RejectFalseClaim, joinPaths(bad), ""), nil
+	}
+	if fb, err := s.checkSurfaces(ctx, r, sc, t); err != nil || fb != "" {
+		if err != nil {
+			s.pendVerify(r, sc, t, testsBefore, err)
+		}
+		return false, fb, err
 	}
 	testsAfter, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
 	if err != nil {
@@ -155,16 +180,7 @@ func (s *Service) green(ctx context.Context, r *run) error {
 			data.Feedback = r.st.ReviewNote
 		}
 
-		pending, err := s.answerPending(ctx, r, sc)
-		if err != nil {
-			return err
-		}
-		var before ports.Snapshot
-		if pending != nil {
-			before = pending.Workspace
-			s.withAnswer(r, sc, &data, pending)
-		}
-		t, err := s.agentStep(ctx, r, prompts.Green, data, before)
+		t, err := s.turnOf(ctx, r, sc, prompts.Green, data)
 		if err != nil {
 			return err
 		}
@@ -173,6 +189,14 @@ func (s *Service) green(ctx context.Context, r *run) error {
 		}
 		if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
 			fb = s.reject(r, RejectFalseClaim, joinPaths(bad), r.st.LastFailure)
+			continue
+		}
+		if next, err := s.checkSurfaces(ctx, r, sc, t); err != nil || next != "" {
+			if err != nil {
+				s.pendVerify(r, sc, t, nil, err)
+				return err
+			}
+			fb = next
 			continue
 		}
 		r.st.AddFiles(t.Changed...)
@@ -208,12 +232,23 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		// Everything was verified already; only the review is missing.
 		return s.close(ctx, r, sc, p.Context)
 	}
+	if _, err := s.assess(ctx, r, false); err != nil {
+		return err
+	}
 	for {
+		if p := r.st.PendingFor(); p != nil && p.Kind == tdd.PendingVerify {
+			// A question about the last turn's files: answer it, then judge
+			// the project again.
+			if _, err := s.afterRefactorTurn(ctx, r, sc, func() (turn, error) { return s.observe(ctx, r, p) }); err != nil {
+				return err
+			}
+			continue
+		}
 		pending, err := s.answerPending(ctx, r, sc)
 		if err != nil {
 			return err
 		}
-		suite, err := s.runTests(ctx, r, "")
+		suiteFailure, err := s.runSuite(ctx, r)
 		if err != nil {
 			return err
 		}
@@ -223,17 +258,13 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		}
 		s.d.Events.Gates(report)
 
-		suiteFailure := ""
-		if !suite.Green() {
-			suiteFailure = suite.Output
-		}
 		if suiteFailure == "" && report.OK(r.o.Strict) {
 			if err := s.learn(r); err != nil {
 				return err
 			}
 			r.st.Record("refactor", "accepted", gateSummary(report), s.d.Now())
 			s.d.Events.Accepted(tdd.PhaseRefactor, sc)
-			return s.close(ctx, r, sc, gateSummary(report))
+			return s.afterRefactor(ctx, r, sc, gateSummary(report))
 		}
 		if suiteFailure == "" && onlySkipped(report, r.o.Strict) {
 			// The agent cannot install tools: stop and tell the developer.
@@ -251,30 +282,41 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		if fb == "" {
 			data.Feedback = r.st.ReviewNote
 		}
-
 		var before ports.Snapshot
 		if pending != nil {
 			before = pending.Workspace
 			s.withAnswer(r, sc, &data, pending)
 		}
-		t, err := s.agentStep(ctx, r, prompts.Refactor, data, before)
+		r.st.Fail(strings.TrimSpace(suiteFailure+"\n"+data.GateReport), s.d.Now())
+		fb, err = s.afterRefactorTurn(ctx, r, sc, func() (turn, error) { return s.agentStep(ctx, r, prompts.Refactor, data, before) })
 		if err != nil {
 			return err
 		}
-		if err := s.checkTampering(r); err != nil {
-			return err
-		}
-		r.st.AddFiles(t.Changed...)
-		r.st.Fail(strings.TrimSpace(suiteFailure+"\n"+data.GateReport), s.d.Now())
-		if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
-			fb = feedback(r.o.Language, RejectFalseClaim, joinPaths(bad))
-		} else {
-			fb = ""
-		}
-		if err := s.save(r); err != nil {
-			return err
-		}
 	}
+}
+
+// afterRefactorTurn runs one REFACTOR turn through take and verifies it:
+// the tests untouched, the claims true, the files within the plan. It
+// returns the feedback for the next turn.
+func (s *Service) afterRefactorTurn(ctx context.Context, r *run, sc tdd.ScenarioRef, take func() (turn, error)) (string, error) {
+	t, err := take()
+	if err != nil {
+		return "", err
+	}
+	if err := s.checkTampering(r); err != nil {
+		return "", err
+	}
+	fb := ""
+	if bad := falseClaims(t.Claimed, t.Changed); len(bad) > 0 {
+		fb = feedback(r.o.Language, RejectFalseClaim, joinPaths(bad))
+	} else if next, err := s.checkSurfaces(ctx, r, sc, t); err != nil {
+		s.pendVerify(r, sc, t, nil, err)
+		return "", errors.Join(err, s.save(r))
+	} else {
+		fb = next
+	}
+	r.st.AddFiles(notRefused(r.st, t.Changed)...)
+	return fb, s.save(r)
 }
 
 // turn is one agent turn as observed on disk.
@@ -283,6 +325,8 @@ type turn struct {
 	Claimed []string
 	// Before is the snapshot the turn is measured from.
 	Before ports.Snapshot
+	// After is the snapshot when the turn ended.
+	After ports.Snapshot
 	// Changed are the files that really changed since Before.
 	Changed []string
 }
@@ -319,7 +363,7 @@ func (s *Service) agentStep(ctx context.Context, r *run, name prompts.Name, data
 	if err != nil {
 		return turn{}, err
 	}
-	return turn{Claimed: resp.FilesWritten, Before: before, Changed: before.Changed(after)}, nil
+	return turn{Claimed: resp.FilesWritten, Before: before, After: after, Changed: before.Changed(after)}, nil
 }
 
 // answerPending answers the question that interrupted the current step,
@@ -378,7 +422,7 @@ func (s *Service) observe(ctx context.Context, r *run, p *tdd.Pending) (turn, er
 	}
 	r.st.Pending = nil
 	before := ports.Snapshot(p.Workspace)
-	return turn{Claimed: p.Claimed, Before: before, Changed: before.Changed(after)}, nil
+	return turn{Claimed: p.Claimed, Before: before, After: after, Changed: before.Changed(after)}, nil
 }
 
 // pendVerify saves a RED step whose verification asked a question nobody
@@ -419,8 +463,16 @@ func (s *Service) runTests(ctx context.Context, r *run, filter string) (tdd.Outc
 
 func (s *Service) runGates(ctx context.Context, r *run) (quality.Report, error) {
 	var report quality.Report
+	tier := risk.Medium
+	if sc, ok := r.st.Scenario(); ok && sc.Risk != nil {
+		tier = sc.Risk.Tier
+	}
 	for _, g := range s.d.Gates {
 		if !g.Applies(r.o.Profile) {
+			continue
+		}
+		if !gateRuns(g.Name(), tier, r.o.MutationFrom) {
+			s.d.Events.GateNotRun(g.Name(), tier)
 			continue
 		}
 		res, err := g.Check(ctx, r.o.Root, r.o.Profile)
@@ -502,12 +554,11 @@ func (s *Service) existingRed(ctx context.Context, r *run, sc tdd.ScenarioRef) (
 // decidePremature asks the developer what a test that passes before any
 // implementation means. accepted is true when the scenario was closed.
 func (s *Service) decidePremature(ctx context.Context, r *run, sc tdd.ScenarioRef, written []string) (accepted bool, stricterFeedback string, err error) {
-	q := question(r.o.Language, "premature")
-	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginVerify), ports.Question{Text: fmt.Sprintf(q.text, sc.Index), Options: q.options, Strict: true})
+	picked, err := s.choose(ctx, r, sc, OriginVerify, "premature")
 	if err != nil {
 		return false, "", fmt.Errorf("%w: %w", tdd.ErrPrematureGreen, err)
 	}
-	switch pick(answer, q.options) {
+	switch picked {
 	case 0:
 		// The test still documents the behaviour: record it like any scenario.
 		r.st.AddFiles(written...)

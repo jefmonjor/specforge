@@ -97,7 +97,7 @@ Results, a screenshot per step and REPORT.md go to docs/e2e/<spec>/.`,
 				Scenarios:    scenarios,
 				MaxSteps:     maxSteps,
 				MinPassRate:  minPassRate / 100,
-				Model:        p.settings.Model,
+				Model:        p.settings.ModelFor("e2e"),
 				AgentTimeout: p.settings.AgentTimeout,
 			})
 			if err != nil {

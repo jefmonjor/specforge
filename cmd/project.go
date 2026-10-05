@@ -99,7 +99,7 @@ func (a *App) resolveStack(ctx context.Context, p project) (stack.Profile, error
 		if prof, ok := stack.ByName(candidates, name); ok {
 			return prof, nil
 		}
-		return stack.Profile{}, fmt.Errorf("%w: stack %q is configured but its build file is not at %s", tdd.ErrUnsupportedStack, name, p.root)
+		return stack.Profile{}, errStackMissing(name, p.root)
 	}
 	switch len(candidates) {
 	case 0:
@@ -122,6 +122,10 @@ func (a *App) resolveStack(ctx context.Context, p project) (stack.Profile, error
 		return prof, nil
 	}
 	return stack.Profile{}, fmt.Errorf("%q is not one of the detected stacks (%s)", answer, strings.Join(names, ", "))
+}
+
+func errStackMissing(name, root string) error {
+	return fmt.Errorf("%w: stack %q is configured but its build file is not at %s", tdd.ErrUnsupportedStack, name, root)
 }
 
 // listFiles walks root for the audit when it is not a git repository.

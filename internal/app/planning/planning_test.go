@@ -125,7 +125,7 @@ func TestDraftBlockedAndPending(t *testing.T) {
 	if !errors.As(err, &blocked) || blocked.Reason != "no idea" {
 		t.Fatalf("err=%v", err)
 	}
-	_, _, err = draft(t, &agent{replies: []string{"```json\n{\"status\":\"needs_clarification\",\"question\":\"REST or gRPC?\"}\n```"}})
+	_, _, err = draft(t, &agent{replies: []string{"```json\n{\"status\":\"needs_clarification\",\"question\":\"REST or gRPC?\",\"options\":[\"REST\",\"gRPC\"]}\n```"}})
 	var pending *clarify.PendingQuestionError
 	if !errors.As(err, &pending) {
 		t.Fatalf("err=%v", err)
@@ -142,7 +142,7 @@ func TestDraftAcceptsTheDecisionsLogWrittenDuringTheTurn(t *testing.T) {
 	root := t.TempDir()
 	a := &agent{root: root,
 		writes:  []map[string]string{nil, {"specs/0001-reset/plan.md": planOK}},
-		replies: []string{"```json\n{\"status\":\"needs_clarification\",\"question\":\"REST or gRPC?\"}\n```", done}}
+		replies: []string{"```json\n{\"status\":\"needs_clarification\",\"question\":\"REST or gRPC?\",\"options\":[\"REST\",\"gRPC\"]}\n```", done}}
 	doc, _ := spec.Parse(specText, spec.ParseOptions{})
 	_, err := Draft(context.Background(), Deps{
 		Agent: a, Workspace: workspace.New(process.NewRunner(nil)), Files: fsys.OS{},

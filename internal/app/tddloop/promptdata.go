@@ -15,14 +15,19 @@ const (
 	maxLessonsBytes     = 6_000
 )
 
-// promptData builds the context shared by every prompt of a scenario.
-func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
-	var source string
+// docScenario is the specification's text of a scenario.
+func (r *run) docScenario(sc tdd.ScenarioRef) spec.Scenario {
 	for _, d := range r.doc.Scenarios {
 		if d.Index == sc.Index {
-			source = d.Source
+			return d
 		}
 	}
+	return spec.Scenario{}
+}
+
+// promptData builds the context shared by every prompt of a scenario.
+func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
+	source := r.docScenario(sc).Source
 	p := r.o.Profile
 	return prompts.Data{
 		SpecTitle:   r.doc.Title,
@@ -41,6 +46,8 @@ func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
 		Lessons:     s.lessons(r),
 		MaxAttempts: r.o.MaxAttempts,
 		Attempt:     r.st.Attempts,
+		Known:       knownFailures(r.st),
+		Surfaces:    r.allowedSurfaces(),
 
 		Legacy:           r.o.Legacy,
 		LegacySources:    legacySources(r.o.Legacy, r.md),

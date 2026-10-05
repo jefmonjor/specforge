@@ -21,7 +21,7 @@ func TestALessonAfterARejectionIsKeptAndShown(t *testing.T) {
 		withLesson(map[string]string{"reset.go": "package m\n// v1\n"}, "Not kept: GREEN passed at once."),
 		writes(map[string]string{test2: testFor("SDD_0001_002"), "expiry.go": "package m\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{notCompiled(), red(1), green(), green(), red(1)}
+	h.tests.outcomes = []tdd.Outcome{baseline(), notCompiled(), red(1), green(), green(), red(1)}
 
 	_, err := h.run()
 	if err == nil || !strings.Contains(err.Error(), "unexpected agent call") {

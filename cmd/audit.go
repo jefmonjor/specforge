@@ -72,7 +72,7 @@ to docs/security/ with owner-only permissions.`,
 				Base:         base,
 				Threshold:    threshold,
 				Language:     p.settings.Language,
-				Model:        p.settings.Model,
+				Model:        p.settings.ModelFor("audit"),
 				AgentTimeout: p.settings.AgentTimeout,
 			})
 			events.Done()
