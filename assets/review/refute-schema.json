@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Refuter verdicts",
+  "type": "object",
+  "required": ["verdicts"],
+  "additionalProperties": false,
+  "properties": {
+    "verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "verdict", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "verdict": {"enum": ["confirmed", "refuted"]},
+          "reason": {"type": "string", "minLength": 10}
+        }
+      }
+    }
+  }
+}

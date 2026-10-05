@@ -203,3 +203,9 @@ func matchesAny(p string, res []*regexp.Regexp) bool {
 	}
 	return false
 }
+
+// Sensitive reports whether p matches a high-risk path.
+func (r Rules) Sensitive(p string) bool { return matchesAny(p, r.High) }
+
+// Documentation reports whether p matches a passive path.
+func (r Rules) Documentation(p string) bool { return matchesAny(p, r.Passive) }

@@ -89,3 +89,44 @@ func FromContent(p string, data []byte) File {
 	}
 	return f
 }
+
+// maxCells bounds the line-diff table; beyond it the count is the
+// conservative upper bound (every line changed).
+const maxCells = 4_000_000
+
+// Between counts the lines that differ between two versions of a file, as
+// a line diff would: the lines of old not kept are deleted, the lines of
+// new not kept are added.
+func Between(p string, old, new []byte) File {
+	a, b := lines(old), lines(new)
+	if len(a)*len(b) > maxCells {
+		return File{Path: p, Added: len(b), Deleted: len(a)}
+	}
+	kept := lcs(a, b)
+	return File{Path: p, Added: len(b) - kept, Deleted: len(a) - kept}
+}
+
+func lines(data []byte) []string {
+	s := strings.TrimSuffix(string(data), "\n")
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, "\n")
+}
+
+// lcs is the length of the longest common subsequence of a and b.
+func lcs(a, b []string) int {
+	prev := make([]int, len(b)+1)
+	cur := make([]int, len(b)+1)
+	for i := 1; i <= len(a); i++ {
+		for j := 1; j <= len(b); j++ {
+			if a[i-1] == b[j-1] {
+				cur[j] = prev[j-1] + 1
+			} else {
+				cur[j] = max(prev[j], cur[j-1])
+			}
+		}
+		prev, cur = cur, prev
+	}
+	return prev[len(b)]
+}

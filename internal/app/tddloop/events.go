@@ -49,6 +49,8 @@ type Events interface {
 	// ReviewSkipped reports a scenario accepted without the developer's
 	// review because its change is passive (review: risk).
 	ReviewSkipped(sc tdd.ScenarioRef, a risk.Assessment)
+	// Reviewed reports the outcome of a scenario's lens review.
+	Reviewed(sc tdd.ScenarioRef, rec tdd.ReviewRecord)
 	Accepted(phase tdd.Phase, sc tdd.ScenarioRef)
 	Satisfied(sc tdd.ScenarioRef)
 	// Committed reports the commit that recorded a scenario; sha is ""
@@ -72,6 +74,7 @@ func (NopEvents) Gates(quality.Report)                           {}
 func (NopEvents) Risk(tdd.ScenarioRef, risk.Assessment)          {}
 func (NopEvents) GateNotRun(string, risk.Tier)                   {}
 func (NopEvents) ReviewSkipped(tdd.ScenarioRef, risk.Assessment) {}
+func (NopEvents) Reviewed(tdd.ScenarioRef, tdd.ReviewRecord)     {}
 func (NopEvents) Accepted(tdd.Phase, tdd.ScenarioRef)            {}
 func (NopEvents) Satisfied(tdd.ScenarioRef)                      {}
 func (NopEvents) Committed(tdd.ScenarioRef, string)              {}

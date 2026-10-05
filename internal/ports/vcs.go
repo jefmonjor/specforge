@@ -38,6 +38,9 @@ type Measurer interface {
 	Changes(ctx context.Context, root string, paths []string) ([]change.File, error)
 	// CommitChanges measures the files a commit changed.
 	CommitChanges(ctx context.Context, root, commit string) ([]change.File, error)
+	// Patch is the unified diff of paths in the working tree against the
+	// last commit, untracked files included as new files.
+	Patch(ctx context.Context, root string, paths []string) (string, error)
 }
 
 // VCS is the project's version control: every capability above. Use cases

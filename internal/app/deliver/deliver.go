@@ -22,6 +22,7 @@ import (
 	"specforge/internal/domain/delivery"
 	"specforge/internal/domain/e2e"
 	"specforge/internal/domain/lessons"
+	"specforge/internal/domain/review"
 	"specforge/internal/domain/security"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
@@ -210,6 +211,9 @@ func scenario(files ports.Files, lay layout.Layout, o Options, id string, sc spe
 	if a := ref.Risk; a != nil {
 		out.Risk = &delivery.Risk{Tier: string(a.Tier), Lines: a.Lines, Reasons: a.Reasons}
 	}
+	if rec := ref.Review; rec != nil && len(rec.Lenses) > 0 {
+		out.Review = reviewOf(rec.Lenses, rec.Reported, len(rec.Corrected), rec.Verdict, rec.FollowUps, nil)
+	}
 	for _, f := range ref.Files {
 		if o.Profile != nil && !o.Profile.IsTestFile(f) {
 			continue
@@ -262,8 +266,49 @@ func testNames(files ports.Files, path, marker string) []string {
 	return names
 }
 
+// reviewOf summarises a review for the delivery.
+func reviewOf(lenses []review.Lens, reported, corrected int, v review.Verdict, followUps, open []review.Finding) *delivery.Review {
+	r := &delivery.Review{Reported: reported, Corrected: corrected, Discarded: len(v.Discarded)}
+	for _, l := range lenses {
+		r.Lenses = append(r.Lenses, string(l))
+	}
+	for _, f := range followUps {
+		r.FollowUps = append(r.FollowUps, findingLine(f))
+	}
+	for _, f := range open {
+		r.Open = append(r.Open, findingLine(f))
+	}
+	return r
+}
+
+func findingLine(f review.Finding) string {
+	return fmt.Sprintf("%s · `%s:%d` · %s", f.ID, f.Location.Path, f.Location.Line, f.Claim)
+}
+
+// branchReview reads the report of `specforge review` for the
+// specification, when there is one.
+func branchReview(files ports.Files, path string) *delivery.Review {
+	data, err := files.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var r struct {
+		Review struct {
+			Lenses   []review.Lens  `json:"lenses"`
+			Reported int            `json:"reported"`
+			Verdict  review.Verdict `json:"verdict"`
+		} `json:"review"`
+	}
+	if json.Unmarshal(data, &r) != nil {
+		return nil
+	}
+	v := r.Review.Verdict
+	return reviewOf(r.Review.Lenses, r.Review.Reported, 0, v, v.FollowUps, append(slices.Clone(v.Blocking), v.Escalated...))
+}
+
 func checks(files ports.Files, o Options, lay layout.Layout) delivery.Checks {
 	var c delivery.Checks
+	c.BranchReview = branchReview(files, filepath.Join(lay.SpecDir(o.SpecPath), "review", "branch.json"))
 	if data, err := files.ReadFile(filepath.Join(o.Root, "docs", "security", "findings.json")); err == nil {
 		var r security.Report
 		if json.Unmarshal(data, &r) == nil {

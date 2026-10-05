@@ -264,7 +264,7 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 			}
 			r.st.Record("refactor", "accepted", gateSummary(report), s.d.Now())
 			s.d.Events.Accepted(tdd.PhaseRefactor, sc)
-			return s.close(ctx, r, sc, gateSummary(report))
+			return s.afterRefactor(ctx, r, sc, gateSummary(report))
 		}
 		if suiteFailure == "" && onlySkipped(report, r.o.Strict) {
 			// The agent cannot install tools: stop and tell the developer.

@@ -48,6 +48,20 @@ type Scenario struct {
 	// Lines are the authored lines of the scenario's commit (lock files,
 	// vendored and golden files excluded).
 	Lines int `json:"lines"`
+	// Review is the lens review; nil when none ran.
+	Review *Review `json:"review,omitempty"`
+}
+
+// Review summarises a lens review.
+type Review struct {
+	Lenses    []string `json:"lenses"`
+	Reported  int      `json:"reported"`
+	Corrected int      `json:"corrected"`
+	Discarded int      `json:"discarded"`
+	// FollowUps are left for later, each as "ID · path:line · claim".
+	FollowUps []string `json:"follow_ups,omitempty"`
+	// Open are findings still blocking (a branch review only).
+	Open []string `json:"open,omitempty"`
 }
 
 // Risk is how much scrutiny a scenario's change got, and why.
@@ -63,6 +77,8 @@ type Checks struct {
 	Security *Security `json:"security,omitempty"`
 	// E2E is nil when no E2E report exists for the specification.
 	E2E *E2E `json:"e2e,omitempty"`
+	// BranchReview is nil when `specforge review` did not run for it.
+	BranchReview *Review `json:"branch_review,omitempty"`
 }
 
 // Security is the audit summary.
@@ -119,8 +135,9 @@ func (t Trace) Count(s Status) int {
 	return n
 }
 
-// Complete reports whether every scenario is done or satisfied and no
-// question is waiting.
+// Complete reports whether every scenario is done or satisfied, no
+// question is waiting and no review finding is open.
 func (t Trace) Complete() bool {
-	return t.Count(Pending) == 0 && len(t.Pending) == 0 && len(t.Scenarios) > 0
+	open := t.Checks.BranchReview != nil && len(t.Checks.BranchReview.Open) > 0
+	return t.Count(Pending) == 0 && len(t.Pending) == 0 && len(t.Scenarios) > 0 && !open
 }

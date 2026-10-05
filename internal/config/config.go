@@ -13,7 +13,10 @@ import (
 	"strings"
 	"time"
 
+	"go.yaml.in/yaml/v3"
+
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
 )
 
@@ -66,7 +69,10 @@ type Project struct {
 	} `yaml:"quality,omitempty"`
 	Migration Migration `yaml:"migration,omitempty"`
 	Risk      Risk      `yaml:"risk,omitempty"`
-	Plan      struct {
+	// Lenses are the review lenses after REFACTOR: auto (by risk), off, or
+	// a list of lenses.
+	Lenses StringList `yaml:"lenses,omitempty"`
+	Plan   struct {
 		// Surfaces: what happens when the agent edits a file the approved
 		// plan does not name (ask, strict or off).
 		Surfaces string `yaml:"surfaces,omitempty"`
@@ -76,6 +82,23 @@ type Project struct {
 		// proposes slices above it.
 		BudgetLines int `yaml:"budget_lines,omitempty"`
 	} `yaml:"delivery,omitempty"`
+}
+
+// StringList reads a YAML scalar or a sequence of scalars.
+type StringList []string
+
+// UnmarshalYAML implements yaml.Unmarshaler.
+func (l *StringList) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode {
+		*l = StringList{n.Value}
+		return nil
+	}
+	var list []string
+	if err := n.Decode(&list); err != nil {
+		return err
+	}
+	*l = list
+	return nil
 }
 
 // Risk tunes how the risk of each scenario's change is classified.
@@ -144,6 +167,10 @@ type Settings struct {
 	// Surfaces is plan.surfaces; BudgetLines is delivery.budget_lines.
 	Surfaces    string
 	BudgetLines int
+	// LensesAuto picks the review lenses by risk; otherwise Lenses are the
+	// lenses of every scenario (none: no lens review).
+	LensesAuto bool
+	Lenses     []review.Lens
 }
 
 // ModelFor resolves the model of a phase: --model, then models.<phase>,
@@ -235,6 +262,10 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 	if p.Quality.MutationFrom != "" {
 		s.MutationFrom, err = risk.ParseTier(p.Quality.MutationFrom)
 		errs = append(errs, err)
+	}
+	s.Lenses, s.LensesAuto, err = review.ParseLenses(p.Lenses)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("lenses: %w", err))
 	}
 	for phase := range p.Models {
 		if !slices.Contains(Phases, phase) {

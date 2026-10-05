@@ -27,6 +27,9 @@ func (*fakeVCS) Changes(context.Context, string, []string) ([]change.File, error
 func (*fakeVCS) CommitChanges(context.Context, string, string) ([]change.File, error) {
 	return nil, nil
 }
+func (*fakeVCS) Patch(context.Context, string, []string) (string, error) {
+	return "", ports.ErrNotARepository
+}
 
 func reviewed(h *harness) *fakeVCS {
 	v := &fakeVCS{}

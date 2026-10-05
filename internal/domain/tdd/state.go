@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
 )
 
@@ -22,9 +23,12 @@ const oldestUpgradable = 2
 type Phase string
 
 const (
-	PhaseRed       Phase = "RED"
-	PhaseGreen     Phase = "GREEN"
-	PhaseRefactor  Phase = "REFACTOR"
+	PhaseRed      Phase = "RED"
+	PhaseGreen    Phase = "GREEN"
+	PhaseRefactor Phase = "REFACTOR"
+	// PhaseReview runs the review lenses over a scenario whose REFACTOR
+	// passed, and its one correction.
+	PhaseReview    Phase = "REVIEW"
 	PhaseCompleted Phase = "COMPLETED"
 )
 
@@ -49,6 +53,32 @@ type ScenarioRef struct {
 	Risk      *risk.Assessment `json:"risk,omitempty"`
 	RaisedTo  risk.Tier        `json:"raised_to,omitempty"`
 	RaisedWhy string           `json:"raised_why,omitempty"`
+	// Review is the lens review of the scenario's change, kept so a resume
+	// never runs the lenses twice.
+	Review *ReviewRecord `json:"review,omitempty"`
+}
+
+// ReviewRecord is the lens review of one scenario and what came of it.
+type ReviewRecord struct {
+	Lenses   []review.Lens  `json:"lenses"`
+	Reported int            `json:"reported"`
+	Verdict  review.Verdict `json:"verdict"`
+	// Correction: the findings sent to the one correction, its size in
+	// lines and the budget it had.
+	Corrected  []review.Finding `json:"corrected,omitempty"`
+	Lines      int              `json:"correction_lines,omitempty"`
+	Budget     int              `json:"correction_budget,omitempty"`
+	Validation map[string]Check `json:"validation,omitempty"`
+	// FollowUps are findings left for later: pre-existing ones, and those
+	// the developer accepted (escalated or regressed).
+	FollowUps []review.Finding `json:"follow_ups,omitempty"`
+	Done      bool             `json:"done,omitempty"`
+}
+
+// Check is the outcome of checking one finding again.
+type Check struct {
+	Status string `json:"status"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // Checkpoint records one completed step for the audit trail.
@@ -230,7 +260,7 @@ func (s *State) Advance(now time.Time) {
 	case PhaseGreen:
 		s.Phase = PhaseRefactor
 		s.LastFailure = ""
-	case PhaseRefactor:
+	case PhaseRefactor, PhaseReview:
 		s.nextScenario()
 	}
 	s.UpdatedAt = now
@@ -261,6 +291,18 @@ func (s *State) SendBack(phase Phase, note string, now time.Time) {
 	if phase == PhaseRed {
 		s.TestHashes = nil
 	}
+	if !s.Done() {
+		s.Scenarios[s.Current].Review = nil // a changed scenario is reviewed again
+	}
+	s.UpdatedAt = now
+}
+
+// Reopen returns a corrected scenario to REFACTOR, keeping its review, so
+// the suite and the gates judge the correction before it is validated.
+func (s *State) Reopen(now time.Time) {
+	s.Phase = PhaseRefactor
+	s.Attempts = 0
+	s.Pending = nil
 	s.UpdatedAt = now
 }
 
@@ -272,9 +314,9 @@ func (s *State) Jump(index int, phase Phase, now time.Time) error {
 		return fmt.Errorf("there is no scenario %d (the specification has %d)", index, len(s.Scenarios))
 	}
 	switch phase {
-	case PhaseRed, PhaseGreen, PhaseRefactor:
+	case PhaseRed, PhaseGreen, PhaseRefactor, PhaseReview:
 	default:
-		return fmt.Errorf("cannot start a scenario at %q: use red, green or refactor", phase)
+		return fmt.Errorf("cannot start a scenario at %q: use red, green, refactor or review", phase)
 	}
 	s.Current = index - 1
 	s.Scenarios[s.Current].Done = false
@@ -282,6 +324,7 @@ func (s *State) Jump(index int, phase Phase, now time.Time) error {
 	s.Scenarios[s.Current].Commit = ""
 	s.Scenarios[s.Current].Files = nil
 	s.Scenarios[s.Current].Risk = nil
+	s.Scenarios[s.Current].Review = nil
 	s.Scenarios[s.Current].RaisedTo, s.Scenarios[s.Current].RaisedWhy = "", ""
 	s.Phase = phase
 	s.Attempts = 0

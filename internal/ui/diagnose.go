@@ -15,6 +15,7 @@ import (
 	"specforge/internal/app/migrate"
 	"specforge/internal/app/planning"
 	"specforge/internal/app/protocol"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/app/specs"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/config"
@@ -122,7 +123,10 @@ func specErrors(_ string, err error, d *Diagnosis) (int, string) {
 	return 0, ""
 }
 
-func gateErrors(_ string, err error, d *Diagnosis) (int, string) {
+func gateErrors(lang string, err error, d *Diagnosis) (int, string) {
+	if code, key := reviewErrors(lang, err, d); key != "" {
+		return code, key
+	}
 	var (
 		gates    *tddloop.GatesError
 		blocked  *tdd.AgentBlockedError
@@ -175,6 +179,26 @@ func gateErrors(_ string, err error, d *Diagnosis) (int, string) {
 		return ExitGate, "auditstep"
 	case errors.As(err, &e2eBelow):
 		return ExitGate, "e2e"
+	}
+	return 0, ""
+}
+
+// reviewErrors classify what the review lenses and the plan's edit
+// surfaces stop: each is a gate saying no.
+func reviewErrors(_ string, err error, _ *Diagnosis) (int, string) {
+	var (
+		blocked  *reviewer.BlockedError
+		step     *reviewer.StepError
+		readOnly *reviewer.ReadOnlyError
+		surfaces *tddloop.SurfaceError
+	)
+	switch {
+	case errors.As(err, &blocked), errors.Is(err, tddloop.ErrReviewStopped):
+		return ExitGate, "review"
+	case errors.As(err, &step), errors.As(err, &readOnly):
+		return ExitGate, "reviewstep"
+	case errors.As(err, &surfaces):
+		return ExitGate, "surfaces"
 	}
 	return 0, ""
 }

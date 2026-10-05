@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"specforge/internal/domain/change"
+	"specforge/internal/domain/review"
 	"specforge/internal/ports"
 )
 
@@ -108,4 +109,44 @@ func untracked(root, rel string) (change.File, bool) {
 		return change.File{}, false
 	}
 	return change.FromContent(rel, data), true
+}
+
+// Patch implements ports.VCS.
+func (g *Git) Patch(ctx context.Context, root string, paths []string) (string, error) {
+	if len(paths) == 0 {
+		return "", nil
+	}
+	if res, err := g.git(ctx, root, "rev-parse", "--is-inside-work-tree"); err != nil {
+		return "", err
+	} else if !res.Success() {
+		return "", ports.ErrNotARepository
+	}
+	base, err := g.head(ctx, root)
+	if err != nil {
+		return "", err
+	}
+	args := append([]string{"--literal-pathspecs", "diff", "--no-color", "--no-ext-diff", "--no-renames", base, "--"}, paths...)
+	res, err := g.git(ctx, root, args...)
+	if err != nil {
+		return "", err
+	}
+	if !res.Success() {
+		return "", fmt.Errorf("git diff: %s", res.Combined())
+	}
+	var b strings.Builder
+	b.WriteString(res.Stdout)
+	tracked, err := g.git(ctx, root, append([]string{"--literal-pathspecs", "ls-files", "--"}, paths...)...)
+	if err != nil {
+		return "", err
+	}
+	known := strings.Split(strings.TrimSpace(tracked.Stdout), "\n")
+	for _, p := range paths {
+		if slices.Contains(known, p) {
+			continue
+		}
+		if data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p))); err == nil {
+			b.WriteString(review.NewFileDiff(p, data))
+		}
+	}
+	return b.String(), nil
 }

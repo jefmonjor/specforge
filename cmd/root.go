@@ -25,6 +25,7 @@ loop against an approved specification, and verifies every step itself.
   specforge plan 0001                draft where the code goes; then plan approve
   specforge loop 0001                Red → Green → Refactor, review, one commit per scenario
   specforge deliver 0001             DELIVERY.md, trace.json and PR_BODY.md
+  specforge review                   the review lenses over your branch (read only)
   specforge audit                    adversarial security review of your branch
   specforge e2e 0001 --url <url>     verify the scenarios in a real browser
 
@@ -63,6 +64,7 @@ awaits your answer · 130 interrupted.`,
 		a.planCommand(),
 		a.loopCommand(),
 		a.deliverCommand(),
+		a.reviewCommand(),
 		a.auditCommand(),
 		a.e2eCommand(),
 		a.versionCommand(),

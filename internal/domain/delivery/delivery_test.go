@@ -98,3 +98,22 @@ func TestRiskIsShownPerScenario(t *testing.T) {
 		t.Errorf("missing the risk note:\n%s", md)
 	}
 }
+
+func TestReviewIsShownPerScenarioWithItsFollowUps(t *testing.T) {
+	tr := sample()
+	tr.Scenarios[0].Review = &Review{Lenses: []string{"risk", "reliability", "readability", "resilience"}, Reported: 5, Corrected: 2, Discarded: 1,
+		FollowUps: []string{"REL-004 · `pay/net.go:9` · rounding was already wrong"}}
+	tr.Checks.BranchReview = &Review{Lenses: []string{"reliability"}, Reported: 1, Open: []string{"REL-001 · `a.go:3` · x"}}
+	md := tr.Markdown("en")
+	for _, want := range []string{
+		"review: 4 lens(es) · 2 corrected · 1 follow-up(s) · 1 discarded",
+		"## Review follow-ups (not blocking: pre-existing, or accepted by the developer)\n\n- SDD_0001_001 · REL-004 · `pay/net.go:9` · rounding was already wrong\n",
+		"## ⚠ Review findings still open (they block)\n\n- REL-001 · `a.go:3` · x",
+		"⚠ This delivery is incomplete",
+		"Branch review: 1 lens(es) · 1 reported · 1 still open",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+}

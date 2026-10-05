@@ -6,9 +6,11 @@ import (
 	"sync"
 
 	"specforge/internal/app/audit"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/domain/e2e"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
@@ -24,7 +26,10 @@ type LoopEvents struct {
 	stop func()
 }
 
-var _ tddloop.Events = (*LoopEvents)(nil)
+var (
+	_ tddloop.Events  = (*LoopEvents)(nil)
+	_ reviewer.Events = (*LoopEvents)(nil)
+)
 
 func (e *LoopEvents) halt() {
 	e.mu.Lock()
@@ -141,6 +146,33 @@ func (e *LoopEvents) GateNotRun(gate string, tier risk.Tier) {
 func (e *LoopEvents) ReviewSkipped(_ tdd.ScenarioRef, a risk.Assessment) {
 	e.halt()
 	e.C.OK(e.C.T("loop.review.skipped", strings.Join(a.Reasons, " · ")))
+}
+
+func (e *LoopEvents) Reviewed(_ tdd.ScenarioRef, rec tdd.ReviewRecord) {
+	e.halt()
+	if len(rec.Lenses) == 0 {
+		e.C.Info(e.C.T("review.none"))
+		return
+	}
+	e.C.OK(e.C.T("review.done", len(rec.Lenses), rec.Reported, len(rec.Corrected), len(rec.FollowUps), len(rec.Verdict.Discarded)))
+	for _, d := range rec.Verdict.Discarded {
+		e.C.Detail(e.C.T("review.discarded", d.ID, d.Reason))
+	}
+}
+
+// Lens implements reviewer.Events.
+func (e *LoopEvents) Lens(l review.Lens) { e.start(e.C.T("review.lens", l)) }
+
+// Refuting implements reviewer.Events.
+func (e *LoopEvents) Refuting(n int) { e.start(e.C.T("review.refuting", n)) }
+
+// Validating implements reviewer.Events.
+func (e *LoopEvents) Validating(n int) { e.start(e.C.T("review.validating", n)) }
+
+// Retried implements reviewer.Events.
+func (e *LoopEvents) Retried(step string) {
+	e.halt()
+	e.C.Warn(e.C.T("review.retried", step))
 }
 
 func (e *LoopEvents) Accepted(p tdd.Phase, _ tdd.ScenarioRef) {

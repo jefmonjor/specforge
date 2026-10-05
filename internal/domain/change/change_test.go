@@ -36,3 +36,16 @@ func TestFromContent(t *testing.T) {
 		t.Fatalf("binary: %+v", f)
 	}
 }
+
+func TestBetween(t *testing.T) {
+	f := Between("a.go", []byte("a\nb\nc\nd\n"), []byte("a\nB\nc\nd\ne\n"))
+	if f.Added != 2 || f.Deleted != 1 {
+		t.Fatalf("Between = %+v (b→B changed, e added)", f)
+	}
+	if f := Between("a.go", nil, []byte("x\ny")); f.Added != 2 || f.Deleted != 0 {
+		t.Fatalf("new file = %+v", f)
+	}
+	if f := Between("a.go", []byte("same\n"), []byte("same\n")); f.Lines() != 0 {
+		t.Fatalf("unchanged = %+v", f)
+	}
+}

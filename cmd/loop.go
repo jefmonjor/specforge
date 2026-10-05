@@ -13,6 +13,7 @@ import (
 	"specforge/internal/adapters/vcs"
 	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/config"
 	"specforge/internal/domain/legacy"
@@ -37,6 +38,10 @@ func (a *App) loopCommand() *cobra.Command {
   GREEN     the agent writes the code; the test files are fingerprinted and may
             not change; the scenario's test must pass
   REFACTOR  the whole suite and the quality gates of the stack must pass
+  REVIEW    review lenses read the scenario's diff (none for a passive change,
+            one for a medium one, four for a high one); every finding must
+            point at a changed line; what blocks gets one correction, judged
+            again by REFACTOR and validated on those findings only
 
 The agent may answer with a question instead of guessing: you answer it at
 the terminal and it is recorded in specs/NNNN-slug/decisions.md. Without a
@@ -81,15 +86,17 @@ The state is saved after every step: --resume continues where it stopped.`,
 			con := a.console()
 			files := fsys.OS{}
 			events := &ui.LoopEvents{C: con, Agent: ag.Name(), Stack: profile.Name()}
+			ws := workspace.New(proc)
 			svc := tddloop.New(tddloop.Deps{
 				Agent: ag,
 				Tests: testrun.New(proc),
 				Gates: append(gates.ForProfile(profile, proc, p.settings.Quality),
 					&gates.Migration{Target: legacy.Target{JavaRelease: p.settings.Migration.JavaRelease, ForbiddenImports: p.settings.Migration.ForbiddenImports}}),
-				Workspace: workspace.New(proc),
+				Workspace: ws,
 				Files:     files,
 				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
 				VCS:       vcs.New(proc),
+				Reviewer:  reviewer.New(reviewer.Deps{Agent: ag, Workspace: ws, Events: events}),
 				Events:    events,
 				Log:       a.log,
 				Now:       a.Now,
@@ -112,6 +119,8 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Risk:         p.settings.Risk,
 				MutationFrom: p.settings.MutationFrom,
 				Surfaces:     p.settings.Surfaces,
+				LensesAuto:   p.settings.LensesAuto,
+				Lenses:       p.settings.Lenses,
 				Strict:       p.settings.Quality.Strict,
 
 				Legacy:           legacyDir,

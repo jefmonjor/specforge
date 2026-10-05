@@ -20,7 +20,9 @@ import (
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/conversation"
 	"specforge/internal/app/layout"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
@@ -68,10 +70,18 @@ type Deps struct {
 	Asker     *clarify.Asker
 	// VCS measures each scenario's change and records it as a commit;
 	// nil measures files without git and commits nothing.
-	VCS    ports.VCS
-	Events Events
-	Log    *slog.Logger
-	Now    func() time.Time
+	VCS ports.VCS
+	// Reviewer runs the review lenses after REFACTOR; nil skips them.
+	Reviewer Reviewer
+	Events   Events
+	Log      *slog.Logger
+	Now      func() time.Time
+}
+
+// Reviewer runs review lenses over a change and validates a correction.
+type Reviewer interface {
+	Review(ctx context.Context, req reviewer.Request) (reviewer.Result, error)
+	Validate(ctx context.Context, req reviewer.Request, fixed []review.Finding) (map[string]reviewer.Validation, error)
 }
 
 // Options select the specification and tune the loop.
@@ -102,6 +112,10 @@ type Options struct {
 	// Surfaces is what happens when the agent changes a file the approved
 	// plan does not name: "ask" (default), "strict" or "off".
 	Surfaces string
+	// LensesAuto picks the review lenses by risk; otherwise Lenses are the
+	// lenses of every scenario (none: no lens review).
+	LensesAuto bool
+	Lenses     []review.Lens
 
 	MaxAttempts       int
 	MaxClarifications int
@@ -228,6 +242,8 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 			err = s.green(ctx, r)
 		case tdd.PhaseRefactor:
 			err = s.refactor(ctx, r)
+		case tdd.PhaseReview:
+			err = s.reviewPhase(ctx, r)
 		}
 		if err != nil {
 			return r.st, errors.Join(err, s.save(r))

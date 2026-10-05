@@ -66,3 +66,20 @@ func TestCommitChanges(t *testing.T) {
 		t.Fatalf("option injection: %v", err)
 	}
 }
+
+func TestPatchIncludesUntrackedFiles(t *testing.T) {
+	root := repo(t)
+	g := New(process.NewRunner(nil))
+	patch, err := g.Patch(context.Background(), root, []string{"a.go", "new.go"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"+++ b/a.go", "+func Login() {}", "new file mode 100644\n--- /dev/null\n+++ b/new.go", "+package a"} {
+		if !strings.Contains(patch, want) {
+			t.Errorf("missing %q in:\n%s", want, patch)
+		}
+	}
+	if _, err := g.Patch(context.Background(), t.TempDir(), []string{"x"}); !errors.Is(err, ports.ErrNotARepository) {
+		t.Fatalf("outside git: %v", err)
+	}
+}

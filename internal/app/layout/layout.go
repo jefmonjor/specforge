@@ -54,6 +54,11 @@ func (l Layout) State(specPath string) string {
 	return filepath.Join(l.LocalDir(), "state", base+".json")
 }
 
+// ReviewRecord is where the lens review of one scenario is kept.
+func (l Layout) ReviewRecord(specPath, marker string) string {
+	return filepath.Join(l.SpecDir(specPath), "review", marker+".json")
+}
+
 // Lessons is the project's curated list of lessons learned.
 func (l Layout) Lessons() string { return filepath.Join(l.SpecsDir(), "LESSONS.md") }
 

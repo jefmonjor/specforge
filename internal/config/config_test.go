@@ -154,3 +154,29 @@ func TestPlanSurfacesAndDeliveryBudget(t *testing.T) {
 		t.Fatalf("invalid mode: %v", err)
 	}
 }
+
+func TestLensesAreAutoOffOrAList(t *testing.T) {
+	root := t.TempDir()
+	load := func(yaml string) (Settings, error) {
+		if err := os.WriteFile(filepath.Join(root, ProjectFile), []byte(yaml), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		p, err := LoadProject(root)
+		if err != nil {
+			return Settings{}, err
+		}
+		return Resolve(User{Agent: "claude"}, p, Overrides{}, true)
+	}
+	if s, err := load("language: en\n"); err != nil || !s.LensesAuto {
+		t.Fatalf("default is auto: %+v %v", s.Lenses, err)
+	}
+	if s, err := load("lenses: off\n"); err != nil || s.LensesAuto || len(s.Lenses) != 0 {
+		t.Fatalf("off: %+v %v", s.Lenses, err)
+	}
+	if s, err := load("lenses: [risk, reliability]\n"); err != nil || s.LensesAuto || len(s.Lenses) != 2 {
+		t.Fatalf("list: %+v %v", s.Lenses, err)
+	}
+	if _, err := load("lenses: style\n"); err == nil || !strings.Contains(err.Error(), "lenses:") {
+		t.Fatalf("unknown lens: %v", err)
+	}
+}

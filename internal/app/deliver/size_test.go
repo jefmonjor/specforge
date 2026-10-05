@@ -24,6 +24,7 @@ const specMD = "# Discounts\n\n## 5. Acceptance criteria\n\n```gherkin\nFeature:
 type measurer map[string][]change.File
 
 func (m measurer) Changes(context.Context, string, []string) ([]change.File, error) { return nil, nil }
+func (m measurer) Patch(context.Context, string, []string) (string, error)          { return "", nil }
 func (m measurer) CommitChanges(_ context.Context, _, sha string) ([]change.File, error) {
 	files, ok := m[sha]
 	if !ok {

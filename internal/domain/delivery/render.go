@@ -17,6 +17,7 @@ type labels struct {
 	known, baseLine, baseClean                                                    string
 	risk                                                                          string
 	size, sizeOver, slices, sliceLine, oversized, lines                           string
+	reviewNote, followUps, branchLine, branchNone, openFindings                   string
 }
 
 var catalog = map[string]labels{
@@ -45,6 +46,11 @@ var catalog = map[string]labels{
 		sliceLine:    "Slice %d · scenario(s) %s · %d line(s) · `git branch specforge/slice-%d %s`",
 		oversized:    " · ⚠ larger than the budget on its own: review it whole, it is never cut",
 		lines:        "%d line(s)",
+		reviewNote:   "review: %d lens(es) · %d corrected · %d follow-up(s) · %d discarded",
+		followUps:    "Review follow-ups (not blocking: pre-existing, or accepted by the developer)",
+		branchLine:   "Branch review: %d lens(es) · %d reported · %d still open · %d follow-up(s) · %d discarded (every finding checked against the diff).",
+		branchNone:   "Branch review: not run.",
+		openFindings: "⚠ Review findings still open (they block)",
 	},
 	"es": {
 		delivery: "Entrega", spec: "Especificación", plan: "Plan", noPlan: "sin plan (el ciclo trabajó desde la especificación)",
@@ -71,6 +77,11 @@ var catalog = map[string]labels{
 		sliceLine:    "Corte %d · escenario(s) %s · %d línea(s) · `git branch specforge/slice-%d %s`",
 		oversized:    " · ⚠ supera el presupuesto por sí solo: revísalo entero, nunca se corta",
 		lines:        "%d línea(s)",
+		reviewNote:   "revisión: %d lente(s) · %d corregidos · %d seguimiento(s) · %d descartados",
+		followUps:    "Seguimientos de la revisión (no bloquean: ya existían o los aceptó el desarrollador)",
+		branchLine:   "Revisión de la rama: %d lente(s) · %d informados · %d aún abiertos · %d seguimiento(s) · %d descartados (cada hallazgo contrastado con el diff).",
+		branchNone:   "Revisión de la rama: no ejecutada.",
+		openFindings: "⚠ Hallazgos de revisión aún abiertos (bloquean)",
 	},
 }
 
@@ -105,6 +116,12 @@ func (t Trace) Markdown(lang string) string {
 	}
 	if t.Baseline != nil && len(t.Baseline.Failures) > 0 {
 		section(&b, l.known, code(t.Baseline.Failures), "")
+	}
+	if r := t.Checks.BranchReview; r != nil && len(r.Open) > 0 {
+		section(&b, l.openFindings, r.Open, "")
+	}
+	if f := t.followUps(); len(f) > 0 {
+		section(&b, l.followUps, f, "")
 	}
 	section(&b, l.decisions, t.Decisions, l.none)
 	if len(t.Pending) > 0 {
@@ -242,11 +259,32 @@ func (sc Scenario) notes(l labels) []string {
 	if sc.Lines > 0 {
 		out = append(out, fmt.Sprintf(l.lines, sc.Lines))
 	}
+	if r := sc.Review; r != nil && len(r.Lenses) > 0 {
+		out = append(out, fmt.Sprintf(l.reviewNote, len(r.Lenses), r.Corrected, len(r.FollowUps), r.Discarded))
+	}
 	if sc.ReviewNotes > 0 {
 		out = append(out, fmt.Sprintf(l.reviewed, sc.ReviewNotes))
 	}
 	if sc.Rejections > 0 {
 		out = append(out, fmt.Sprintf(l.rejected, sc.Rejections))
+	}
+	return out
+}
+
+// followUps lists every scenario's and the branch review's follow-ups.
+func (t Trace) followUps() []string {
+	var out []string
+	for _, sc := range t.Scenarios {
+		if sc.Review != nil {
+			for _, f := range sc.Review.FollowUps {
+				out = append(out, sc.Marker+" · "+escape(f))
+			}
+		}
+	}
+	if r := t.Checks.BranchReview; r != nil {
+		for _, f := range r.FollowUps {
+			out = append(out, escape(f))
+		}
 	}
 	return out
 }
@@ -289,6 +327,9 @@ func (t Trace) checkLines(l labels) []string {
 		lines = append(lines, fmt.Sprintf(l.secLine, s.Confirmed, s.NeedsValidation, s.Rejected))
 	} else {
 		lines = append(lines, l.secNone)
+	}
+	if r := t.Checks.BranchReview; r != nil {
+		lines = append(lines, fmt.Sprintf(l.branchLine, len(r.Lenses), r.Reported, len(r.Open), len(r.FollowUps), r.Discarded))
 	}
 	if e := t.Checks.E2E; e != nil {
 		lines = append(lines, fmt.Sprintf(l.e2eLine, e.Passed, e.Scenarios, e.PassRate*100))

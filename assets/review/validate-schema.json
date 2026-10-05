@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Targeted validation of a correction",
+  "type": "object",
+  "required": ["results"],
+  "additionalProperties": false,
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "status": {"enum": ["resolved", "regression"]},
+          "reason": {"type": "string", "minLength": 5}
+        }
+      }
+    }
+  }
+}

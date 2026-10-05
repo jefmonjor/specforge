@@ -21,6 +21,18 @@ var choices = map[string]map[string]choice{
 		"raised": {
 			text: "The agent asked for more scrutiny of scenario %d",
 		},
+		"escalated": {
+			text:    "Scenario %d · review finding %s at %s:%d, severe but its cause or evidence is unclear: %s What should happen to it?",
+			options: []string{"Keep it as a follow-up", "Correct it now", "Stop the loop"},
+		},
+		"budget": {
+			text:    "Scenario %d: the correction changed %d lines, over its budget of %d: that is a redesign rather than a fix. Accept it?",
+			options: []string{"Accept the larger correction", "Stop the loop"},
+		},
+		"regression": {
+			text:    "Scenario %d · finding %s is not resolved after the correction: %s There is no second automatic correction. What now?",
+			options: []string{"Keep it as a follow-up", "Stop the loop"},
+		},
 		"surfaces": {
 			text:    "Scenario %d: the agent changed files that are not in the approved plan: %s. Accept them for this specification, or refuse them (the agent has to put them back)?",
 			options: []string{"Accept them", "Refuse them"},
@@ -33,6 +45,18 @@ var choices = map[string]map[string]choice{
 	"es": {
 		"raised": {
 			text: "El agente pidió más escrutinio para el escenario %d",
+		},
+		"escalated": {
+			text:    "Escenario %d · hallazgo de revisión %s en %s:%d, grave pero con causa o evidencia poco clara: %s ¿Qué hacemos con él?",
+			options: []string{"Dejarlo como seguimiento", "Corregirlo ahora", "Detener el ciclo"},
+		},
+		"budget": {
+			text:    "Escenario %d: la corrección cambió %d líneas, por encima de su presupuesto de %d: es un rediseño más que un arreglo. ¿La aceptas?",
+			options: []string{"Aceptar la corrección mayor", "Detener el ciclo"},
+		},
+		"regression": {
+			text:    "Escenario %d · el hallazgo %s no quedó resuelto tras la corrección: %s No hay una segunda corrección automática. ¿Y ahora?",
+			options: []string{"Dejarlo como seguimiento", "Detener el ciclo"},
 		},
 		"surfaces": {
 			text:    "Escenario %d: el agente cambió ficheros que no están en el plan aprobado: %s. ¿Los aceptas para esta especificación o los rechazas (el agente tendrá que deshacerlos)?",
