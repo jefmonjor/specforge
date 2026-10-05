@@ -121,3 +121,29 @@ func TestAScenarioThatStopsRunsAgainOnItsOwn(t *testing.T) {
 		t.Fatalf("the question is written once: %d", n)
 	}
 }
+
+func TestAStoppedScenarioRecordsItsEscalationOnce(t *testing.T) {
+	h := parallelHarness(t)
+	raised := func(p *project, _ string) string {
+		p.write(test2, testFor("SDD_0001_002"))
+		return "```json\n{\"status\":\"done\",\"files_written\":[\"" + test2 + "\"],\"risk\":\"high\",\"risk_reason\":\"expiry decides access\"}\n```"
+	}
+	// The attempt in the sandbox is discarded: its escalation is not a
+	// decision about the code that ships, the attempt in the project is.
+	h.agent.byScenario[2] = []reply{raised, ask("Which clock?"), raised, ask("Which clock?")}
+	h.tests.keyed["SDD_0001_002"] = []tdd.Outcome{red(1), red(1)}
+	h.prompter.nonTTY = true
+	_, _ = h.run(inParallel)
+	if n := strings.Count(h.p.read("specs/0001-reset/decisions.md"), "expiry decides access"); n != 1 {
+		t.Fatalf("the escalation is recorded %d times:\n%s", n, h.p.read("specs/0001-reset/decisions.md"))
+	}
+}
+
+func TestWithoutEntriesKeepsTheOtherDecisions(t *testing.T) {
+	log := "### t · RISK · scenario 2\n\n- **Answer:** high\n\n" +
+		"### t · GREEN · scenario 2\n\n- **Answer:** UTC\n\n" +
+		"### t · RISK\n\n- **Answer:** high\n"
+	if got := withoutEntries(log, OriginRisk); got != "### t · GREEN · scenario 2\n\n- **Answer:** UTC\n\n" {
+		t.Fatalf("got %q", got)
+	}
+}

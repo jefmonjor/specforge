@@ -137,7 +137,8 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 	for _, c := range children {
 		ref, ok := s.finished(r, c)
 		if !ok {
-			// The decisions the developer took there still count.
+			// The decisions the developer took there still count; the
+			// attempt itself runs again, so its escalation does not.
 			if c.box.Dir != "" {
 				if err := s.bringLogs(r, sandboxLayout(r, c), false); err != nil {
 					return err
@@ -256,14 +257,16 @@ func (s *Service) bringRecords(r *run, box layout.Layout, ref tdd.ScenarioRef) e
 }
 
 // bringLogs appends what a child added to the decisions and lessons and,
-// for a finished scenario, to the questions.
-func (s *Service) bringLogs(r *run, box layout.Layout, questions bool) error {
+// for a finished scenario, to the questions. The escalations of an
+// unfinished scenario stay behind: they judged an attempt that runs again.
+func (s *Service) bringLogs(r *run, box layout.Layout, finished bool) error {
 	childSpec := box.Abs(r.lay.Rel(r.o.SpecPath))
+	decisions := r.lay.Decisions(r.o.SpecPath)
 	pairs := [][2]string{
-		{r.lay.Decisions(r.o.SpecPath), box.Decisions(childSpec)},
+		{decisions, box.Decisions(childSpec)},
 		{r.lay.Lessons(), box.Lessons()},
 	}
-	if questions {
+	if finished {
 		pairs = append(pairs, [2]string{r.lay.Questions(r.o.SpecPath), box.Questions(childSpec)})
 	}
 	for _, pair := range pairs {
@@ -272,11 +275,35 @@ func (s *Service) bringLogs(r *run, box layout.Layout, questions bool) error {
 		if err != nil || len(theirs) <= len(mine) || string(theirs[:len(mine)]) != string(mine) {
 			continue
 		}
-		if err := s.d.Files.AppendFile(pair[0], theirs[len(mine):]); err != nil {
+		added := string(theirs[len(mine):])
+		if !finished && pair[0] == decisions {
+			added = withoutEntries(added, OriginRisk)
+		}
+		if added == "" {
+			continue
+		}
+		if err := s.d.Files.AppendFile(pair[0], []byte(added)); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// withoutEntries drops from a decisions log the entries of one phase: an
+// entry runs from its "### <time> · <phase> · …" header to the next one.
+func withoutEntries(log, phase string) string {
+	var kept strings.Builder
+	drop := false
+	for _, line := range strings.SplitAfter(log, "\n") {
+		if strings.HasPrefix(line, "### ") {
+			parts := strings.Split(strings.TrimSpace(line), " · ")
+			drop = len(parts) > 1 && parts[1] == phase
+		}
+		if !drop {
+			kept.WriteString(line)
+		}
+	}
+	return kept.String()
 }
 
 // takeBack restores the files of arrivals that will run again.
