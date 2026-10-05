@@ -149,7 +149,8 @@ func (a *App) specApproveCommand() *cobra.Command {
 		Long: `approve lints the specification and refuses while anything blocks it. Then it
 records the approver and the date in the front matter and seals the content
 with a SHA-256 hash. The approver is --by, else your git user.name, else a
-question. Approving an edited specification again accepts the change.`,
+question. Approving an edited specification again accepts the change; each
+scenario keeps its marker (see specforge spec --help).`,
 		Example: "  specforge spec approve 0001\n  specforge spec approve 0001 --by \"Ana López\"",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -181,6 +182,9 @@ question. Approving an edited specification again accepts the change.`,
 				con.OK(con.T("spec.approved", e.Rel, approver, short(res.Hash)))
 				if res.Resealed {
 					a.printDelta(res.Delta)
+				}
+				if res.Positional {
+					con.Warn(con.T("spec.positional", p.layout.Rel(p.layout.Scenarios(e.Path))))
 				}
 				a.printAdvice(res.Advice)
 			}
@@ -528,6 +532,9 @@ func (a *App) runChange(ctx context.Context, p project, e specs.Entry, request s
 	con.OK(con.T("change.done", e.Rel))
 	if preview, err := p.specs(a).Preview(e); err == nil {
 		a.printDelta(preview)
+	}
+	if p.specs(a).Positional(e) {
+		con.Warn(con.T("spec.positional.preview"))
 	}
 	if len(res.Open) > 0 {
 		con.Warn(con.T("interview.open", len(res.Open), e.ID))

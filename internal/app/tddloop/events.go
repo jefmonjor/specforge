@@ -36,6 +36,9 @@ type Events interface {
 	// Orphaned reports tests still carrying the marker of a scenario the
 	// specification no longer has.
 	Orphaned(tests []string)
+	// CheckpointFailed reports, once per run, that the working tree could
+	// not be checkpointed: specforge restore has nothing new to bring back.
+	CheckpointFailed(reason string)
 	// Baseline reports the tests that already failed before the loop (nil
 	// when the runner cannot name them) and whether the project built.
 	Baseline(b *tdd.Baseline, builds bool)
@@ -79,6 +82,7 @@ type NopEvents struct{}
 func (NopEvents) Started(*tdd.State, *spec.Document)             {}
 func (NopEvents) Amended([]string)                               {}
 func (NopEvents) Orphaned([]string)                              {}
+func (NopEvents) CheckpointFailed(string)                        {}
 func (NopEvents) Baseline(*tdd.Baseline, bool)                   {}
 func (NopEvents) Phase(*tdd.State, tdd.ScenarioRef)              {}
 func (NopEvents) AgentWorking(tdd.Phase)                         {}

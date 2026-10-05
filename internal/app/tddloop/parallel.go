@@ -378,6 +378,7 @@ func (q *quietEvents) do(f func()) {
 func (q *quietEvents) Started(*tdd.State, *spec.Document) {}
 func (q *quietEvents) Amended([]string)                   {}
 func (q *quietEvents) Orphaned([]string)                  {}
+func (q *quietEvents) CheckpointFailed(string)            {}
 func (q *quietEvents) Baseline(*tdd.Baseline, bool)       {}
 func (q *quietEvents) Finished(*tdd.State)                {}
 func (q *quietEvents) Phase(st *tdd.State, sc tdd.ScenarioRef) {

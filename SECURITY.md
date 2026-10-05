@@ -6,8 +6,8 @@ Only the latest release of SpecForge receives active security updates and vulner
 
 | Version | Supported          |
 | :---    | :---               |
-| 3.x     | :white_check_mark: |
-| < 3.0   | :x:                |
+| 6.x     | :white_check_mark: |
+| < 6.0   | :x:                |
 
 ## Reporting a Vulnerability
 

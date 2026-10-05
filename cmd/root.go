@@ -22,9 +22,11 @@ loop against an approved specification, and verifies every step itself.
   specforge spec new "<title>"       start a specification from the template
   specforge spec interview 0001      complete it with the agent
   specforge spec approve 0001        lint, record the approver and seal it
+  specforge spec change 0001 "<x>"   change an approved one; approve it again
   specforge plan 0001                draft where the code goes; then plan approve
   specforge loop 0001                Red → Green → Refactor, review, one commit per scenario
   specforge deliver 0001             DELIVERY.md, trace.json and PR_BODY.md
+  specforge restore                  list the loop's checkpoints and bring one back
   specforge review                   the review lenses over your branch (read only)
   specforge verify 0001              an independent check of the specification
   specforge audit                    adversarial security review of your branch
@@ -54,7 +56,7 @@ awaits your answer · 130 interrupted.`,
 	f.BoolVar(&a.flags.traceIO, "trace-io", false, "record every prompt and agent answer in the log file")
 	f.BoolVarP(&a.flags.quiet, "quiet", "q", false, "print only warnings, errors and data")
 	f.BoolVar(&a.flags.nonInteractive, "non-interactive", false, "never ask: write questions to a file and exit with code 5")
-	f.BoolVar(&a.flags.json, "json", false, "print data (version, spec list, deliver) and errors as JSON")
+	f.BoolVar(&a.flags.json, "json", false, "print data and errors as JSON")
 
 	root.AddCommand(
 		a.initCommand(),

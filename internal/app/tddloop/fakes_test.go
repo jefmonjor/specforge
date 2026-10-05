@@ -241,17 +241,18 @@ func (f *fakePrompter) Ask(_ context.Context, q ports.Question) (string, error) 
 }
 
 type recorder struct {
-	mu        sync.Mutex
-	rejected  []Rejection
-	accepted  []tdd.Phase
-	satisfied int
-	answered  int
-	amended   []string
-	orphaned  []string
-	commits   []string
-	known     int
-	risks     []risk.Tier
-	notRun    []string
+	mu               sync.Mutex
+	rejected         []Rejection
+	accepted         []tdd.Phase
+	satisfied        int
+	answered         int
+	amended          []string
+	orphaned         []string
+	checkpointFailed []string
+	commits          []string
+	known            int
+	risks            []risk.Tier
+	notRun           []string
 
 	reviewSkipped int
 	reviews       []tdd.ReviewRecord
@@ -265,6 +266,9 @@ type recorder struct {
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
 func (r *recorder) Amended(p []string)                 { r.amended = p }
 func (r *recorder) Orphaned(tests []string)            { r.orphaned = tests }
+func (r *recorder) CheckpointFailed(reason string) {
+	r.checkpointFailed = append(r.checkpointFailed, reason)
+}
 func (r *recorder) Baseline(b *tdd.Baseline, _ bool) {
 	if b != nil {
 		r.known = len(b.Failures)

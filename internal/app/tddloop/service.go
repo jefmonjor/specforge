@@ -40,8 +40,9 @@ var (
 	// ErrPlanNotApproved: plan.md exists but is a draft or changed since
 	// its approval. Without plan.md the loop runs from the specification.
 	ErrPlanNotApproved = errors.New("the plan is not approved: review specs/<spec>/plan.md and run `specforge plan approve <spec>`")
-	// ErrPlanOutdated: the approved plan does not place every scenario.
-	ErrPlanOutdated = errors.New("the plan does not place every scenario of the specification: update it with `specforge plan <spec>` and approve it again")
+	// ErrPlanOutdated: the approved plan does not match the specification's
+	// scenarios: one is missing, or one it names was removed.
+	ErrPlanOutdated = errors.New("the plan does not match the specification's scenarios: update it with `specforge plan <spec>` and approve it again")
 	// ErrTooManyQuestions: the agent keeps asking within one phase.
 	ErrTooManyQuestions = conversation.ErrTooManyQuestions
 )
@@ -230,6 +231,8 @@ type run struct {
 	// sequential are scenarios a parallel batch could not finish: they run
 	// one at a time.
 	sequential map[int]bool
+	// checkpointFailed is true once a failed checkpoint was reported.
+	checkpointFailed bool
 }
 
 // Run executes the loop until every scenario is done or a step stops it.

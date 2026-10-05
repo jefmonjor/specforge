@@ -52,7 +52,8 @@ func (a *App) loopCommand() *cobra.Command {
 The agent may answer with a question instead of guessing: you answer it at
 the terminal and it is recorded in specs/NNNN-slug/decisions.md. Without a
 terminal the question goes to questions.md and loop exits with code 5.
-The state is saved after every step: --resume continues where it stopped.`,
+The state is saved after every step: --resume continues where it stopped.
+Before every agent turn your working tree is checkpointed (specforge restore).`,
 		Example: "  specforge loop 0001\n  specforge loop --resume\n  specforge loop 0001 --restart --strict",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

@@ -143,5 +143,9 @@ func (s *Service) checkpoint(ctx context.Context, r *run, sc tdd.ScenarioRef) {
 	label := fmt.Sprintf("%s · scenario %d (%s) · before %s", r.specID, sc.Index, sc.Marker, r.st.Phase)
 	if _, err := s.d.Checkpoints.Save(ctx, r.o.Root, label); err != nil && !errors.Is(err, ports.ErrNotARepository) {
 		r.st.Record("checkpoint", "failed", err.Error(), s.d.Now())
+		if !r.checkpointFailed {
+			r.checkpointFailed = true
+			s.d.Events.CheckpointFailed(err.Error())
+		}
 	}
 }

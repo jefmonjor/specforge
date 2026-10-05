@@ -57,6 +57,9 @@ func TestAFailedCheckpointIsRecordedNotFatal(t *testing.T) {
 	if !found || !st.Scenarios[0].Done {
 		t.Fatalf("recorded and the loop went on: done=%v", st.Scenarios[0].Done)
 	}
+	if len(h.events.checkpointFailed) != 1 || h.events.checkpointFailed[0] != "disk full" {
+		t.Fatalf("the developer is told once: %q", h.events.checkpointFailed)
+	}
 }
 
 func TestSandboxesTakeNoCheckpoints(t *testing.T) {

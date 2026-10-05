@@ -106,6 +106,21 @@ func (s Service) ledger(e Entry) (spec.Ledger, error) {
 	return l, nil
 }
 
+// Positional reports a specification approved before the ledger existed
+// whose loop state is not here (another clone, or no loop yet): its next
+// approval numbers the scenarios by position, which may not be the
+// markers its tests carry.
+func (s Service) Positional(e Entry) bool {
+	if l, err := ReadLedger(s.Files, s.Layout, e.Path); err != nil || len(l.Scenarios) > 0 {
+		return false
+	}
+	if !s.Files.Exists(s.Layout.Approvals(e.Path)) {
+		return false
+	}
+	l, err := s.ledger(e)
+	return err == nil && len(l.Scenarios) == 0
+}
+
 // Preview is what approving the specification as it is now would record:
 // each scenario's marker and how it changed. Nothing is written.
 func (s Service) Preview(e Entry) ([]spec.ScenarioChange, error) {
