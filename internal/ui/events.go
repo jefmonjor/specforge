@@ -53,6 +53,23 @@ func (e *LoopEvents) Amended(pending []string) {
 	e.C.Warn(e.C.T("loop.amended", len(pending), strings.Join(pending, " · ")))
 }
 
+func (e *LoopEvents) Baseline(b *tdd.Baseline, builds bool) {
+	e.halt()
+	switch {
+	case !builds:
+		e.C.Warn(e.C.T("loop.baseline.nobuild"))
+	case b == nil:
+		e.C.Warn(e.C.T("loop.baseline.unnamed"))
+	case len(b.Failures) == 0:
+		e.C.OK(e.C.T("loop.baseline.clean"))
+	default:
+		e.C.Warn(e.C.T("loop.baseline.known", len(b.Failures)))
+		for _, f := range b.Failures {
+			e.C.Detail(f.String())
+		}
+	}
+}
+
 func (e *LoopEvents) Phase(st *tdd.State, sc tdd.ScenarioRef) {
 	e.halt()
 	e.C.Title(e.C.T("loop.scenario", sc.Index, len(st.Scenarios), st.Phase, sc.Title))

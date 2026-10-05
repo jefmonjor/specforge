@@ -119,6 +119,11 @@ var messages = map[string]map[string]string{
 		"e2e.step":                "step %d · %s %s → %s",
 		"e2e.result":              "%s · %d/%d Then verified",
 		"e2e.passed":              "pass rate %.0f%% · report in %s",
+		"loop.baseline.known":     "%d test(s) already fail on this branch and will not block (the agent is told to leave them alone):",
+		"loop.baseline.clean":     "the whole suite passes before the loop: every new failure will block",
+		"loop.baseline.unnamed":   "the runner cannot name failing tests: any failure of the whole suite will block",
+		"loop.baseline.nobuild":   "the project does not build before the loop: RED will show why",
+		"reject.new-failures":     "tests that passed before the loop fail now",
 	},
 	"es": {
 		"setup.new.java":          "instala y comprueba las herramientas: mvn test (JUnit, ArchUnit), mvn pmd:check",
@@ -217,5 +222,10 @@ var messages = map[string]map[string]string{
 		"e2e.step":                "paso %d · %s %s → %s",
 		"e2e.result":              "%s · %d/%d Then verificados",
 		"e2e.passed":              "tasa de éxito %.0f%% · informe en %s",
+		"loop.baseline.known":     "%d test(s) ya fallan en esta rama y no bloquearán (el agente sabe que no son suyos):",
+		"loop.baseline.clean":     "la suite completa pasa antes del loop: cualquier fallo nuevo bloqueará",
+		"loop.baseline.unnamed":   "el runner no puede nombrar los tests que fallan: cualquier fallo de la suite bloqueará",
+		"loop.baseline.nobuild":   "el proyecto no compila antes del loop: RED mostrará por qué",
+		"reject.new-failures":     "tests que pasaban antes del loop fallan ahora",
 	},
 }

@@ -183,13 +183,19 @@ type recorder struct {
 	answered  int
 	amended   []string
 	commits   []string
+	known     int
 }
 
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
 func (r *recorder) Amended(p []string)                 { r.amended = p }
-func (r *recorder) Phase(*tdd.State, tdd.ScenarioRef)  {}
-func (r *recorder) AgentWorking(tdd.Phase)             {}
-func (r *recorder) RunningTests(string)                {}
+func (r *recorder) Baseline(b *tdd.Baseline, _ bool) {
+	if b != nil {
+		r.known = len(b.Failures)
+	}
+}
+func (r *recorder) Phase(*tdd.State, tdd.ScenarioRef) {}
+func (r *recorder) AgentWorking(tdd.Phase)            {}
+func (r *recorder) RunningTests(string)               {}
 func (r *recorder) Rejected(why Rejection, _ string) {
 	r.mu.Lock()
 	r.rejected = append(r.rejected, why)
@@ -241,6 +247,10 @@ func red(failed int) tdd.Outcome {
 	return tdd.Outcome{Compiled: true, Exact: true, Failed: failed, Output: "want link"}
 }
 func green() tdd.Outcome { return tdd.Outcome{Compiled: true, Exact: true, Passed: 1} }
+
+// baseline is the whole-suite run a new loop takes before its first RED:
+// nothing fails yet.
+func baseline() tdd.Outcome { return tdd.Outcome{Compiled: true, Exact: true, Passed: 3} }
 func notCompiled() tdd.Outcome {
 	return tdd.Outcome{Compiled: false, Exact: true, Output: "undefined: Reset"}
 }

@@ -74,6 +74,9 @@ type Data struct {
 	Answer           string
 	Attempt          int
 	MaxAttempts      int
+	// Known are the tests that failed before the loop began: not the
+	// agent's to fix.
+	Known []string
 
 	// Migration: the legacy repository (read-only), its inventory, the
 	// capability map, the capability a specification is drafted for, the

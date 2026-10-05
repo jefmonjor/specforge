@@ -24,6 +24,12 @@ This is a rewrite: the behaviour comes from the legacy code at `{{.Legacy}}`, an
 ## Decisions already taken by the developer (do not ask again)
 {{.Decisions}}
 {{end}}
+{{- if .Known}}
+## Known failures on this branch (not yours to fix)
+These tests already failed before this loop started. Do not try to fix them, do not delete or skip them; SpecForge does not count them against you.
+{{range .Known}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Lessons}}
 ## Lessons from earlier scenarios
 {{.Lessons}}

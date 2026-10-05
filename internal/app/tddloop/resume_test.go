@@ -22,6 +22,7 @@ func answerInFile(t *testing.T, p *project, answer string) {
 func TestAQuestionAfterWritingResumesTheSameTurn(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.prompter.nonTTY = true
+	h.tests.outcomes = []tdd.Outcome{baseline()}
 	// The agent writes the test, then asks: nobody is there.
 	h.agent.turns = []reply{func(p *project, prompt string) string {
 		p.write(test1, testFor("SDD_0001_001"))
@@ -70,7 +71,7 @@ func TestAPrematureGreenWithoutTerminalIsDecidedOnResume(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.prompter.nonTTY = true
 	h.agent.turns = []reply{writes(map[string]string{test1: testFor("SDD_0001_001")})}
-	h.tests.outcomes = []tdd.Outcome{green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), green()}
 	_, err := h.run()
 	var pending *clarify.PendingQuestionError
 	if !errors.As(err, &pending) || !errors.Is(err, tdd.ErrPrematureGreen) {
@@ -98,7 +99,7 @@ func TestAnExistingTestIsCheckedBeforeCallingTheAgent(t *testing.T) {
 		h := newHarness(t, specBody)
 		h.p.write(test1, testFor("SDD_0001_001"))
 		h.agent.turns = []reply{writes(map[string]string{"reset.go": "package m\n"})}
-		h.tests.outcomes = []tdd.Outcome{red(1), green()}
+		h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green()}
 		_, err := h.run()
 		if err == nil || !strings.Contains(err.Error(), "unexpected test run") {
 			t.Fatalf("want the script to end in REFACTOR, got %v", err)
@@ -111,7 +112,7 @@ func TestAnExistingTestIsCheckedBeforeCallingTheAgent(t *testing.T) {
 		h := newHarness(t, specBody)
 		h.p.write(test1, testFor("SDD_0001_001"))
 		h.agent.turns = happyScenario("SDD_0001_002", test2, "expiry.go")
-		h.tests.outcomes = []tdd.Outcome{green(), red(1), green(), green()}
+		h.tests.outcomes = []tdd.Outcome{baseline(), green(), red(1), green(), green()}
 		h.prompter.answers = []string{"Yes: mark the scenario as already satisfied"}
 		st, err := h.run()
 		if err != nil || !st.Scenarios[0].Satisfied || len(h.agent.prompts) != 2 {

@@ -177,3 +177,26 @@ func TestSendBackAndJump(t *testing.T) {
 		t.Fatalf("after redoing scenario 1 the loop is done: %+v", s)
 	}
 }
+
+func TestUpgradeReadsTheLastVersionOnly(t *testing.T) {
+	for v, ok := range map[int]bool{1: false, 2: true, StateVersion: true, StateVersion + 1: false} {
+		s := &State{Version: v}
+		if got := s.Upgrade(); got != ok {
+			t.Fatalf("Upgrade(v%d) = %v, want %v", v, got, ok)
+		}
+		if ok && s.Version != StateVersion {
+			t.Fatalf("Upgrade(v%d) left version %d", v, s.Version)
+		}
+	}
+}
+
+func TestCarryKeepsTheBaseline(t *testing.T) {
+	now := time.Now()
+	old := NewState("s.md", "0001", "h1", []ScenarioRef{{Index: 1, Fingerprint: "a"}}, now)
+	old.Baseline = &Baseline{Failures: []TestRef{{Name: "TestBroken"}}}
+	fresh := NewState("s.md", "0001", "h2", []ScenarioRef{{Index: 1, Fingerprint: "b"}}, now)
+	fresh.Carry(old, now)
+	if !fresh.Baseline.Has(TestRef{Name: "TestBroken"}) {
+		t.Fatal("an amended specification keeps the baseline of the branch")
+	}
+}

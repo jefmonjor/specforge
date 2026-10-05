@@ -4,6 +4,8 @@ import (
 	"encoding/xml"
 	"os"
 	"strings"
+
+	"specforge/internal/domain/tdd"
 )
 
 // junitSuite covers the JUnit XML written by Maven Surefire, Gradle and
@@ -30,10 +32,12 @@ type junitProblem struct {
 	Body    string `xml:",chardata"`
 }
 
-// junitTotals sums the counts of every suite in the given report files and
-// collects the failure messages. Errors count as failures: an exception
-// such as NotImplementedError is a legitimate RED once the test compiled.
-func junitTotals(paths []string) (passed, failed, skipped int, output string, ok bool) {
+// junitOutcome sums the counts of every suite in the given report files,
+// names the failing test cases and collects their messages. Errors count
+// as failures: an exception such as NotImplementedError is a legitimate RED
+// once the test compiled. ok is false when no report could be read.
+func junitOutcome(paths []string) (o tdd.Outcome, ok bool) {
+	o = tdd.Outcome{Compiled: true, Exact: true}
 	var out strings.Builder
 	for _, p := range paths {
 		data, err := os.ReadFile(p)
@@ -46,19 +50,25 @@ func junitTotals(paths []string) (passed, failed, skipped int, output string, ok
 		}
 		ok = true
 		for _, s := range flatten(root) {
-			failed += s.Failures + s.Errors
-			skipped += s.Skipped
-			passed += s.Tests - s.Failures - s.Errors - s.Skipped
+			o.Failed += s.Failures + s.Errors
+			o.Skipped += s.Skipped
+			o.Passed += s.Tests - s.Failures - s.Errors - s.Skipped
 			for _, c := range s.Cases {
+				failed := false
 				for _, prob := range []*junitProblem{c.Failure, c.Error} {
 					if prob != nil {
+						failed = true
 						out.WriteString(c.Classname + "." + c.Name + ": " + prob.Message + "\n" + strings.TrimSpace(prob.Body) + "\n\n")
 					}
+				}
+				if failed {
+					o.Failures = append(o.Failures, tdd.TestRef{Suite: c.Classname, Name: c.Name})
 				}
 			}
 		}
 	}
-	return passed, failed, skipped, out.String(), ok
+	o.Output = clip(out.String())
+	return o, ok
 }
 
 func flatten(s junitSuite) []junitSuite {

@@ -66,6 +66,13 @@ type E2E struct {
 	PassRate  float64 `json:"pass_rate"`
 }
 
+// Baseline is what already failed before the loop changed anything.
+type Baseline struct {
+	At       time.Time `json:"at"`
+	Command  string    `json:"command"`
+	Failures []string  `json:"failures"`
+}
+
 // Trace is the machine-readable delivery (trace.json).
 type Trace struct {
 	GeneratedAt time.Time  `json:"generated_at"`
@@ -79,6 +86,9 @@ type Trace struct {
 	Lessons     []string   `json:"lessons,omitempty"`
 	OutOfScope  string     `json:"out_of_scope,omitempty"`
 	Checks      Checks     `json:"checks"`
+	// Baseline is nil when the loop never ran or its runner cannot name
+	// failing tests.
+	Baseline *Baseline `json:"baseline,omitempty"`
 }
 
 // Count returns how many scenarios have status s.

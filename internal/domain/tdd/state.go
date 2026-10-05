@@ -8,8 +8,12 @@ import (
 	"time"
 )
 
-// StateVersion is bumped whenever State changes incompatibly.
-const StateVersion = 2
+// StateVersion is bumped whenever State changes. Older states that only
+// lack the newer fields are upgraded by Upgrade.
+const StateVersion = 3
+
+// oldestUpgradable is the first version Upgrade can read.
+const oldestUpgradable = 2
 
 // Phase is the step of the loop the current scenario is in.
 type Phase string
@@ -117,7 +121,10 @@ type State struct {
 	ReviewNote string `json:"review_note,omitempty"`
 	// Pending is the step a question interrupted when nobody could answer
 	// it. --resume answers it first and continues that same step.
-	Pending     *Pending     `json:"pending,omitempty"`
+	Pending *Pending `json:"pending,omitempty"`
+	// Baseline lists the tests that already failed before the loop began.
+	// Nil when the runner cannot name failures, or for an upgraded state.
+	Baseline    *Baseline    `json:"baseline,omitempty"`
 	Checkpoints []Checkpoint `json:"checkpoints"`
 	UpdatedAt   time.Time    `json:"updated_at"`
 }
@@ -161,10 +168,22 @@ func (s *State) Carry(old *State, now time.Time) []string {
 		pending = append(pending, s.Scenarios[i].Title)
 	}
 	s.Checkpoints = append(old.Checkpoints, s.Checkpoints...)
+	s.Baseline = old.Baseline
 	s.Current = -1
 	s.seek()
 	s.UpdatedAt = now
 	return pending
+}
+
+// Upgrade brings a state written by an older SpecForge to StateVersion.
+// The newer fields start empty (no baseline): nothing is invented. It
+// reports false for a state it cannot read.
+func (s *State) Upgrade() bool {
+	if s.Version < oldestUpgradable || s.Version > StateVersion {
+		return false
+	}
+	s.Version = StateVersion
+	return true
 }
 
 // Done reports whether every scenario went through the loop.

@@ -47,13 +47,12 @@ func (r *Runner) pytest(ctx context.Context, req ports.TestRequest) (tdd.Outcome
 		return tdd.Outcome{}, errors.New("pytest could not run: " + clip(res.Combined()))
 	}
 
-	passed, failed, skipped, out, ok := junitTotals([]string{report})
+	o, ok := junitOutcome([]string{report})
 	if !ok {
-		o := tdd.Outcome{Compiled: true, Exact: false, Output: clip(res.Combined())}
+		o = tdd.Outcome{Compiled: true, Exact: false, Output: clip(res.Combined())}
 		if !res.Success() {
 			o.Failed = 1
 		}
-		return o, nil
 	}
-	return tdd.Outcome{Compiled: true, Exact: true, Passed: passed, Failed: failed, Skipped: skipped, Output: clip(out)}, nil
+	return o, nil
 }

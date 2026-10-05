@@ -70,6 +70,7 @@ func Build(files ports.Files, o Options) (delivery.Trace, error) {
 	}
 
 	st := readState(files, lay.State(o.SpecPath))
+	t.Baseline = baselineOf(st)
 	for _, sc := range doc.Scenarios {
 		t.Scenarios = append(t.Scenarios, scenario(files, lay, o, id, sc, st))
 	}
@@ -129,6 +130,17 @@ func readState(files ports.Files, path string) *tdd.State {
 		return nil
 	}
 	return &st
+}
+
+func baselineOf(st *tdd.State) *delivery.Baseline {
+	if st == nil || st.Baseline == nil {
+		return nil
+	}
+	b := &delivery.Baseline{At: st.Baseline.At, Command: st.Baseline.Command, Failures: []string{}}
+	for _, f := range st.Baseline.Failures {
+		b.Failures = append(b.Failures, f.String())
+	}
+	return b
 }
 
 // scenario traces one scenario. The loop state is matched by content

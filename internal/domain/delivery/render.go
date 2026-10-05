@@ -14,6 +14,7 @@ type labels struct {
 	testsLine, gatesLine, secLine, secNone, e2eLine, e2eNone                      string
 	prSummary, prScenarios, prDecisions, prChecks, prNotDone, prImplements        string
 	incomplete                                                                    string
+	known, baseLine, baseClean                                                    string
 }
 
 var catalog = map[string]labels{
@@ -32,6 +33,9 @@ var catalog = map[string]labels{
 		prSummary: "Summary", prScenarios: "Scenarios", prDecisions: "Decisions", prChecks: "Checks", prNotDone: "Not done",
 		prImplements: "Implements specification %s · %s (`%s`), built test-first with SpecForge.",
 		incomplete:   "⚠ This delivery is incomplete: see the pending items below.",
+		known:        "Known failures (already failing before the loop; not counted against it)",
+		baseLine:     "Baseline: %d test(s) already failed before the loop (`%s`); listed below, they never blocked a scenario.",
+		baseClean:    "Baseline: the whole suite passed before the loop (`%s`); any new failure blocked.",
 	},
 	"es": {
 		delivery: "Entrega", spec: "Especificación", plan: "Plan", noPlan: "sin plan (el ciclo trabajó desde la especificación)",
@@ -48,6 +52,9 @@ var catalog = map[string]labels{
 		prSummary: "Resumen", prScenarios: "Escenarios", prDecisions: "Decisiones", prChecks: "Comprobaciones", prNotDone: "Sin hacer",
 		prImplements: "Implementa la especificación %s · %s (`%s`), construida con tests primero mediante SpecForge.",
 		incomplete:   "⚠ Esta entrega está incompleta: mira los pendientes más abajo.",
+		known:        "Fallos conocidos (ya fallaban antes del loop; no cuentan contra él)",
+		baseLine:     "Línea base: %d test(s) ya fallaban antes del loop (`%s`); listados abajo, nunca bloquearon un escenario.",
+		baseClean:    "Línea base: la suite completa pasaba antes del loop (`%s`); cualquier fallo nuevo bloqueó.",
 	},
 }
 
@@ -74,6 +81,9 @@ func (t Trace) Markdown(lang string) string {
 	}
 	fmt.Fprintf(&b, "**%s** %s\n\n", l.scenarios, t.counts(l))
 	b.WriteString(t.table(l, true))
+	if t.Baseline != nil && len(t.Baseline.Failures) > 0 {
+		section(&b, l.known, code(t.Baseline.Failures), "")
+	}
 	section(&b, l.decisions, t.Decisions, l.none)
 	if len(t.Pending) > 0 {
 		section(&b, l.open, t.Pending, "")
@@ -212,6 +222,13 @@ func (sc Scenario) notes(l labels) []string {
 
 func (t Trace) checkLines(l labels) []string {
 	lines := []string{l.testsLine, l.gatesLine}
+	if b := t.Baseline; b != nil {
+		if len(b.Failures) > 0 {
+			lines = append(lines, fmt.Sprintf(l.baseLine, len(b.Failures), b.Command))
+		} else {
+			lines = append(lines, fmt.Sprintf(l.baseClean, b.Command))
+		}
+	}
 	if s := t.Checks.Security; s != nil {
 		lines = append(lines, fmt.Sprintf(l.secLine, s.Confirmed, s.NeedsValidation, s.Rejected))
 	} else {
@@ -276,6 +293,14 @@ func orDash(s string) string {
 		return "—"
 	}
 	return s
+}
+
+func code(items []string) []string {
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = "`" + it + "`"
+	}
+	return out
 }
 
 func escape(s string) string { return strings.ReplaceAll(s, "|", "\\|") }

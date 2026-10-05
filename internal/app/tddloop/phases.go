@@ -213,7 +213,7 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		if err != nil {
 			return err
 		}
-		suite, err := s.runTests(ctx, r, "")
+		suiteFailure, err := s.runSuite(ctx, r)
 		if err != nil {
 			return err
 		}
@@ -223,10 +223,6 @@ func (s *Service) refactor(ctx context.Context, r *run) error {
 		}
 		s.d.Events.Gates(report)
 
-		suiteFailure := ""
-		if !suite.Green() {
-			suiteFailure = suite.Output
-		}
 		if suiteFailure == "" && report.OK(r.o.Strict) {
 			if err := s.learn(r); err != nil {
 				return err

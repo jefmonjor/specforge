@@ -69,3 +69,24 @@ func TestPRBodyKeepsTheRepositoryTemplate(t *testing.T) {
 		t.Fatalf("plain body:\n%s", plain)
 	}
 }
+
+func TestKnownFailuresAreListedApart(t *testing.T) {
+	tr := sample()
+	tr.Baseline = &Baseline{Command: "go test ./...", Failures: []string{"pay › TestLegacyRounding"}}
+	md := tr.Markdown("en")
+	for _, want := range []string{
+		"## Known failures (already failing before the loop; not counted against it)\n\n- `pay › TestLegacyRounding`",
+		"Baseline: 1 test(s) already failed before the loop (`go test ./...`)",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+	if !strings.Contains(tr.PRBody("es", ""), "Línea base: 1 test(s) ya fallaban") {
+		t.Error("the PR body states the baseline too")
+	}
+	tr.Baseline.Failures = nil
+	if md := tr.Markdown("en"); strings.Contains(md, "Known failures") || !strings.Contains(md, "the whole suite passed before the loop") {
+		t.Errorf("a clean baseline is one line, not a section:\n%s", md)
+	}
+}

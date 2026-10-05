@@ -32,7 +32,7 @@ func TestReviewChangeGoesBackToGreenThenCommits(t *testing.T) {
 		writes(map[string]string{"reset.go": "package m\n// v1\n"}),
 		writes(map[string]string{"reset.go": "package m\n// v2 with a struct\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), green(), green()}
 	h.prompter.answers = []string{"Use a struct instead of a map", "Accept"}
 
 	_, err := h.run(func(o *Options) { o.Review, o.Commit = ReviewScenario, true })
@@ -62,7 +62,7 @@ func TestReviewBackToRedRewritesTheTest(t *testing.T) {
 		writes(map[string]string{"reset.go": "package m\n// v1\n"}),
 		writes(map[string]string{test1: testFor("SDD_0001_001") + "// stricter\n"}),
 	}
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), red(1)}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), red(1)}
 	h.prompter.answers = []string{"Back to RED: the test does not express the scenario"}
 
 	_, err := h.run(func(o *Options) { o.Review = ReviewScenario })
@@ -80,13 +80,13 @@ func TestReviewBackToRedRewritesTheTest(t *testing.T) {
 func TestJumpRedoesOneScenarioFromGreen(t *testing.T) {
 	h := newHarness(t, specBody)
 	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"), happyScenario("SDD_0001_002", test2, "expiry.go")...)
-	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), red(1), green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), red(1), green(), green()}
 	if _, err := h.run(); err != nil {
 		t.Fatal(err)
 	}
 
 	h.agent.turns = []reply{writes(map[string]string{"reset.go": "package m\n// redone\n"})}
-	h.tests.outcomes = []tdd.Outcome{green(), green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), green(), green()}
 	st, err := h.run(func(o *Options) { o.Scenario, o.From = 1, tdd.PhaseGreen })
 	if err != nil {
 		t.Fatal(err)
@@ -103,7 +103,7 @@ func TestASatisfiedScenarioCommitsItsTest(t *testing.T) {
 	h := newHarness(t, specBody)
 	vcs := reviewed(h)
 	h.agent.turns = []reply{writes(map[string]string{test1: testFor("SDD_0001_001")})}
-	h.tests.outcomes = []tdd.Outcome{green()}
+	h.tests.outcomes = []tdd.Outcome{baseline(), green()}
 	h.prompter.answers = []string{"Yes: mark the scenario as already satisfied"}
 	_, err := h.run(func(o *Options) { o.Commit = true })
 	if err == nil || !strings.Contains(err.Error(), "unexpected agent call") {

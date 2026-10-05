@@ -22,6 +22,7 @@ const (
 	RejectUnconfirmed   Rejection = "unconfirmed"
 	RejectReviewChange  Rejection = "review-change"
 	RejectReviewRed     Rejection = "review-red"
+	RejectNewFailures   Rejection = "new-failures"
 )
 
 // Events lets the presentation layer follow the loop. Implementations must
@@ -29,6 +30,9 @@ const (
 type Events interface {
 	Started(st *tdd.State, doc *spec.Document)
 	Amended(pending []string)
+	// Baseline reports the tests that already failed before the loop (nil
+	// when the runner cannot name them) and whether the project built.
+	Baseline(b *tdd.Baseline, builds bool)
 	Phase(st *tdd.State, sc tdd.ScenarioRef)
 	AgentWorking(phase tdd.Phase)
 	RunningTests(command string)
@@ -48,6 +52,7 @@ type NopEvents struct{}
 
 func (NopEvents) Started(*tdd.State, *spec.Document)  {}
 func (NopEvents) Amended([]string)                    {}
+func (NopEvents) Baseline(*tdd.Baseline, bool)        {}
 func (NopEvents) Phase(*tdd.State, tdd.ScenarioRef)   {}
 func (NopEvents) AgentWorking(tdd.Phase)              {}
 func (NopEvents) RunningTests(string)                 {}

@@ -78,6 +78,7 @@ func parseGoTest(stdout, stderr string) tdd.Outcome {
 				o.Passed++
 			case "fail":
 				o.Failed++
+				o.Failures = append(o.Failures, tdd.TestRef{Suite: ev.Package, Name: ev.Test})
 				failedTests = append(failedTests, ev.Package+"."+ev.Test)
 			case "skip":
 				o.Skipped++

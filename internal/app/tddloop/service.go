@@ -158,6 +158,9 @@ type run struct {
 	// lesson is the latest lesson the agent offered in this phase.
 	lesson string
 	st     *tdd.State
+	// fresh is true when this invocation started a new loop: the baseline
+	// is taken before its first RED.
+	fresh bool
 }
 
 // Run executes the loop until every scenario is done or a step stops it.
@@ -182,6 +185,11 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 		}
 	}
 	s.d.Events.Started(r.st, r.doc)
+	if r.fresh {
+		if err := s.takeBaseline(ctx, r); err != nil {
+			return r.st, errors.Join(err, s.save(r))
+		}
+	}
 
 	for !r.st.Done() {
 		if err := ctx.Err(); err != nil {
@@ -267,7 +275,7 @@ func (s *Service) loadState(r *run) error {
 	case err != nil && !errors.Is(err, errNoState):
 		return err
 	case r.o.Restart || (saved == nil && !r.o.Resume):
-		r.st = fresh
+		r.st, r.fresh = fresh, true
 		return s.save(r)
 	case saved == nil:
 		return ErrNothingToResume
@@ -330,7 +338,7 @@ func (s *Service) readState(path string) (*tdd.State, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("loop state %s is corrupt: %w", path, err)
 	}
-	if st.Version != tdd.StateVersion {
+	if !st.Upgrade() {
 		return nil, fmt.Errorf("loop state %s was written by an incompatible version: start over with --restart", path)
 	}
 	return &st, nil

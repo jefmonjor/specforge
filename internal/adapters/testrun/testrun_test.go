@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -61,6 +62,9 @@ func TestGoFailingAssertionIsAValidRed(t *testing.T) {
 	if !strings.Contains(o.Output, "want 70") {
 		t.Fatalf("failure output missing: %q", o.Output)
 	}
+	if want := []tdd.TestRef{{Suite: "example.com/m", Name: "TestSDD_0001_001_Withdraw"}}; !reflect.DeepEqual(o.Failures, want) {
+		t.Fatalf("failures = %v, want %v", o.Failures, want)
+	}
 }
 
 func TestGoCompileErrorIsNotRed(t *testing.T) {
@@ -114,29 +118,43 @@ func TestParseGoTestLegacyBuildOutput(t *testing.T) {
 
 func TestParseJestReport(t *testing.T) {
 	load, _ := os.ReadFile("testdata/vitest-load-error.json")
-	if o := parseJestReport(load); o.Compiled || !strings.Contains(o.Output, "Failed to load") {
+	if o := parseJestReport(load, "/repo"); o.Compiled || !strings.Contains(o.Output, "Failed to load") {
 		t.Errorf("load error must not compile: %+v", o)
 	}
 	mixed, _ := os.ReadFile("testdata/jest-mixed.json")
-	o := parseJestReport(mixed)
+	o := parseJestReport(mixed, "/repo")
 	if !o.Compiled || o.Passed != 2 || o.Failed != 1 || o.Skipped != 1 || !strings.Contains(o.Output, "Received: false") {
 		t.Errorf("mixed report = %+v", o)
 	}
-	if o := parseJestReport([]byte("{")); o.Compiled || o.Exact {
+	want := []tdd.TestRef{{Suite: "src/a.test.js", Name: "reset SDD_0001_001 sends a link"}}
+	if !reflect.DeepEqual(o.Failures, want) {
+		t.Errorf("failures = %v, want %v (file relative to the project)", o.Failures, want)
+	}
+	if o := parseJestReport([]byte("{"), ""); o.Compiled || o.Exact {
 		t.Errorf("garbage report = %+v", o)
 	}
 }
 
-func TestJUnitTotals(t *testing.T) {
-	p, f, s, out, ok := junitTotals([]string{"testdata/surefire.xml"})
-	if !ok || p != 1 || f != 2 || s != 0 || !strings.Contains(out, "Not implemented yet") {
-		t.Errorf("surefire: %d %d %d ok=%v\n%s", p, f, s, ok, out)
+func TestJUnitOutcome(t *testing.T) {
+	o, ok := junitOutcome([]string{"testdata/surefire.xml"})
+	if !ok || o.Passed != 1 || o.Failed != 2 || o.Skipped != 0 || !strings.Contains(o.Output, "Not implemented yet") {
+		t.Errorf("surefire: %+v ok=%v", o, ok)
 	}
-	p, f, s, _, ok = junitTotals([]string{"testdata/pytest.xml"})
-	if !ok || p != 2 || f != 1 || s != 1 {
-		t.Errorf("pytest wrapper: %d %d %d ok=%v", p, f, s, ok)
+	want := []tdd.TestRef{
+		{Suite: "com.acme.ResetTest", Name: "SDD_0001_001_sendsLink"},
+		{Suite: "com.acme.ResetTest", Name: "SDD_0001_002_expires"},
 	}
-	if _, _, _, _, ok := junitTotals([]string{"testdata/missing.xml"}); ok {
+	if !reflect.DeepEqual(o.Failures, want) {
+		t.Errorf("surefire failures = %v, want %v (failures and errors)", o.Failures, want)
+	}
+	o, ok = junitOutcome([]string{"testdata/pytest.xml"})
+	if !ok || o.Passed != 2 || o.Failed != 1 || o.Skipped != 1 {
+		t.Errorf("pytest wrapper: %+v ok=%v", o, ok)
+	}
+	if want := []tdd.TestRef{{Suite: "tests.test_reset", Name: "test_SDD_0001_001_link"}}; !reflect.DeepEqual(o.Failures, want) {
+		t.Errorf("pytest failures = %v", o.Failures)
+	}
+	if _, ok := junitOutcome([]string{"testdata/missing.xml"}); ok {
 		t.Error("missing report must not be ok")
 	}
 }
