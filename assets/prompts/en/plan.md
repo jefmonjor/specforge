@@ -14,8 +14,8 @@ You are working on the approved specification **{{.SpecTitle}}** (`{{.SpecPath}}
 Write the technical plan to `{{.PlanPath}}` and change no other file. Use these sections:
 
 1. `## Approach`: at most five sentences on how the scenarios will be implemented, in the project's existing style.
-2. `## Components`: one line per file to create or change: path, responsibility, new or changed.
-3. `## Tests per scenario`: a table with one row per scenario: marker, scenario title, test file, test name. Every marker must appear: {{range $i, $m := .Markers}}{{if $i}}, {{end}}`{{$m}}`{{end}}.
+2. `## Components`: one line per file to create or change, with the path in backticks, like this line: - `internal/pay/net.go`: computes the net salary (new). SpecForge lets the agent edit only these files, the planned test files and new files under the directory of a new component.
+3. `## Tests per scenario`: a table with one row per scenario: marker, scenario title, test file (in backticks), test name. Every marker must appear: {{range $i, $m := .Markers}}{{if $i}}, {{end}}`{{$m}}`{{end}}.
 4. `## Interfaces and dependencies`: the interfaces (ports) the domain needs and which existing code or library implements them. Prefer what the project already uses; add no dependency the specification does not require.
 5. `## Risks`: what could make a scenario harder than it looks.
 

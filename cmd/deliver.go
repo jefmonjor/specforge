@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"specforge/internal/adapters/fsys"
+	"specforge/internal/adapters/vcs"
 	"specforge/internal/app/deliver"
 	"specforge/internal/config"
 	"specforge/internal/domain/delivery"
@@ -13,7 +14,8 @@ import (
 )
 
 func (a *App) deliverCommand() *cobra.Command {
-	return &cobra.Command{
+	var slices bool
+	c := &cobra.Command{
 		Use:   "deliver [spec]",
 		Short: "Write the hand-over: DELIVERY.md, trace.json and PR_BODY.md (gate R4)",
 		Long: `deliver gathers what SpecForge recorded for an approved specification into
@@ -25,6 +27,12 @@ specs/NNNN-slug/:
   trace.json    the same, for tools
   PR_BODY.md    ready for the pull request; it keeps the repository's PR
                 template when there is one
+
+Each scenario's size is counted from its commit (lock files excluded).
+Above delivery.budget_lines (400 by default) DELIVERY.md proposes slices:
+consecutive scenarios that fit the budget, each with the command to create
+its branch; --slices also writes PR_BODY-1.md … PR_BODY-n.md. A scenario is
+never cut in half.
 
 Nothing comes from the agent: only from the sealed documents, the loop
 state, the decisions log and the reports. What is not done is said first.`,
@@ -40,14 +48,15 @@ state, the decisions log and the reports. What is not done is said first.`,
 			if err != nil {
 				return err
 			}
-			o := deliver.Options{Root: p.root, SpecPath: entry.Path, Language: p.settings.Language, Now: a.Now()}
+			o := deliver.Options{Root: p.root, SpecPath: entry.Path, Language: p.settings.Language, Now: a.Now(),
+				Budget: p.settings.BudgetLines, SliceBodies: slices}
 			if prof, err := a.resolveStack(ctx, p); err == nil {
 				o.Profile = &prof
 			} else if !errors.Is(err, tdd.ErrUnsupportedStack) {
 				return err // ambiguous: never guess
 			}
 			files := fsys.OS{}
-			trace, err := deliver.Build(files, o)
+			trace, err := deliver.Build(ctx, files, vcs.New(a.NewProcess(a.log)), o)
 			if err != nil {
 				return err
 			}
@@ -69,10 +78,15 @@ state, the decisions log and the reports. What is not done is said first.`,
 			} else {
 				con.Warn(con.T("deliver.incomplete", finished, len(trace.Scenarios), len(trace.Pending)))
 			}
+			if len(trace.Slices) > 0 {
+				con.Warn(con.T("deliver.slices", trace.Lines(), trace.Budget, len(trace.Slices)))
+			}
 			for _, path := range rel {
 				con.Data(path)
 			}
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&slices, "slices", false, "also write one PR_BODY-n.md per proposed slice")
+	return c
 }

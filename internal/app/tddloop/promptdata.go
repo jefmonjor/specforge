@@ -42,6 +42,7 @@ func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
 		MaxAttempts: r.o.MaxAttempts,
 		Attempt:     r.st.Attempts,
 		Known:       knownFailures(r.st),
+		Surfaces:    r.allowedSurfaces(),
 
 		Legacy:           r.o.Legacy,
 		LegacySources:    legacySources(r.o.Legacy, r.md),

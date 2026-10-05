@@ -12,6 +12,12 @@ This is a rewrite: the behaviour comes from the legacy code at `{{.Legacy}}`, an
 ## Approved technical plan (follow it; ask before departing from it)
 {{.Plan}}
 {{end}}
+{{- if .Surfaces}}
+## Allowed edit surfaces
+Change only these files (a path ending in `/` allows everything under it). SpecForge checks every file you change; anything else goes to the developer, who may refuse it. If the task needs another file, ask.
+{{range .Surfaces}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Glossary}}
 ## Ubiquitous language (use these names in code)
 {{.Glossary}}

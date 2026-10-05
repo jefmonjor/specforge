@@ -111,6 +111,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Models:       p.settings.ModelChoice(),
 				Risk:         p.settings.Risk,
 				MutationFrom: p.settings.MutationFrom,
+				Surfaces:     p.settings.Surfaces,
 				Strict:       p.settings.Quality.Strict,
 
 				Legacy:           legacyDir,

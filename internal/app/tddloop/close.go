@@ -51,7 +51,10 @@ func (s *Service) close(ctx context.Context, r *run, sc tdd.ScenarioRef, gates s
 		r.st.Record("review", "accepted", "", s.d.Now())
 	}
 
-	files := slices.Sorted(slices.Values(r.st.FilesWritten))
+	files, err := s.scenarioFiles(ctx, r)
+	if err != nil {
+		return err
+	}
 	sha, err := s.commit(ctx, r, sc, files, "feat")
 	if err != nil {
 		return err

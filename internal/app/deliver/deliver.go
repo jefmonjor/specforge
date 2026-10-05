@@ -6,6 +6,7 @@
 package deliver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -17,6 +18,7 @@ import (
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/layout"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/domain/change"
 	"specforge/internal/domain/delivery"
 	"specforge/internal/domain/e2e"
 	"specforge/internal/domain/lessons"
@@ -33,6 +35,11 @@ type Options struct {
 	// Profile tells test files apart; nil when the project has no stack yet.
 	Profile *stack.Profile
 	Now     time.Time
+	// Budget is the size of a reviewable pull request in authored lines;
+	// zero proposes no slices.
+	Budget int
+	// SliceBodies also writes PR_BODY-1.md … PR_BODY-n.md, one per slice.
+	SliceBodies bool
 }
 
 // processOrigins label the questions SpecForge asked about its own process
@@ -43,8 +50,9 @@ var processOrigins = []string{tddloop.OriginReview, tddloop.OriginVerify, tddloo
 var outOfScope = regexp.MustCompile(`(?i)out of scope|fuera de alcance`)
 
 // Build assembles the trace. The specification must be approved: a
-// delivery of something nobody approved would describe nothing.
-func Build(files ports.Files, o Options) (delivery.Trace, error) {
+// delivery of something nobody approved would describe nothing. measure
+// counts each scenario commit's lines; nil skips sizes and slices.
+func Build(ctx context.Context, files ports.Files, measure ports.Measurer, o Options) (delivery.Trace, error) {
 	lay := layout.Layout{Root: o.Root}
 	data, err := files.ReadFile(o.SpecPath)
 	if err != nil {
@@ -108,7 +116,34 @@ func Build(files ports.Files, o Options) (delivery.Trace, error) {
 		}
 	}
 	t.Checks = checks(files, o, lay)
+	if err := size(ctx, measure, o, &t); err != nil {
+		return t, err
+	}
 	return t, nil
+}
+
+// size measures the authored lines of each scenario's commit and, over the
+// budget, proposes slices.
+func size(ctx context.Context, measure ports.Measurer, o Options, t *delivery.Trace) error {
+	if measure == nil {
+		return nil
+	}
+	for i := range t.Scenarios {
+		sc := &t.Scenarios[i]
+		if sc.Commit == "" {
+			continue
+		}
+		files, err := measure.CommitChanges(ctx, o.Root, sc.Commit)
+		if err != nil {
+			return fmt.Errorf("measuring the commit of scenario %d (%s): %w", sc.Index, sc.Commit, err)
+		}
+		sc.Lines = change.Total(change.Authored(files))
+	}
+	t.Budget = o.Budget
+	if t.OverBudget() {
+		t.Slices = delivery.Slices(t.Scenarios, t.Budget)
+	}
+	return nil
 }
 
 func approvalOf(path, content string) delivery.Approval {
@@ -280,8 +315,16 @@ func Write(files ports.Files, o Options, t delivery.Trace) ([]string, error) {
 		filepath.Join(dir, "trace.json"):  append(trace, '\n'),
 		filepath.Join(dir, "PR_BODY.md"):  []byte(t.PRBody(o.Language, template)),
 	}
+	names := []string{"DELIVERY.md", "trace.json", "PR_BODY.md"}
+	if o.SliceBodies {
+		for _, sl := range t.Slices {
+			name := fmt.Sprintf("PR_BODY-%d.md", sl.N)
+			out[filepath.Join(dir, name)] = []byte(t.Sub(sl).PRBody(o.Language, template))
+			names = append(names, name)
+		}
+	}
 	var paths []string
-	for _, name := range []string{"DELIVERY.md", "trace.json", "PR_BODY.md"} {
+	for _, name := range names {
 		p := filepath.Join(dir, name)
 		if err := files.WriteFile(p, out[p]); err != nil {
 			return paths, fmt.Errorf("writing %s: %w", name, err)

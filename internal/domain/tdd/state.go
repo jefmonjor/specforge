@@ -5,6 +5,7 @@ package tdd
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"specforge/internal/domain/risk"
@@ -132,9 +133,16 @@ type State struct {
 	Pending *Pending `json:"pending,omitempty"`
 	// Baseline lists the tests that already failed before the loop began.
 	// Nil when the runner cannot name failures, or for an upgraded state.
-	Baseline    *Baseline    `json:"baseline,omitempty"`
-	Checkpoints []Checkpoint `json:"checkpoints"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	Baseline *Baseline `json:"baseline,omitempty"`
+	// Surfaces are files outside the approved plan that the developer
+	// accepted for this specification.
+	Surfaces []string `json:"surfaces,omitempty"`
+	// Refused maps each file outside the plan the developer refused to its
+	// fingerprint before the agent changed it ("" when it matched the last
+	// commit): the agent has to put it back.
+	Refused     map[string]string `json:"refused,omitempty"`
+	Checkpoints []Checkpoint      `json:"checkpoints"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // NewState starts a loop at RED of the first scenario not yet done.
@@ -177,6 +185,7 @@ func (s *State) Carry(old *State, now time.Time) []string {
 	}
 	s.Checkpoints = append(old.Checkpoints, s.Checkpoints...)
 	s.Baseline = old.Baseline
+	s.Surfaces, s.Refused = old.Surfaces, old.Refused
 	s.Current = -1
 	s.seek()
 	s.UpdatedAt = now
@@ -322,6 +331,45 @@ func (s *State) Raise(to risk.Tier, why string) bool {
 	}
 	sc.RaisedTo, sc.RaisedWhy = to, why
 	return true
+}
+
+// Accept adds files outside the plan the developer accepted.
+func (s *State) Accept(paths ...string) {
+	for _, p := range paths {
+		if !slices.Contains(s.Surfaces, p) {
+			s.Surfaces = append(s.Surfaces, p)
+		}
+		delete(s.Refused, p)
+	}
+	slices.Sort(s.Surfaces)
+}
+
+// Refuse records a file outside the plan the developer refused, with its
+// fingerprint before the change. A file refused twice keeps the first one:
+// that is the content to go back to.
+func (s *State) Refuse(path, before string) {
+	if s.Refused == nil {
+		s.Refused = map[string]string{}
+	}
+	if _, ok := s.Refused[path]; !ok {
+		s.Refused[path] = before
+	}
+}
+
+// Unreverted checks the refused files against now (the fingerprints of the
+// files that differ from the last commit): those back to their content
+// leave the list; the others are returned, sorted.
+func (s *State) Unreverted(now map[string]string) []string {
+	var out []string
+	for p, before := range s.Refused {
+		if now[p] == before {
+			delete(s.Refused, p)
+			continue
+		}
+		out = append(out, p)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // Fail records a failed attempt in the current phase.

@@ -25,6 +25,7 @@ const (
 	RejectReviewRed     Rejection = "review-red"
 	RejectNewFailures   Rejection = "new-failures"
 	RejectNoOptions     Rejection = "no-options"
+	RejectOutsidePlan   Rejection = "outside-plan"
 )
 
 // Events lets the presentation layer follow the loop. Implementations must

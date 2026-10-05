@@ -12,6 +12,12 @@ Esto es una reescritura: el comportamiento sale del código legacy en `{{.Legacy
 ## Plan técnico aprobado (síguelo; pregunta antes de apartarte de él)
 {{.Plan}}
 {{end}}
+{{- if .Surfaces}}
+## Ficheros que puedes editar
+Cambia solo estos ficheros (una ruta terminada en `/` permite todo lo que haya debajo). SpecForge comprueba cada fichero que cambias; cualquier otro va al desarrollador, que puede rechazarlo. Si la tarea necesita otro fichero, pregunta.
+{{range .Surfaces}}- `{{.}}`
+{{end}}
+{{- end}}
 {{- if .Glossary}}
 ## Lenguaje ubicuo (usa estos nombres en el código)
 {{.Glossary}}

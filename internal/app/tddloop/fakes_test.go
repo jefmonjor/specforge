@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -66,6 +67,19 @@ func (p *project) write(rel, content string) {
 	p.t.Helper()
 	if err := fsys.WriteAtomic(filepath.Join(p.root, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
 		p.t.Fatal(err)
+	}
+}
+
+// gitInit makes the project a repository with everything committed, so
+// snapshots hold only what changes afterwards.
+func (p *project) gitInit() {
+	p.t.Helper()
+	p.t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	p.t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(p.t.TempDir(), "gitconfig"))
+	for _, args := range [][]string{{"init", "-q"}, {"add", "-A"}, {"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init"}} {
+		if out, err := exec.Command("git", append([]string{"-C", p.root}, args...)...).CombinedOutput(); err != nil {
+			p.t.Fatalf("git %v: %v %s", args, err, out)
+		}
 	}
 }
 

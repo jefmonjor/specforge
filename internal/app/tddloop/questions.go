@@ -21,6 +21,10 @@ var choices = map[string]map[string]choice{
 		"raised": {
 			text: "The agent asked for more scrutiny of scenario %d",
 		},
+		"surfaces": {
+			text:    "Scenario %d: the agent changed files that are not in the approved plan: %s. Accept them for this specification, or refuse them (the agent has to put them back)?",
+			options: []string{"Accept them", "Refuse them"},
+		},
 		"inexact": {
 			text:    "The %s runner gives no report, so SpecForge cannot tell why the test fails. Is this a valid RED (the test fails on its assertion)? The output is below.",
 			options: []string{"Yes: accept it", "No: ask the agent to fix the test"},
@@ -29,6 +33,10 @@ var choices = map[string]map[string]choice{
 	"es": {
 		"raised": {
 			text: "El agente pidió más escrutinio para el escenario %d",
+		},
+		"surfaces": {
+			text:    "Escenario %d: el agente cambió ficheros que no están en el plan aprobado: %s. ¿Los aceptas para esta especificación o los rechazas (el agente tendrá que deshacerlos)?",
+			options: []string{"Aceptarlos", "Rechazarlos"},
 		},
 		"premature": {
 			text:    "El test del escenario %d pasó antes de existir implementación. ¿Este comportamiento ya está implementado?",

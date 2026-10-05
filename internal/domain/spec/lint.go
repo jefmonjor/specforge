@@ -194,6 +194,10 @@ func invariants(markdown string) []Issue {
 // RulePlanMarker reports a scenario the plan does not place.
 const RulePlanMarker Rule = "plan-marker"
 
+// RulePlanComponent warns about a component line that names no file: the
+// loop cannot tell whether a change is inside the plan.
+const RulePlanComponent Rule = "plan-component"
+
 // LintPlan checks a technical plan against its specification: every
 // scenario marker must appear (so each scenario has a planned test) and no
 // placeholder may be left.
@@ -206,6 +210,9 @@ func LintPlan(plan string, markers []string) []Issue {
 		if !strings.Contains(plan, m) {
 			issues = append(issues, Issue{Rule: RulePlanMarker, Message: "no planned test for " + m, Blocking: true})
 		}
+	}
+	for _, line := range unparsedComponents(plan) {
+		issues = append(issues, Issue{Rule: RulePlanComponent, Message: "component without a file path in backticks: " + line})
 	}
 	return issues
 }

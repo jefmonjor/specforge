@@ -77,6 +77,9 @@ type Data struct {
 	// Known are the tests that failed before the loop began: not the
 	// agent's to fix.
 	Known []string
+	// Surfaces are the files the approved plan allows the agent to edit
+	// (a trailing slash allows a whole directory).
+	Surfaces []string
 
 	// Migration: the legacy repository (read-only), its inventory, the
 	// capability map, the capability a specification is drafted for, the

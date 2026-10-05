@@ -22,6 +22,8 @@ var (
 	Agents    = []string{"claude", "gemini"}
 	Languages = []string{"es", "en"}
 	Reviews   = []string{"scenario", "risk", "off"}
+	// SurfaceModes are the values of plan.surfaces.
+	SurfaceModes = []string{"ask", "strict", "off"}
 	// Phases are the steps of work a model can be chosen for.
 	Phases = []string{"interview", "plan", "legacy", "red", "green", "refactor", "review", "refute", "verify", "audit", "e2e"}
 )
@@ -64,6 +66,16 @@ type Project struct {
 	} `yaml:"quality,omitempty"`
 	Migration Migration `yaml:"migration,omitempty"`
 	Risk      Risk      `yaml:"risk,omitempty"`
+	Plan      struct {
+		// Surfaces: what happens when the agent edits a file the approved
+		// plan does not name (ask, strict or off).
+		Surfaces string `yaml:"surfaces,omitempty"`
+	} `yaml:"plan,omitempty"`
+	Delivery struct {
+		// BudgetLines is the size of a reviewable pull request; deliver
+		// proposes slices above it.
+		BudgetLines int `yaml:"budget_lines,omitempty"`
+	} `yaml:"delivery,omitempty"`
 }
 
 // Risk tunes how the risk of each scenario's change is classified.
@@ -129,6 +141,9 @@ type Settings struct {
 	// tier that runs the mutation gate.
 	Risk         risk.Rules
 	MutationFrom risk.Tier
+	// Surfaces is plan.surfaces; BudgetLines is delivery.budget_lines.
+	Surfaces    string
+	BudgetLines int
 }
 
 // ModelFor resolves the model of a phase: --model, then models.<phase>,
@@ -156,6 +171,9 @@ const (
 	// DefaultMutationFrom: mutation testing is slow; documentation-only
 	// changes do not pay for it.
 	DefaultMutationFrom = risk.Medium
+	DefaultSurfaces     = "ask"
+	// DefaultBudgetLines is the size of a pull request a person reviews well.
+	DefaultBudgetLines = 400
 )
 
 // Resolve merges the layers and validates the result. requireAgent is false
@@ -175,6 +193,11 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		Migration:    p.Migration,
 		Models:       p.Models,
 		modelFlag:    strings.TrimSpace(f.Model),
+		Surfaces:     strings.ToLower(first(p.Plan.Surfaces, DefaultSurfaces)),
+		BudgetLines:  DefaultBudgetLines,
+	}
+	if p.Delivery.BudgetLines > 0 {
+		s.BudgetLines = p.Delivery.BudgetLines
 	}
 	if s.Migration.JavaRelease > 0 && s.Migration.ForbiddenImports == nil {
 		s.Migration.ForbiddenImports = DefaultForbiddenImports
@@ -236,6 +259,9 @@ func (s Settings) validate(requireAgent bool) error {
 	}
 	if !slices.Contains(Languages, s.Language) {
 		errs = append(errs, fmt.Errorf("unsupported language %q (supported: %s)", s.Language, strings.Join(Languages, ", ")))
+	}
+	if !slices.Contains(SurfaceModes, s.Surfaces) {
+		errs = append(errs, fmt.Errorf("unknown plan.surfaces %q (supported: %s)", s.Surfaces, strings.Join(SurfaceModes, ", ")))
 	}
 	if !slices.Contains(Reviews, s.Review) {
 		errs = append(errs, fmt.Errorf("unknown review mode %q (supported: %s)", s.Review, strings.Join(Reviews, ", ")))

@@ -45,6 +45,9 @@ type Scenario struct {
 	// Risk is the tier of the scenario's change and why; nil when the loop
 	// did not assess it.
 	Risk *Risk `json:"risk,omitempty"`
+	// Lines are the authored lines of the scenario's commit (lock files,
+	// vendored and golden files excluded).
+	Lines int `json:"lines"`
 }
 
 // Risk is how much scrutiny a scenario's change got, and why.
@@ -99,6 +102,10 @@ type Trace struct {
 	// Baseline is nil when the loop never ran or its runner cannot name
 	// failing tests.
 	Baseline *Baseline `json:"baseline,omitempty"`
+	// Budget is the size of a reviewable pull request, in authored lines;
+	// Slices are proposed when the delivery is larger.
+	Budget int     `json:"budget_lines"`
+	Slices []Slice `json:"slices,omitempty"`
 }
 
 // Count returns how many scenarios have status s.

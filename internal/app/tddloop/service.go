@@ -99,6 +99,9 @@ type Options struct {
 	MutationFrom risk.Tier
 	// Commit records every finished scenario as one commit.
 	Commit bool
+	// Surfaces is what happens when the agent changes a file the approved
+	// plan does not name: "ask" (default), "strict" or "off".
+	Surfaces string
 
 	MaxAttempts       int
 	MaxClarifications int
@@ -139,6 +142,9 @@ func (o Options) withDefaults() Options {
 	if o.MutationFrom == "" {
 		o.MutationFrom = risk.Passive
 	}
+	if o.Surfaces == "" {
+		o.Surfaces = SurfacesAsk
+	}
 	return o
 }
 
@@ -169,6 +175,8 @@ type run struct {
 	md     string
 	specID string
 	plan   string
+	// surfaces are the files the approved plan allows the agent to edit.
+	surfaces spec.Surfaces
 	// lesson is the latest lesson the agent offered in this phase.
 	lesson string
 	st     *tdd.State
@@ -272,6 +280,7 @@ func (s *Service) loadPlan(r *run) error {
 		return fmt.Errorf("%w: %s", ErrPlanOutdated, issues[0].Message)
 	}
 	r.plan = strings.TrimSpace(spec.StripSeal(content))
+	r.surfaces = spec.PlanSurfaces(r.plan)
 	return nil
 }
 

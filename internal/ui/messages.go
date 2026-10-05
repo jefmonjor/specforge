@@ -132,6 +132,8 @@ var messages = map[string]map[string]string{
 		"doctor.ready":            "ready: everything required is installed",
 		"diag.doctor.title":       "Something required is missing",
 		"diag.doctor.action":      "install what the lines marked ✗ above say, then run specforge doctor again",
+		"reject.outside-plan":     "files outside the approved plan: %s",
+		"deliver.slices":          "%d authored lines over a budget of %d: %d stacked slices proposed in DELIVERY.md",
 	},
 	"es": {
 		"setup.new.java":          "instala y comprueba las herramientas: mvn test (JUnit, ArchUnit), mvn pmd:check",
@@ -243,5 +245,7 @@ var messages = map[string]map[string]string{
 		"doctor.ready":            "listo: todo lo necesario está instalado",
 		"diag.doctor.title":       "Falta algo necesario",
 		"diag.doctor.action":      "instala lo que dicen las líneas marcadas con ✗ arriba y vuelve a ejecutar specforge doctor",
+		"reject.outside-plan":     "ficheros fuera del plan aprobado: %s",
+		"deliver.slices":          "%d líneas escritas sobre un presupuesto de %d: %d cortes apilados propuestos en DELIVERY.md",
 	},
 }

@@ -137,3 +137,20 @@ func TestRiskSettings(t *testing.T) {
 		t.Fatalf("every invalid risk setting is reported: %v", err)
 	}
 }
+
+func TestPlanSurfacesAndDeliveryBudget(t *testing.T) {
+	s, err := Resolve(User{Agent: "claude"}, Project{}, Overrides{}, true)
+	if err != nil || s.Surfaces != "ask" || s.BudgetLines != 400 {
+		t.Fatalf("defaults: %q %d %v", s.Surfaces, s.BudgetLines, err)
+	}
+	p := Project{}
+	p.Plan.Surfaces = "Strict"
+	p.Delivery.BudgetLines = 250
+	if s, err = Resolve(User{Agent: "claude"}, p, Overrides{}, true); err != nil || s.Surfaces != "strict" || s.BudgetLines != 250 {
+		t.Fatalf("configured: %q %d %v", s.Surfaces, s.BudgetLines, err)
+	}
+	p.Plan.Surfaces = "sometimes"
+	if _, err := Resolve(User{Agent: "claude"}, p, Overrides{}, true); err == nil || !strings.Contains(err.Error(), "plan.surfaces") {
+		t.Fatalf("invalid mode: %v", err)
+	}
+}

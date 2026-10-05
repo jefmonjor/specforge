@@ -16,6 +16,7 @@ type labels struct {
 	incomplete                                                                    string
 	known, baseLine, baseClean                                                    string
 	risk                                                                          string
+	size, sizeOver, slices, sliceLine, oversized, lines                           string
 }
 
 var catalog = map[string]labels{
@@ -38,6 +39,12 @@ var catalog = map[string]labels{
 		baseLine:     "Baseline: %d test(s) already failed before the loop (`%s`); listed below, they never blocked a scenario.",
 		baseClean:    "Baseline: the whole suite passed before the loop (`%s`); any new failure blocked.",
 		risk:         "risk %s: %s",
+		size:         "%d authored line(s) · budget %d",
+		sizeOver:     "%d authored line(s), over the budget of %d: see the suggested slices",
+		slices:       "Suggested slices (stacked pull requests, in order)",
+		sliceLine:    "Slice %d · scenario(s) %s · %d line(s) · `git branch specforge/slice-%d %s`",
+		oversized:    " · ⚠ larger than the budget on its own: review it whole, it is never cut",
+		lines:        "%d line(s)",
 	},
 	"es": {
 		delivery: "Entrega", spec: "Especificación", plan: "Plan", noPlan: "sin plan (el ciclo trabajó desde la especificación)",
@@ -58,6 +65,12 @@ var catalog = map[string]labels{
 		baseLine:     "Línea base: %d test(s) ya fallaban antes del loop (`%s`); listados abajo, nunca bloquearon un escenario.",
 		baseClean:    "Línea base: la suite completa pasaba antes del loop (`%s`); cualquier fallo nuevo bloqueó.",
 		risk:         "riesgo %s: %s",
+		size:         "%d línea(s) escritas · presupuesto %d",
+		sizeOver:     "%d línea(s) escritas, por encima del presupuesto de %d: mira los cortes propuestos",
+		slices:       "Cortes propuestos (pull requests apiladas, en orden)",
+		sliceLine:    "Corte %d · escenario(s) %s · %d línea(s) · `git branch specforge/slice-%d %s`",
+		oversized:    " · ⚠ supera el presupuesto por sí solo: revísalo entero, nunca se corta",
+		lines:        "%d línea(s)",
 	},
 }
 
@@ -83,7 +96,13 @@ func (t Trace) Markdown(lang string) string {
 		fmt.Fprintf(&b, "**%s** %s\n\n", l.plan, l.noPlan)
 	}
 	fmt.Fprintf(&b, "**%s** %s\n\n", l.scenarios, t.counts(l))
+	if line := t.sizeLine(l); line != "" {
+		b.WriteString(line + "\n\n")
+	}
 	b.WriteString(t.table(l, true))
+	if len(t.Slices) > 0 {
+		section(&b, l.slices, t.sliceLines(l), "")
+	}
 	if t.Baseline != nil && len(t.Baseline.Failures) > 0 {
 		section(&b, l.known, code(t.Baseline.Failures), "")
 	}
@@ -116,6 +135,9 @@ func (t Trace) PRBody(lang, template string) string {
 		summary.WriteString(l.incomplete + "\n\n")
 	}
 	summary.WriteString(t.counts(l) + "\n")
+	if line := t.sizeLine(l); line != "" {
+		summary.WriteString("\n" + line + "\n")
+	}
 
 	var trace strings.Builder
 	fmt.Fprintf(&trace, "\n## %s\n\n%s", l.prScenarios, t.table(l, false))
@@ -217,11 +239,39 @@ func (sc Scenario) notes(l labels) []string {
 	if sc.Risk != nil {
 		out = append(out, fmt.Sprintf(l.risk, sc.Risk.Tier, escape(strings.Join(sc.Risk.Reasons, ", "))))
 	}
+	if sc.Lines > 0 {
+		out = append(out, fmt.Sprintf(l.lines, sc.Lines))
+	}
 	if sc.ReviewNotes > 0 {
 		out = append(out, fmt.Sprintf(l.reviewed, sc.ReviewNotes))
 	}
 	if sc.Rejections > 0 {
 		out = append(out, fmt.Sprintf(l.rejected, sc.Rejections))
+	}
+	return out
+}
+
+func (t Trace) sizeLine(l labels) string {
+	switch {
+	case t.Budget <= 0 || t.Lines() == 0:
+		return ""
+	case len(t.Slices) > 0:
+		return fmt.Sprintf(l.sizeOver, t.Lines(), t.Budget)
+	}
+	return fmt.Sprintf(l.size, t.Lines(), t.Budget)
+}
+
+func (t Trace) sliceLines(l labels) []string {
+	out := make([]string, len(t.Slices))
+	for i, s := range t.Slices {
+		idx := make([]string, len(s.Scenarios))
+		for j, n := range s.Scenarios {
+			idx[j] = fmt.Sprint(n)
+		}
+		out[i] = fmt.Sprintf(l.sliceLine, s.N, strings.Join(idx, ", "), s.Lines, s.N, short(s.LastSHA))
+		if s.Oversized {
+			out[i] += l.oversized
+		}
 	}
 	return out
 }
