@@ -33,7 +33,12 @@ func fill(info *debug.BuildInfo) {
 	}
 }
 
-// String returns a single-line human-readable description of the build.
+// String returns a single-line human-readable description of the build:
+// the version alone when nothing recorded the commit (go install of a
+// module version).
 func String() string {
+	if Commit == "none" && Date == "unknown" {
+		return Version
+	}
 	return Version + " (" + Commit + ", " + Date + ")"
 }

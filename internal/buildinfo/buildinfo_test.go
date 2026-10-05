@@ -26,6 +26,15 @@ func TestLinkFlagsWin(t *testing.T) {
 	}
 }
 
+func TestAModuleVersionWithoutVCSShowsTheVersionAlone(t *testing.T) {
+	Version, Commit, Date = "dev", "none", "unknown"
+	t.Cleanup(func() { Version, Commit, Date = "dev", "none", "unknown" })
+	fill(&debug.BuildInfo{Main: debug.Module{Version: "v6.1.1"}})
+	if String() != "v6.1.1" {
+		t.Fatal(String())
+	}
+}
+
 func TestALocalBuildStaysDev(t *testing.T) {
 	Version = "dev"
 	fill(&debug.BuildInfo{Main: debug.Module{Version: "(devel)"}})
