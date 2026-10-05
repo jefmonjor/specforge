@@ -355,7 +355,7 @@ Your agent applies the request to every section it touches, asks what the reques
 | add one | gets the next number, never a used one | does it; the plan must place it first |
 | remove one | its number is retired: `REMOVED` | warns that its tests are still in the project |
 
-`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop state in `.specforge/` at its next approval, so its tests keep their names. Make that approval in the clone where the loop ran, then commit `scenarios.json`; elsewhere the markers follow the scenarios' order.
+`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop state in `.specforge/` at its next approval, so its tests keep their names. Make that approval in the clone where the loop ran, then commit `scenarios.json`; elsewhere the markers follow the scenarios' order, and `spec approve` and `spec change` say so. Rename scenarios after that first approval: until then a new title reads as a new scenario.
 
 ## 7. The plan: `plan`
 
@@ -724,7 +724,7 @@ What stays out of reach: what a program imports, a compiled binary, a variable's
 
 ### Checkpoints: `restore`
 
-Before every agent turn, the loop saves a **checkpoint** of your working tree: uncommitted and untracked files included, ignored ones (`node_modules`, `.env`) not. A checkpoint lives under `refs/specforge/checkpoints/`: no branch, commit, index, stash or push carries it, `git status` does not show it, and the newest 50 are kept. Only what changed is hashed, so one takes tens of milliseconds. Scenarios run [side by side](#scenarios-side-by-side) are not checkpointed inside their sandboxes, and a checkpoint that cannot be saved is noted in the loop state without stopping the loop.
+Before every agent turn, the loop saves a **checkpoint** of your working tree: uncommitted and untracked files included, ignored ones (`node_modules`, `.env`) not. A checkpoint lives under `refs/specforge/checkpoints/`: no branch, commit, index, stash or push carries it, `git status` does not show it, and the newest 50 are kept. Only what changed is hashed, so one takes tens of milliseconds. Scenarios run [side by side](#scenarios-side-by-side) are not checkpointed inside their sandboxes, and when a checkpoint cannot be saved the loop warns once, notes it in the loop state and goes on.
 
 If something gets past the guard, nothing is lost:
 

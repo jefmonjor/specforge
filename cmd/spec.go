@@ -183,6 +183,9 @@ scenario keeps its marker (see specforge spec --help).`,
 				if res.Resealed {
 					a.printDelta(res.Delta)
 				}
+				if res.Positional {
+					con.Warn(con.T("spec.positional", p.layout.Rel(p.layout.Scenarios(e.Path))))
+				}
 				a.printAdvice(res.Advice)
 			}
 			con.Info(a.nextAfterApproval(p, e, res))
@@ -529,6 +532,9 @@ func (a *App) runChange(ctx context.Context, p project, e specs.Entry, request s
 	con.OK(con.T("change.done", e.Rel))
 	if preview, err := p.specs(a).Preview(e); err == nil {
 		a.printDelta(preview)
+	}
+	if p.specs(a).Positional(e) {
+		con.Warn(con.T("spec.positional.preview"))
 	}
 	if len(res.Open) > 0 {
 		con.Warn(con.T("interview.open", len(res.Open), e.ID))

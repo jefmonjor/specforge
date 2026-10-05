@@ -849,6 +849,7 @@ La valoración de la v6 dejó dos huecos que pesaban: la guardia solo leía la l
   - Un fuzz de 260.000 líneas encontró un pánico con una línea que solo era una redirección.
   - Un intento fallido de clon copy-on-write dejaba el fichero en 0600 y un script perdía su bit `x`.
   - `rimraf` no se reconocía.
+  - Revisando la documentación salieron dos fallos silenciosos: aprobar una spec de la 6.0 en un clon sin el estado del loop renumeraba sus marcadores por posición, y un checkpoint que fallaba solo quedaba en el estado. Ahora `spec approve` y `spec change` avisan del primero y dicen cómo deshacerlo, y el loop avisa una vez del segundo.
 - **Hecho:**
   - Con Claude Code, la misma petición destructiva en tres formas quedó bloqueada tres veces.
   - Un binario compilado destruyó el trabajo sin commit y `specforge restore latest` lo devolvió entero.

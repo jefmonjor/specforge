@@ -295,6 +295,10 @@ type Approval struct {
 	// Delta is how the scenarios changed since the previous approval
 	// (specifications only).
 	Delta []spec.ScenarioChange
+	// Positional is true when the markers were numbered by position
+	// because the specification predates the ledger and its loop state is
+	// not here (see Service.Positional).
+	Positional bool
 }
 
 // Approve is the R0 review gate: the specification must lint clean, then
@@ -311,6 +315,7 @@ func (s Service) Approve(e Entry, by string) (Approval, error) {
 	if err != nil {
 		return a, err
 	}
+	a.Positional = s.Positional(e)
 	a.Delta, err = s.recordApproval(e, string(data), strings.TrimSpace(by), a.Hash, s.Now())
 	return a, err
 }

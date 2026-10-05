@@ -66,6 +66,11 @@ func (e *LoopEvents) Orphaned(tests []string) {
 	e.C.Warn(e.C.T("loop.orphaned", strings.Join(tests, " · ")))
 }
 
+func (e *LoopEvents) CheckpointFailed(reason string) {
+	e.halt()
+	e.C.Warn(e.C.T("loop.checkpoint.failed", reason))
+}
+
 func (e *LoopEvents) Baseline(b *tdd.Baseline, builds bool) {
 	e.halt()
 	switch {

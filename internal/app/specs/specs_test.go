@@ -290,3 +290,29 @@ func TestTheFirstLedgerStartsFromTheLoop(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 }
+
+func TestAnOldApprovalWithoutItsLoopIsNumberedByPosition(t *testing.T) {
+	s, root := newService(t, "en")
+	write(t, root, "specs/0001-reset.md", ready)
+	e, _ := s.Resolve("1")
+	if s.Positional(e) {
+		t.Fatal("a specification never approved has no markers to lose")
+	}
+	write(t, root, "specs/0001-reset/approvals.md", "### 2026-10-01T10:00:00Z · Ana · sha256-v1:abc\n\n- ADDED · 1 · Link · `fp`\n\n")
+	if !s.Positional(e) {
+		t.Fatal("approved under 6.0, no loop state: the markers come from positions")
+	}
+	data, _ := os.ReadFile(e.Path)
+	doc, _ := spec.Parse(string(data), spec.ParseOptions{})
+	write(t, root, ".specforge/state/0001-reset.json", fmt.Sprintf(`{"version":3,"scenarios":[{"index":1,"title":"Link","marker":"SDD_0001_001","fingerprint":%q}]}`, doc.Scenarios[0].Fingerprint()))
+	if s.Positional(e) {
+		t.Fatal("the loop state gives the markers")
+	}
+	a, err := s.Approve(e, "Ana")
+	if err != nil || a.Positional {
+		t.Fatalf("%+v %v", a, err)
+	}
+	if s.Positional(e) {
+		t.Fatal("once the ledger exists, markers never come from positions")
+	}
+}

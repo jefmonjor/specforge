@@ -231,6 +231,8 @@ type run struct {
 	// sequential are scenarios a parallel batch could not finish: they run
 	// one at a time.
 	sequential map[int]bool
+	// checkpointFailed is true once a failed checkpoint was reported.
+	checkpointFailed bool
 }
 
 // Run executes the loop until every scenario is done or a step stops it.
