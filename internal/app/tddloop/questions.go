@@ -33,6 +33,14 @@ var choices = map[string]map[string]choice{
 			text:    "Scenario %d · finding %s is not resolved after the correction: %s There is no second automatic correction. What now?",
 			options: []string{"Keep it as a follow-up", "Stop the loop"},
 		},
+		"unmet": {
+			text:    "Scenario %d · %s is still broken after the correction: `%s` prints `%s`; the specification expects: %s. There is no second automatic correction. What now?",
+			options: []string{"Keep it as a follow-up", "Stop the loop"},
+		},
+		"regression-tests": {
+			text:    "Scenario %d: the verifier proposes regression tests: %s. Add them to the project (the whole suite must still pass)?",
+			options: []string{"Add them", "Skip them"},
+		},
 		"surfaces": {
 			text:    "Scenario %d: the agent changed files that are not in the approved plan: %s. Accept them for this specification, or refuse them (the agent has to put them back)?",
 			options: []string{"Accept them", "Refuse them"},
@@ -57,6 +65,14 @@ var choices = map[string]map[string]choice{
 		"regression": {
 			text:    "Escenario %d · el hallazgo %s no quedó resuelto tras la corrección: %s No hay una segunda corrección automática. ¿Y ahora?",
 			options: []string{"Dejarlo como seguimiento", "Detener el ciclo"},
+		},
+		"unmet": {
+			text:    "Escenario %d · %s sigue roto tras la corrección: `%s` imprime `%s`; la especificación espera: %s. No hay una segunda corrección automática. ¿Y ahora?",
+			options: []string{"Dejarlo como seguimiento", "Detener el ciclo"},
+		},
+		"regression-tests": {
+			text:    "Escenario %d: el verificador propone tests de regresión: %s. ¿Los añado al proyecto (la suite completa debe seguir pasando)?",
+			options: []string{"Añadirlos", "Omitirlos"},
 		},
 		"surfaces": {
 			text:    "Escenario %d: el agente cambió ficheros que no están en el plan aprobado: %s. ¿Los aceptas para esta especificación o los rechazas (el agente tendrá que deshacerlos)?",

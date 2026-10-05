@@ -2,6 +2,7 @@ package spec
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -90,5 +91,12 @@ func TestLintPlan(t *testing.T) {
 	}
 	if got := LintPlan("  ", nil); len(got) != 1 || !got[0].Blocking {
 		t.Fatalf("empty plan: %v", got)
+	}
+}
+
+func TestInvariantIDs(t *testing.T) {
+	md := "## 4. Invariants\n\n- **INV-01**: once.\n- **INV-02**: never negative, unlike INV-01.\n- **INV-01**: duplicate.\n\n## 5. Other\n- INV-09 is not defined here\n"
+	if got := InvariantIDs(md); strings.Join(got, ",") != "INV-01,INV-02" {
+		t.Fatalf("InvariantIDs = %v", got)
 	}
 }

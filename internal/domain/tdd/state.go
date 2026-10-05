@@ -10,6 +10,7 @@ import (
 
 	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
+	"specforge/internal/domain/verification"
 )
 
 // StateVersion is bumped whenever State changes. Older states that only
@@ -56,6 +57,27 @@ type ScenarioRef struct {
 	// Review is the lens review of the scenario's change, kept so a resume
 	// never runs the lenses twice.
 	Review *ReviewRecord `json:"review,omitempty"`
+	// Verify is the independent verification of the scenario.
+	Verify *VerifyRecord `json:"verify,omitempty"`
+}
+
+// VerifyRecord is the independent verification of one scenario and what
+// came of it.
+type VerifyRecord struct {
+	Report verification.Report `json:"report"`
+	// Skipped says why the verifier did not run.
+	Skipped string `json:"skipped,omitempty"`
+	// Corrected are the blockers sent to the one correction; Recheck is
+	// the verification of those only, afterwards.
+	Corrected []string             `json:"corrected,omitempty"`
+	Recheck   *verification.Report `json:"recheck,omitempty"`
+	// FollowUps are blockers the developer accepted as they are.
+	FollowUps []string `json:"follow_ups,omitempty"`
+	// Tests are the regression tests the developer added; TestsDecided is
+	// set once they were offered.
+	Tests        []string `json:"tests,omitempty"`
+	TestsDecided bool     `json:"tests_decided,omitempty"`
+	Done         bool     `json:"done,omitempty"`
 }
 
 // ReviewRecord is the lens review of one scenario and what came of it.
@@ -292,7 +314,8 @@ func (s *State) SendBack(phase Phase, note string, now time.Time) {
 		s.TestHashes = nil
 	}
 	if !s.Done() {
-		s.Scenarios[s.Current].Review = nil // a changed scenario is reviewed again
+		// A changed scenario is reviewed and verified again.
+		s.Scenarios[s.Current].Review, s.Scenarios[s.Current].Verify = nil, nil
 	}
 	s.UpdatedAt = now
 }
@@ -325,6 +348,7 @@ func (s *State) Jump(index int, phase Phase, now time.Time) error {
 	s.Scenarios[s.Current].Files = nil
 	s.Scenarios[s.Current].Risk = nil
 	s.Scenarios[s.Current].Review = nil
+	s.Scenarios[s.Current].Verify = nil
 	s.Scenarios[s.Current].RaisedTo, s.Scenarios[s.Current].RaisedWhy = "", ""
 	s.Phase = phase
 	s.Attempts = 0

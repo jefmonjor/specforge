@@ -36,6 +36,8 @@ const (
 	Validate Name = "validate"
 	// Correct is the one correction of the findings that block.
 	Correct Name = "correct"
+	// Verify is the independent verifier, in a copy of the project.
+	Verify Name = "verify"
 )
 
 // File is a file shown to the agent as context.
@@ -153,6 +155,22 @@ type ReviewData struct {
 	Diff       string
 	Findings   []review.Finding
 	Feedback   string
+}
+
+// VerifyData is what the verify prompt references.
+type VerifyData struct {
+	Stack, SpecTitle string
+	// Spec is the specification's text; Required the IDs to answer for.
+	Spec     string
+	Required []string
+	// BaseDir is the copy of the project before the change, if any.
+	BaseDir  string
+	Feedback string
+}
+
+// RenderVerify renders the verifier's prompt.
+func RenderVerify(lang string, d VerifyData) (string, error) {
+	return renderStandalone(lang, Verify, d)
 }
 
 // RenderReview renders a review, refute or validate prompt. They end with

@@ -117,3 +117,21 @@ func TestReviewIsShownPerScenarioWithItsFollowUps(t *testing.T) {
 		}
 	}
 }
+
+func TestVerificationIsShown(t *testing.T) {
+	tr := sample()
+	tr.Scenarios[0].Verify = &Verification{Met: 3, Unmet: 1, FollowUps: []string{"INV-02"}}
+	tr.Checks.Verify = &Verification{Met: 4, Unmet: 1, Open: []string{"INV-03 · `go run . -5` → `net: -5` (expected error)"}}
+	md := tr.Markdown("en")
+	for _, want := range []string{
+		"verify: 3 met · 1 unmet · 0 unverified",
+		"SDD_0001_001 · INV-02 · still broken after its correction (verify)",
+		"## ⚠ Requirements the verifier showed broken\n\n- INV-03",
+		"Independent verification of the specification: 4 met · 1 unmet",
+		"⚠ This delivery is incomplete",
+	} {
+		if !strings.Contains(md, want) {
+			t.Errorf("missing %q in:\n%s", want, md)
+		}
+	}
+}

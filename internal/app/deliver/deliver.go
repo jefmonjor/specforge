@@ -27,6 +27,7 @@ import (
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
 	"specforge/internal/domain/tdd"
+	"specforge/internal/domain/verification"
 	"specforge/internal/ports"
 )
 
@@ -211,6 +212,11 @@ func scenario(files ports.Files, lay layout.Layout, o Options, id string, sc spe
 	if a := ref.Risk; a != nil {
 		out.Risk = &delivery.Risk{Tier: string(a.Tier), Lines: a.Lines, Reasons: a.Reasons}
 	}
+	if v := ref.Verify; v != nil {
+		out.Verify = verificationOf(v.Report, v.Skipped)
+		out.Verify.Corrected, out.Verify.FollowUps, out.Verify.Tests = v.Corrected, v.FollowUps, v.Tests
+		out.Verify.Open = nil // corrected or accepted in the loop
+	}
 	if rec := ref.Review; rec != nil && len(rec.Lenses) > 0 {
 		out.Review = reviewOf(rec.Lenses, rec.Reported, len(rec.Corrected), rec.Verdict, rec.FollowUps, nil)
 	}
@@ -266,6 +272,31 @@ func testNames(files ports.Files, path, marker string) []string {
 	return names
 }
 
+// verificationOf summarises a verifier's report.
+func verificationOf(r verification.Report, skipped string) *delivery.Verification {
+	v := &delivery.Verification{Met: r.Count(verification.Met), Unmet: r.Count(verification.Unmet), Unverified: r.Count(verification.Unverified), Skipped: skipped}
+	for _, b := range r.Blockers {
+		v.Open = append(v.Open, fmt.Sprintf("%s · `%s` → `%s` (expected %s)", b.ID, b.Command, b.Observed, b.Expected))
+	}
+	return v
+}
+
+// featureVerification reads the verification of the whole specification.
+func featureVerification(files ports.Files, path string) *delivery.Verification {
+	data, err := files.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var res struct {
+		Report  verification.Report `json:"report"`
+		Skipped string              `json:"skipped"`
+	}
+	if json.Unmarshal(data, &res) != nil {
+		return nil
+	}
+	return verificationOf(res.Report, res.Skipped)
+}
+
 // reviewOf summarises a review for the delivery.
 func reviewOf(lenses []review.Lens, reported, corrected int, v review.Verdict, followUps, open []review.Finding) *delivery.Review {
 	r := &delivery.Review{Reported: reported, Corrected: corrected, Discarded: len(v.Discarded)}
@@ -309,6 +340,7 @@ func branchReview(files ports.Files, path string) *delivery.Review {
 func checks(files ports.Files, o Options, lay layout.Layout) delivery.Checks {
 	var c delivery.Checks
 	c.BranchReview = branchReview(files, filepath.Join(lay.SpecDir(o.SpecPath), "review", "branch.json"))
+	c.Verify = featureVerification(files, lay.FeatureVerify(o.SpecPath))
 	if data, err := files.ReadFile(filepath.Join(o.Root, "docs", "security", "findings.json")); err == nil {
 		var r security.Report
 		if json.Unmarshal(data, &r) == nil {

@@ -18,6 +18,7 @@ import (
 	"specforge/internal/app/reviewer"
 	"specforge/internal/app/specs"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/app/verifier"
 	"specforge/internal/config"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
@@ -191,8 +192,15 @@ func reviewErrors(_ string, err error, _ *Diagnosis) (int, string) {
 		step     *reviewer.StepError
 		readOnly *reviewer.ReadOnlyError
 		surfaces *tddloop.SurfaceError
+		vBlocked *verifier.BlockedError
+		vStep    *verifier.StepError
+		vTouched *verifier.TouchedError
 	)
 	switch {
+	case errors.As(err, &vBlocked):
+		return ExitGate, "verify"
+	case errors.As(err, &vStep), errors.As(err, &vTouched):
+		return ExitGate, "verifystep"
 	case errors.As(err, &blocked), errors.Is(err, tddloop.ErrReviewStopped):
 		return ExitGate, "review"
 	case errors.As(err, &step), errors.As(err, &readOnly):

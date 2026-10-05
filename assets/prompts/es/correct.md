@@ -4,7 +4,7 @@ Trabajas en la especificación **{{.SpecTitle}}** (`{{.SpecPath}}`) en un proyec
 
 ## Hallazgos a corregir
 {{range .Findings}}
-### {{.ID}} · {{.Severity}} · `{{.Location.Path}}:{{.Location.Line}}`
+### {{.ID}} · {{.Severity}}{{if .Location.Path}} · `{{.Location.Path}}:{{.Location.Line}}`{{end}}
 {{.Claim}}
 {{end}}
 ## Reglas

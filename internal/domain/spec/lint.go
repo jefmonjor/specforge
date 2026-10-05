@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -155,6 +156,18 @@ func sections(markdown string) []Issue {
 		}
 	}
 	return out
+}
+
+// InvariantIDs returns the invariants the specification defines (INV-01,
+// INV-02…), in order.
+func InvariantIDs(markdown string) []string {
+	var ids []string
+	for _, line := range strings.Split(Section(markdown, InvariantsTitle), "\n") {
+		if m := invariantEntry.FindStringSubmatch(line); m != nil && !slices.Contains(ids, m[1]) {
+			ids = append(ids, m[1])
+		}
+	}
+	return ids
 }
 
 // invariants advises on invariants that nothing else in the specification

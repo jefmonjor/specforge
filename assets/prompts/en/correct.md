@@ -4,7 +4,7 @@ You are working on the specification **{{.SpecTitle}}** (`{{.SpecPath}}`) in a {
 
 ## Findings to correct
 {{range .Findings}}
-### {{.ID}} · {{.Severity}} · `{{.Location.Path}}:{{.Location.Line}}`
+### {{.ID}} · {{.Severity}}{{if .Location.Path}} · `{{.Location.Path}}:{{.Location.Line}}`{{end}}
 {{.Claim}}
 {{end}}
 ## Rules

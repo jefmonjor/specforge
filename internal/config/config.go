@@ -27,6 +27,8 @@ var (
 	Reviews   = []string{"scenario", "risk", "off"}
 	// SurfaceModes are the values of plan.surfaces.
 	SurfaceModes = []string{"ask", "strict", "off"}
+	// VerifyModes are the values of verify.
+	VerifyModes = []string{"high", "always", "feature", "off"}
 	// Phases are the steps of work a model can be chosen for.
 	Phases = []string{"interview", "plan", "legacy", "red", "green", "refactor", "review", "refute", "verify", "audit", "e2e"}
 )
@@ -72,7 +74,11 @@ type Project struct {
 	// Lenses are the review lenses after REFACTOR: auto (by risk), off, or
 	// a list of lenses.
 	Lenses StringList `yaml:"lenses,omitempty"`
-	Plan   struct {
+	// Verify is when the independent verifier runs: high (default),
+	// always, feature or off. VerifyMaxMB bounds the copy it works in.
+	Verify      string `yaml:"verify,omitempty"`
+	VerifyMaxMB int    `yaml:"verify_max_mb,omitempty"`
+	Plan        struct {
 		// Surfaces: what happens when the agent edits a file the approved
 		// plan does not name (ask, strict or off).
 		Surfaces string `yaml:"surfaces,omitempty"`
@@ -171,6 +177,9 @@ type Settings struct {
 	// lenses of every scenario (none: no lens review).
 	LensesAuto bool
 	Lenses     []review.Lens
+	// Verify is when the verifier runs; VerifyMaxBytes bounds its copy.
+	Verify         string
+	VerifyMaxBytes int64
 }
 
 // ModelFor resolves the model of a phase: --model, then models.<phase>,
@@ -207,21 +216,23 @@ const (
 // for commands that never call an agent.
 func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error) {
 	s := Settings{
-		Agent:        first(f.Agent, p.Agent, u.Agent),
-		Model:        first(f.Model, p.Model, u.Model),
-		Language:     first(p.Language, u.Language, DefaultLanguage),
-		Stack:        first(f.Stack, p.Stack),
-		MaxAttempts:  DefaultMaxAttempts,
-		Review:       first(f.Review, p.Review, DefaultReview),
-		Commit:       !f.NoCommit && (p.Commit == nil || *p.Commit),
-		AgentTimeout: DefaultAgentTimeout,
-		TestTimeout:  DefaultTestTimeout,
-		Quality:      quality.DefaultThresholds(),
-		Migration:    p.Migration,
-		Models:       p.Models,
-		modelFlag:    strings.TrimSpace(f.Model),
-		Surfaces:     strings.ToLower(first(p.Plan.Surfaces, DefaultSurfaces)),
-		BudgetLines:  DefaultBudgetLines,
+		Agent:          first(f.Agent, p.Agent, u.Agent),
+		Model:          first(f.Model, p.Model, u.Model),
+		Language:       first(p.Language, u.Language, DefaultLanguage),
+		Stack:          first(f.Stack, p.Stack),
+		MaxAttempts:    DefaultMaxAttempts,
+		Review:         first(f.Review, p.Review, DefaultReview),
+		Commit:         !f.NoCommit && (p.Commit == nil || *p.Commit),
+		AgentTimeout:   DefaultAgentTimeout,
+		TestTimeout:    DefaultTestTimeout,
+		Quality:        quality.DefaultThresholds(),
+		Migration:      p.Migration,
+		Models:         p.Models,
+		modelFlag:      strings.TrimSpace(f.Model),
+		Surfaces:       strings.ToLower(first(p.Plan.Surfaces, DefaultSurfaces)),
+		Verify:         strings.ToLower(first(p.Verify, "high")),
+		VerifyMaxBytes: int64(max(p.VerifyMaxMB, 0)) << 20,
+		BudgetLines:    DefaultBudgetLines,
 	}
 	if p.Delivery.BudgetLines > 0 {
 		s.BudgetLines = p.Delivery.BudgetLines
@@ -290,6 +301,9 @@ func (s Settings) validate(requireAgent bool) error {
 	}
 	if !slices.Contains(Languages, s.Language) {
 		errs = append(errs, fmt.Errorf("unsupported language %q (supported: %s)", s.Language, strings.Join(Languages, ", ")))
+	}
+	if !slices.Contains(VerifyModes, s.Verify) {
+		errs = append(errs, fmt.Errorf("unknown verify mode %q (supported: %s)", s.Verify, strings.Join(VerifyModes, ", ")))
 	}
 	if !slices.Contains(SurfaceModes, s.Surfaces) {
 		errs = append(errs, fmt.Errorf("unknown plan.surfaces %q (supported: %s)", s.Surfaces, strings.Join(SurfaceModes, ", ")))

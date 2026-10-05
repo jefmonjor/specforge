@@ -50,6 +50,22 @@ type Scenario struct {
 	Lines int `json:"lines"`
 	// Review is the lens review; nil when none ran.
 	Review *Review `json:"review,omitempty"`
+	// Verify is the independent verification; nil when none ran.
+	Verify *Verification `json:"verify,omitempty"`
+}
+
+// Verification summarises an independent verification.
+type Verification struct {
+	Met        int `json:"met"`
+	Unmet      int `json:"unmet"`
+	Unverified int `json:"unverified"`
+	// Open are requirements still broken, as "ID · command → observed".
+	Open []string `json:"open,omitempty"`
+	// Corrected were broken and corrected; FollowUps were accepted.
+	Corrected []string `json:"corrected,omitempty"`
+	FollowUps []string `json:"follow_ups,omitempty"`
+	Tests     []string `json:"regression_tests,omitempty"`
+	Skipped   string   `json:"skipped,omitempty"`
 }
 
 // Review summarises a lens review.
@@ -79,6 +95,9 @@ type Checks struct {
 	E2E *E2E `json:"e2e,omitempty"`
 	// BranchReview is nil when `specforge review` did not run for it.
 	BranchReview *Review `json:"branch_review,omitempty"`
+	// Verify is the verification of the whole specification; nil when
+	// `specforge verify` (or verify: feature) did not run.
+	Verify *Verification `json:"verify,omitempty"`
 }
 
 // Security is the audit summary.
@@ -138,6 +157,7 @@ func (t Trace) Count(s Status) int {
 // Complete reports whether every scenario is done or satisfied, no
 // question is waiting and no review finding is open.
 func (t Trace) Complete() bool {
-	open := t.Checks.BranchReview != nil && len(t.Checks.BranchReview.Open) > 0
+	open := t.Checks.BranchReview != nil && len(t.Checks.BranchReview.Open) > 0 ||
+		t.Checks.Verify != nil && len(t.Checks.Verify.Open) > 0
 	return t.Count(Pending) == 0 && len(t.Pending) == 0 && len(t.Scenarios) > 0 && !open
 }

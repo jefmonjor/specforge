@@ -180,3 +180,16 @@ func TestLensesAreAutoOffOrAList(t *testing.T) {
 		t.Fatalf("unknown lens: %v", err)
 	}
 }
+
+func TestVerifyMode(t *testing.T) {
+	s, err := Resolve(User{Agent: "claude"}, Project{}, Overrides{}, true)
+	if err != nil || s.Verify != "high" || s.VerifyMaxBytes != 0 {
+		t.Fatalf("default: %q %d %v", s.Verify, s.VerifyMaxBytes, err)
+	}
+	if s, err = Resolve(User{Agent: "claude"}, Project{Verify: "Feature", VerifyMaxMB: 50}, Overrides{}, true); err != nil || s.Verify != "feature" || s.VerifyMaxBytes != 50<<20 {
+		t.Fatalf("configured: %q %d %v", s.Verify, s.VerifyMaxBytes, err)
+	}
+	if _, err := Resolve(User{Agent: "claude"}, Project{Verify: "sometimes"}, Overrides{}, true); err == nil {
+		t.Fatal("unknown mode")
+	}
+}

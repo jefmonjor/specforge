@@ -39,6 +39,14 @@ func (OS) WritePrivate(path string, data []byte) error {
 	return WriteAtomic(path, data, 0o600)
 }
 
+// Remove implements ports.Files.
+func (OS) Remove(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // AppendFile implements ports.Files.
 func (OS) AppendFile(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

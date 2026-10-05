@@ -59,6 +59,16 @@ func (l Layout) ReviewRecord(specPath, marker string) string {
 	return filepath.Join(l.SpecDir(specPath), "review", marker+".json")
 }
 
+// VerifyRecord is where the verification of one scenario is kept.
+func (l Layout) VerifyRecord(specPath, marker string) string {
+	return filepath.Join(l.SpecDir(specPath), "verify", marker+".json")
+}
+
+// FeatureVerify is where the verification of a whole specification goes.
+func (l Layout) FeatureVerify(specPath string) string {
+	return filepath.Join(l.SpecDir(specPath), "verify", "feature.json")
+}
+
 // Lessons is the project's curated list of lessons learned.
 func (l Layout) Lessons() string { return filepath.Join(l.SpecsDir(), "LESSONS.md") }
 

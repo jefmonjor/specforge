@@ -73,6 +73,8 @@ type Deps struct {
 	VCS ports.VCS
 	// Reviewer runs the review lenses after REFACTOR; nil skips them.
 	Reviewer Reviewer
+	// Verifier checks the specification in a copy; nil skips it.
+	Verifier Verifier
 	Events   Events
 	Log      *slog.Logger
 	Now      func() time.Time
@@ -116,6 +118,10 @@ type Options struct {
 	// lenses of every scenario (none: no lens review).
 	LensesAuto bool
 	Lenses     []review.Lens
+	// Verify is when the independent verifier runs: "high" (scenarios of
+	// high risk, the default), "always", "feature" (once, at the end) or
+	// "off".
+	Verify string
 
 	MaxAttempts       int
 	MaxClarifications int
@@ -158,6 +164,9 @@ func (o Options) withDefaults() Options {
 	}
 	if o.Surfaces == "" {
 		o.Surfaces = SurfacesAsk
+	}
+	if o.Verify == "" {
+		o.Verify = VerifyHigh
 	}
 	return o
 }
@@ -248,6 +257,9 @@ func (s *Service) Run(ctx context.Context, opts Options) (*tdd.State, error) {
 		if err != nil {
 			return r.st, errors.Join(err, s.save(r))
 		}
+	}
+	if err := s.verifyFeature(ctx, r); err != nil {
+		return r.st, errors.Join(err, s.save(r))
 	}
 	s.d.Events.Finished(r.st)
 	return r.st, s.save(r)

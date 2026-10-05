@@ -24,7 +24,7 @@ var ErrReviewStopped = errors.New("the developer stopped the loop on a review fi
 // when there is a reviewer, or straight to the developer's review and the
 // commit.
 func (s *Service) afterRefactor(ctx context.Context, r *run, sc tdd.ScenarioRef, gates string) error {
-	if s.d.Reviewer == nil {
+	if s.d.Reviewer == nil && s.d.Verifier == nil {
 		return s.close(ctx, r, sc, gates)
 	}
 	r.st.Phase = tdd.PhaseReview
@@ -43,12 +43,16 @@ func (s *Service) reviewPhase(ctx context.Context, r *run) error {
 		return s.close(ctx, r, sc, p.Context)
 	}
 	ref := &r.st.Scenarios[r.st.Current]
+	if ref.Review == nil && s.d.Reviewer == nil {
+		ref.Review = &tdd.ReviewRecord{Done: true}
+	}
+	settled := false
 	if ref.Review == nil {
 		rec, err := s.runLenses(ctx, r, sc)
 		if err != nil {
 			return err
 		}
-		ref.Review = rec
+		ref.Review, settled = rec, rec.Done
 		if err := s.keep(r, sc, rec); err != nil {
 			return err
 		}
@@ -66,12 +70,17 @@ func (s *Service) reviewPhase(ctx context.Context, r *run) error {
 				return err
 			}
 		}
-		rec.Done = true
+		rec.Done, settled = true, true
 		if err := s.keep(r, sc, rec); err != nil {
 			return err
 		}
 	}
-	s.d.Events.Reviewed(sc, *rec)
+	if settled {
+		s.d.Events.Reviewed(sc, *rec)
+	}
+	if proceed, err := s.verifyStep(ctx, r, sc); err != nil || !proceed {
+		return err
+	}
 	return s.close(ctx, r, sc, lastGates(r.st, sc.Index))
 }
 
@@ -131,41 +140,58 @@ func (s *Service) settleEscalated(ctx context.Context, r *run, sc tdd.ScenarioRe
 	return nil
 }
 
-// correct runs the one correction of the blocking findings, measures it
-// against its budget and sends the scenario back to REFACTOR, where the
-// tests and the gates judge it before it is validated.
+// correct runs the one correction of the blocking findings and sends the
+// scenario back to REFACTOR, where the tests and the gates judge it before
+// it is validated.
 func (s *Service) correct(ctx context.Context, r *run, sc tdd.ScenarioRef, rec *tdd.ReviewRecord) error {
-	lines := 0
-	if sc.Risk != nil {
-		lines = sc.Risk.Lines
-	}
-	budget := review.CorrectionBudget(lines)
-	before := s.contents(r, r.st.FilesWritten)
-	data := s.promptData(r, sc)
-	data.TestFiles = s.specTests(r, r.st.FilesWritten)
-	data.Findings, data.Budget = rec.Verdict.Blocking, budget
-	t, err := s.turnOf(ctx, r, sc, prompts.Correct, data)
+	size, budget, err := s.correction(ctx, r, sc, rec.Verdict.Blocking)
 	if err != nil {
 		return err
 	}
-	if err := s.checkTampering(r); err != nil {
-		return err
-	}
-	if _, err := s.checkSurfaces(ctx, r, sc, t); err != nil {
-		s.pendVerify(r, sc, t, nil, err)
-		return err
-	}
-	size := 0
-	for _, p := range notRefused(r.st, t.Changed) {
-		now, _ := s.d.Files.ReadFile(r.lay.Abs(p))
-		size += change.Between(p, before[p], now).Lines()
-	}
 	rec.Corrected, rec.Lines, rec.Budget = rec.Verdict.Blocking, size, budget
-	r.st.AddFiles(notRefused(r.st, t.Changed)...)
 	r.st.Record("review", "corrected", fmt.Sprintf("%d finding(s), %d line(s) of %d", len(rec.Corrected), size, budget), s.d.Now())
 	if err := s.keep(r, sc, rec); err != nil {
 		return err
 	}
+	return s.reopen(ctx, r, sc, size, budget)
+}
+
+// correction runs the one correction turn for findings: tests untouched,
+// files within the plan, its size measured line by line. It returns the
+// size and the budget it had.
+func (s *Service) correction(ctx context.Context, r *run, sc tdd.ScenarioRef, findings []review.Finding) (size, budget int, err error) {
+	lines := 0
+	if sc.Risk != nil {
+		lines = sc.Risk.Lines
+	}
+	budget = review.CorrectionBudget(lines)
+	before := s.contents(r, r.st.FilesWritten)
+	data := s.promptData(r, sc)
+	data.TestFiles = s.specTests(r, r.st.FilesWritten)
+	data.Findings, data.Budget = findings, budget
+	t, err := s.turnOf(ctx, r, sc, prompts.Correct, data)
+	if err != nil {
+		return 0, 0, err
+	}
+	if err := s.checkTampering(r); err != nil {
+		return 0, 0, err
+	}
+	if _, err := s.checkSurfaces(ctx, r, sc, t); err != nil {
+		s.pendVerify(r, sc, t, nil, err)
+		return 0, 0, err
+	}
+	changed := notRefused(r.st, t.Changed)
+	for _, p := range changed {
+		now, _ := s.d.Files.ReadFile(r.lay.Abs(p))
+		size += change.Between(p, before[p], now).Lines()
+	}
+	r.st.AddFiles(changed...)
+	return size, budget, nil
+}
+
+// reopen asks the developer about a correction over its budget, then
+// returns the scenario to REFACTOR.
+func (s *Service) reopen(ctx context.Context, r *run, sc tdd.ScenarioRef, size, budget int) error {
 	if size > budget {
 		if err := s.acceptOverBudget(ctx, r, sc, size, budget); err != nil {
 			return err

@@ -206,6 +206,7 @@ type recorder struct {
 
 	reviewSkipped int
 	reviews       []tdd.ReviewRecord
+	verified      []tdd.VerifyRecord
 }
 
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
@@ -236,6 +237,9 @@ func (r *recorder) Risk(_ tdd.ScenarioRef, a risk.Assessment) {
 func (r *recorder) ReviewSkipped(tdd.ScenarioRef, risk.Assessment) { r.reviewSkipped++ }
 func (r *recorder) Reviewed(_ tdd.ScenarioRef, rec tdd.ReviewRecord) {
 	r.reviews = append(r.reviews, rec)
+}
+func (r *recorder) Verified(_ tdd.ScenarioRef, rec tdd.VerifyRecord) {
+	r.verified = append(r.verified, rec)
 }
 
 type harness struct {

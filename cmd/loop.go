@@ -9,12 +9,14 @@ import (
 
 	"specforge/internal/adapters/fsys"
 	"specforge/internal/adapters/gates"
+	"specforge/internal/adapters/scratch"
 	"specforge/internal/adapters/testrun"
 	"specforge/internal/adapters/vcs"
 	"specforge/internal/adapters/workspace"
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/app/verifier"
 	"specforge/internal/config"
 	"specforge/internal/domain/legacy"
 	"specforge/internal/domain/tdd"
@@ -42,6 +44,9 @@ func (a *App) loopCommand() *cobra.Command {
             one for a medium one, four for a high one); every finding must
             point at a changed line; what blocks gets one correction, judged
             again by REFACTOR and validated on those findings only
+  VERIFY    for high-risk scenarios (verify: high), an independent verifier
+            probes the specification in a copy of the project and must give
+            a verdict, with the command and its output, for every invariant
 
 The agent may answer with a question instead of guessing: you answer it at
 the terminal and it is recorded in specs/NNNN-slug/decisions.md. Without a
@@ -97,9 +102,11 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
 				VCS:       vcs.New(proc),
 				Reviewer:  reviewer.New(reviewer.Deps{Agent: ag, Workspace: ws, Events: events}),
-				Events:    events,
-				Log:       a.log,
-				Now:       a.Now,
+				Verifier: verifier.New(verifier.Deps{Agent: ag, Scratch: scratch.New(proc, p.settings.VerifyMaxBytes),
+					Workspace: ws, Files: files, Events: events}),
+				Events: events,
+				Log:    a.log,
+				Now:    a.Now,
 			})
 			_, err = svc.Run(ctx, tddloop.Options{
 				Root:         p.root,
@@ -121,6 +128,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 				Surfaces:     p.settings.Surfaces,
 				LensesAuto:   p.settings.LensesAuto,
 				Lenses:       p.settings.Lenses,
+				Verify:       p.settings.Verify,
 				Strict:       p.settings.Quality.Strict,
 
 				Legacy:           legacyDir,

@@ -8,12 +8,14 @@ import (
 	"specforge/internal/app/audit"
 	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/app/verifier"
 	"specforge/internal/domain/e2e"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
+	"specforge/internal/domain/verification"
 )
 
 // LoopEvents prints the TDD loop.
@@ -29,6 +31,7 @@ type LoopEvents struct {
 var (
 	_ tddloop.Events  = (*LoopEvents)(nil)
 	_ reviewer.Events = (*LoopEvents)(nil)
+	_ verifier.Events = (*LoopEvents)(nil)
 )
 
 func (e *LoopEvents) halt() {
@@ -159,6 +162,27 @@ func (e *LoopEvents) Reviewed(_ tdd.ScenarioRef, rec tdd.ReviewRecord) {
 		e.C.Detail(e.C.T("review.discarded", d.ID, d.Reason))
 	}
 }
+
+func (e *LoopEvents) Verified(_ tdd.ScenarioRef, rec tdd.VerifyRecord) {
+	e.halt()
+	if rec.Skipped != "" {
+		e.C.Warn(e.C.T("verify.skipped", rec.Skipped))
+		return
+	}
+	r := rec.Report
+	line := e.C.T("verify.done", r.Count(verification.Met), r.Count(verification.Unmet), r.Count(verification.Unverified))
+	if len(r.Blockers) == 0 {
+		e.C.OK(line)
+		return
+	}
+	e.C.Bad(line)
+	for _, b := range r.Blockers {
+		e.C.Detail(e.C.T("verify.blocker", b.ID, b.Command, b.Observed, b.Expected))
+	}
+}
+
+// Verifying implements verifier.Events.
+func (e *LoopEvents) Verifying(n int) { e.start(e.C.T("verify.running", n)) }
 
 // Lens implements reviewer.Events.
 func (e *LoopEvents) Lens(l review.Lens) { e.start(e.C.T("review.lens", l)) }
