@@ -243,10 +243,6 @@ var releasePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\brelease(?:\.set\(\s*|\s*=\s*)(\d+)`),
 }
 
-// DeclaredRelease is the Java release the build at the root of fsys
-// declares ("1.6", "21"), or "" when it declares none.
-func DeclaredRelease(fsys fs.FS) string { return javaRelease(fsys) }
-
 // javaRelease reads the release the build declares; the lowest wins, since
 // that is what the code must still compile for.
 func javaRelease(fsys fs.FS) string {

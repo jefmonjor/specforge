@@ -90,20 +90,6 @@ func Verify(content string) error {
 	return nil
 }
 
-// VerifyAgainst checks content against a hash recorded elsewhere (in the
-// loop state), using the algorithm of the seal currently in the file.
-func VerifyAgainst(content, expected string) error {
-	algo := SealV1
-	if s, ok := ReadSeal(content); ok {
-		algo = s.Algorithm
-	}
-	actual := hashFor(content, algo)
-	if !strings.EqualFold(actual, expected) {
-		return &TamperedError{Expected: strings.ToLower(expected), Actual: actual}
-	}
-	return nil
-}
-
 func hashFor(content, algo string) string {
 	if algo == SealV0 {
 		var kept []string

@@ -31,20 +31,6 @@ func ForProfile(p stack.Profile, proc ports.CommandRunner, t quality.Thresholds)
 	return out
 }
 
-// Run executes gates in order and collects their results. It stops only if
-// ctx is cancelled.
-func Run(ctx context.Context, gs []ports.Gate, root string, p stack.Profile) (quality.Report, error) {
-	var report quality.Report
-	for _, g := range gs {
-		res, err := g.Check(ctx, root, p)
-		if err != nil {
-			return report, err
-		}
-		report = append(report, res)
-	}
-	return report, nil
-}
-
 func skipped(gate, why string) quality.Result {
 	return quality.Result{Gate: gate, Status: quality.Skipped, Summary: why}
 }

@@ -102,8 +102,6 @@ type CLI struct {
 	flavor Flavor
 	proc   ports.CommandRunner
 	log    *slog.Logger
-	// activity shows progress while the agent works; it returns a stop func.
-	activity func(label string) func()
 	// stream, when set, receives the agent output live (--verbose).
 	stream *os.File
 }
@@ -113,11 +111,6 @@ var _ ports.Agent = (*CLI)(nil)
 // Option configures a CLI.
 type Option func(*CLI)
 
-// WithActivity installs a progress indicator.
-func WithActivity(f func(label string) func()) Option {
-	return func(c *CLI) { c.activity = f }
-}
-
 // WithStream mirrors the agent output to f as it is produced.
 func WithStream(f *os.File) Option {
 	return func(c *CLI) { c.stream = f }
@@ -125,7 +118,7 @@ func WithStream(f *os.File) Option {
 
 // New returns the agent adapter for flavor.
 func New(flavor Flavor, proc ports.CommandRunner, log *slog.Logger, opts ...Option) *CLI {
-	c := &CLI{flavor: flavor, proc: proc, log: log, activity: func(string) func() { return func() {} }}
+	c := &CLI{flavor: flavor, proc: proc, log: log}
 	for _, o := range opts {
 		o(c)
 	}
@@ -151,9 +144,7 @@ func (c *CLI) Run(ctx context.Context, req ports.AgentRequest) (string, error) {
 		cmd.Stream = c.stream
 	}
 
-	stop := c.activity(c.flavor.Name)
 	res, err := c.proc.Run(ctx, cmd)
-	stop()
 
 	logging.Trace(ctx, c.log, "agent output", res.Stdout)
 	if err != nil {
