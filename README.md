@@ -387,6 +387,7 @@ SpecForge 5 keeps the v4 core and its one rule, **verify, don't trust**, and bri
 - [x] Turn-based interview, fail-closed audit, browser checks
 - [x] Legacy rewrites with verified sources; migration gate
 - [x] Scaffolds for Java 21, React, Python and Go
+- [ ] **Next, v6:** change-risk and proportional review, lens-based review with cited proof, independent verifier, destructive-command guard · [docs/V6_PLAN.md](docs/V6_PLAN.md)
 
 The reasoning behind every item is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bugs are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 

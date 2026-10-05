@@ -31,7 +31,7 @@
 15. [Idioms, contrato de CLI, dependencias y build](#15-idioms-contrato-de-cli-dependencias-y-build)
 16. [Flujo y arquitectura objetivo](#16-flujo-y-arquitectura-objetivo)
 17. [Roadmap por fases y estado](#17-roadmap-por-fases-y-estado)
-18. [Métricas hoy → v4](#18-métricas-hoy--v4)
+18. [Métricas: v3 → v4](#18-métricas-v3--v4-medidas-en-la-rama-de-la-fase-4)
 19. [Las diez cosas que haría mañana](#19-las-diez-cosas-que-haría-mañana-en-orden)
 - [Anexo A · Reproducción de los bloqueantes](#anexo-a--reproducción-de-los-bloqueantes-verificados)
 - [Anexo B · Índice de hallazgos por fichero](#anexo-b--índice-de-hallazgos-por-fichero)
@@ -785,6 +785,12 @@ Origen: en una prueba de migración Java 8 → 21, v3 «creaba más» que v4. v3
   - En el loop real de React, el gate de duplicación contaba `package-lock.json` (2,5 % «duplicado», 11 clones) y bloqueó REFACTOR con exit 2: jscpd cuenta ahora solo formatos de código fuente e ignora `.venv`, `reports`, `coverage` y `.stryker-tmp`.
   - `assets/scaffolds/go/go.mod` cortaba el embed (límite de módulo) y `main.go` se compilaba como paquete de SpecForge: se guardan como `.tmpl`.
 - **Hecho:** migración real con Claude Code de un legacy Java 6 sintético (servlet, DAO JDBC, `Vector`/`Hashtable`, Log4j 1, JSP, JUnit 3): inventario, mapa de 5 capacidades con todas las citas verificadas (detectó incluso que el DAO del servlet nunca se asigna), spec del neto con 6 rarezas convertidas en preguntas (dinero en `double`, bonus sin retención, log antes de truncar…), plan con `BigDecimal` y `RoundingMode.DOWN`, y loop con Maven en el que PMD rechazó y REFACTOR corrigió; el legacy, intacto. Loops reales también en Python (Decimal, ruff del `.venv`) y React (Vitest, Testing Library, Knip, Stryker).
+
+### Fase 6 — v6: proporcionalidad, revisión verificable y seguridad operativa 📋 planificada · P1, P3, P4, P5, P6
+
+Origen: el análisis fichero a fichero de [gentle-shell](https://github.com/Gentleman-Programming/gentle-shell) (octubre de 2026). Doce ideas (riesgo del cambio y proporcionalidad, evidencia RED/GREEN con nombres de tests, presupuesto de corrección, revisión por lentes con pruebas citadas, verificador independiente, guardia de comandos destructivos como hook, worktrees paralelos, revisión ciega a dos modelos…) integradas sobre el núcleo verificable: cada una entra con la pregunta *¿qué comprueba SpecForge con código y qué pasa cuando el agente miente?*
+
+El diseño completo, por puntos, con tests, criterios de hecho, orden de PRs (A–H), releases intermedias (5.1.0 → 6.0.0), riesgos y contratos JSON está en **[V6_PLAN.md](V6_PLAN.md)**.
 
 ## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)
 
