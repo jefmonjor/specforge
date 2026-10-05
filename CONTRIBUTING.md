@@ -16,7 +16,7 @@ Thank you for your interest in contributing to **SpecForge**! We welcome bug rep
    ```bash
    git checkout -b feature/my-new-feature
    ```
-2. Respect the architecture (see the [user guide](USER_GUIDE.md#19-architecture)):
+2. Respect the architecture (see the [user guide](USER_GUIDE.md#22-architecture)):
    - `internal/domain/` is pure: no I/O, no clock, no environment.
    - Use cases live in `internal/app/` and depend only on the interfaces in `internal/ports/`.
    - Processes, files, git, the browser and the agent CLIs belong in `internal/adapters/`.

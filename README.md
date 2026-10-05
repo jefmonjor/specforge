@@ -251,7 +251,7 @@ And in `specs/0001-slug/`:
 
 The loop state for `--resume` lives in `.specforge/`, which `setup` adds to `.gitignore`.
 
-**How do I…** change an approved spec, add a scenario, redo one, answer a question in CI? See the [recipes](USER_GUIDE.md#15-recipes).
+**How do I…** change an approved spec, add a scenario, redo one, answer a question in CI? See the [recipes](USER_GUIDE.md#18-recipes).
 
 ### Anatomy of a specification
 
@@ -276,7 +276,7 @@ Feature: Password reset
   newer link invalidate the old one?
 ````
 
-Each Gherkin scenario becomes one test, one RED → GREEN → REFACTOR and one commit. Keep it to **one behaviour per scenario**: one `When`, at least one `Then`, in business words. Every invariant deserves a scenario that tries to break it. Write what you do not know as `[NEEDS CLARIFICATION]`, and `spec clarify` asks you for each one. The [user guide](USER_GUIDE.md#5-specifications-spec) has the whole template and the lint rules.
+Each Gherkin scenario becomes one test, one RED → GREEN → REFACTOR and one commit. Keep it to **one behaviour per scenario**: one `When`, at least one `Then`, in business words. Every invariant deserves a scenario that tries to break it. Write what you do not know as `[NEEDS CLARIFICATION]`, and `spec clarify` asks you for each one. The [user guide](USER_GUIDE.md#6-specifications-spec) has the whole template and the lint rules.
 
 ## 🏛 Rewriting a legacy system
 
@@ -298,7 +298,7 @@ migration:
   java_release: 21
 ```
 
-The full walkthrough is in the [user guide](USER_GUIDE.md#13-legacy-rewrites-legacy-spec-from-legacy), and a real run in [docs/DEMO.md](docs/DEMO.md#7-a-legacy-rewrite-java-6--21).
+The full walkthrough is in the [user guide](USER_GUIDE.md#15-legacy-rewrites-legacy-spec-from-legacy), and a real run in [docs/DEMO.md](docs/DEMO.md#7-a-legacy-rewrite-java-6--21).
 
 ## 🧱 Quality gates
 

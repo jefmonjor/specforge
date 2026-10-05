@@ -80,6 +80,14 @@ func TestRunReportsNonZeroExit(t *testing.T) {
 	}
 }
 
+func TestRunReportsStdoutWhenStderrIsEmpty(t *testing.T) {
+	proc := &fakeProc{result: ports.CommandResult{ExitCode: 1, Stdout: "You've hit your usage limit"}}
+	_, err := New(Claude, proc, logging.Discard()).Run(context.Background(), ports.AgentRequest{})
+	if err == nil || !strings.Contains(err.Error(), "usage limit") {
+		t.Fatalf("the reason on stdout is reported: %v", err)
+	}
+}
+
 func TestRunPropagatesMissingTool(t *testing.T) {
 	proc := &fakeProc{err: ports.ErrToolNotFound}
 	_, err := New(Gemini, proc, logging.Discard()).Run(context.Background(), ports.AgentRequest{})

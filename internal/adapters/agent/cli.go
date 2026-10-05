@@ -149,7 +149,12 @@ func (c *CLI) Run(ctx context.Context, req ports.AgentRequest) (string, error) {
 		return "", fmt.Errorf("%s: %w", c.flavor.Name, err)
 	}
 	if !res.Success() {
-		return "", fmt.Errorf("%s exited with code %d: %s", c.flavor.Name, res.ExitCode, firstLines(res.Stderr, 20))
+		// Some CLIs explain a failure (a usage limit, a sign-in) on stdout.
+		why := firstLines(res.Stderr, 20)
+		if strings.TrimSpace(why) == "" {
+			why = firstLines(res.Stdout, 20)
+		}
+		return "", fmt.Errorf("%s exited with code %d: %s", c.flavor.Name, res.ExitCode, why)
 	}
 	return res.Stdout, nil
 }

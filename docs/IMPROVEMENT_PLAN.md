@@ -786,11 +786,28 @@ Origen: en una prueba de migración Java 8 → 21, v3 «creaba más» que v4. v3
   - `assets/scaffolds/go/go.mod` cortaba el embed (límite de módulo) y `main.go` se compilaba como paquete de SpecForge: se guardan como `.tmpl`.
 - **Hecho:** migración real con Claude Code de un legacy Java 6 sintético (servlet, DAO JDBC, `Vector`/`Hashtable`, Log4j 1, JSP, JUnit 3): inventario, mapa de 5 capacidades con todas las citas verificadas (detectó incluso que el DAO del servlet nunca se asigna), spec del neto con 6 rarezas convertidas en preguntas (dinero en `double`, bonus sin retención, log antes de truncar…), plan con `BigDecimal` y `RoundingMode.DOWN`, y loop con Maven en el que PMD rechazó y REFACTOR corrigió; el legacy, intacto. Loops reales también en Python (Decimal, ruff del `.venv`) y React (Vitest, Testing Library, Knip, Stryker).
 
-### Fase 6 — v6: proporcionalidad, revisión verificable y seguridad operativa 📋 planificada · P1, P3, P4, P5, P6
+### Fase 6 — v6: proporcionalidad, revisión verificable y seguridad operativa ✅ · P1, P3, P4, P5, P6
 
-Origen: el análisis fichero a fichero de [gentle-shell](https://github.com/Gentleman-Programming/gentle-shell) (octubre de 2026). Doce ideas (riesgo del cambio y proporcionalidad, evidencia RED/GREEN con nombres de tests, presupuesto de corrección, revisión por lentes con pruebas citadas, verificador independiente, guardia de comandos destructivos como hook, worktrees paralelos, revisión ciega a dos modelos…) integradas sobre el núcleo verificable: cada una entra con la pregunta *¿qué comprueba SpecForge con código y qué pasa cuando el agente miente?*
+Origen: el análisis fichero a fichero de [gentle-shell](https://github.com/Gentleman-Programming/gentle-shell) (octubre de 2026). Doce ideas integradas sobre el núcleo verificable: cada una entró con la pregunta *¿qué comprueba SpecForge con código y qué pasa cuando el agente miente?* El diseño completo está en **[V6_PLAN.md](V6_PLAN.md)**.
 
-El diseño completo, por puntos, con tests, criterios de hecho, orden de PRs (A–H), releases intermedias (5.1.0 → 6.0.0), riesgos y contratos JSON está en **[V6_PLAN.md](V6_PLAN.md)**.
+- [x] **Fallos conocidos como evidencia** (`tdd.Baseline`): los runners nombran los tests que fallan; REFACTOR solo bloquea los nuevos; un fallo contado sin nombre sigue bloqueando.
+- [x] **Riesgo determinista** (`domain/risk`, `domain/change`): pasivo, medio o alto desde git; el agente solo puede subirlo; `review: risk`, `quality.mutation_from`, `--strict` lo sube todo.
+- [x] **`doctor`** con sondas `Ready` en cada gate y en el runner (sin duplicar su detección).
+- [x] **Preguntas con opciones** en loop, plan y legacy (`conversation.Rules.RequireOptions`).
+- [x] **Superficies desde el plan**: pregunta o rechazo; lo rechazado se comprueba deshecho por huella.
+- [x] **Presupuesto de entrega** y cortes apilados (`deliver --slices`).
+- [x] **Modelo por fase** (`models.<fase>`).
+- [x] **Lentes de revisión** (`domain/review`, `app/reviewer`): diff en hunks, cada prueba contrastada, refutador, una corrección con presupuesto, validación dirigida, `specforge review` de rama.
+- [x] **Verificador independiente** (`app/verifier`, puerto `Scratch`): copia desechable, veredicto por requisito, proyecto intacto, `specforge verify`.
+- [x] **Guardia de comandos** (`domain/guard`, `app/guardhook`): 90 casos; hook de Claude Code y Gemini CLI; nunca falla abierta.
+- [x] **Revisión ciega doble** y **escenarios en paralelo** en sandboxes con comprobación de costura.
+- **Hallazgos de las pruebas reales con Claude Code, cada uno con su arreglo y su test:**
+  - El verificador de un escenario exigía todas las invariantes y culpó al escenario 3 de INV-01, que implementa el 2: ahora responde por el escenario y las invariantes que nombra.
+  - El verificador dio como «comando» una lectura de código: SpecForge vuelve a ejecutar cada comando bloqueante en la copia y exige la salida que dice haber observado.
+  - Un escenario paralelo que se paraba con una pregunta apuntaba al `questions.md` del sandbox, ya borrado: ahora se repite solo, justo después, con su estado en el proyecto.
+  - Los registros de revisión y verificación quedaban fuera del commit del escenario.
+  - Un límite de uso del agente llegaba como «exited with code 1:» sin motivo: el adaptador lo toma de stdout cuando stderr está vacío.
+- **Hecho:** loop real con Claude Code sobre un proyecto Go con un test roto heredado: línea base, riesgo medio y alto, una y cuatro lentes, dos escenarios en paralelo, verificador, commits por escenario; la guardia bloqueó un `git reset --hard` real de Claude Code sin tocar el trabajo sin commit. Cobertura 78 %, suelo de CI 75 %, `golangci-lint` 0 avisos.
 
 ## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)
 
