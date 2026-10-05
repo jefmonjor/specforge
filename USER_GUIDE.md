@@ -23,6 +23,7 @@ This guide covers every command, every file SpecForge writes, what you edit by h
 - [14. Hand-over: `deliver`](#14-hand-over-deliver)
 - [15. Legacy rewrites: `legacy`, `spec from-legacy`](#15-legacy-rewrites-legacy-spec-from-legacy)
 - [16. The destructive-command guard: `guard`](#16-the-destructive-command-guard-guard)
+  - [What it reads](#what-it-reads) · [Checkpoints: `restore`](#checkpoints-restore)
 
 **Reference**
 - [17. Your files: what to edit](#17-your-files-what-to-edit)
@@ -437,7 +438,7 @@ Everything is kept in `specs/0001-slug/review/SDD_….json`, and `--resume` neve
 
 ### The independent verifier
 
-The writer's test can pin a bug: a test written from the code agrees with the code. The verifier checks the **specification** instead. In a disposable copy of your project (dependency directories linked, plus a copy of the last commit to compare old behaviour), an agent derives its own probes from every invariant and scenario and runs them. It is the only agent allowed to run shell commands without asking, because nothing it does there is kept; the guard still applies.
+The writer's test can pin a bug: a test written from the code agrees with the code. The verifier checks the **specification** instead. In a disposable copy of your project (dependency directories linked, plus a copy of the last commit to compare old behaviour; files are cloned copy-on-write on APFS, Btrfs and XFS, so the copy costs almost nothing there), an agent derives its own probes from every invariant and scenario and runs them. It is the only agent allowed to run shell commands without asking, because nothing it does there is kept; the guard still applies.
 
 SpecForge requires:
 
@@ -654,7 +655,7 @@ Agents run shell commands. The guard reads each one before it runs and blocks wh
 - SQL that drops or empties data: `DROP`, `TRUNCATE`, `DELETE` or `UPDATE` without `WHERE` (comments ignored), MongoDB `drop()` and `deleteMany({})`, Redis `FLUSHALL`;
 - commands that touch secrets: `.env`, `.ssh/`, `*.pem`, `id_rsa`, `credentials`, `.netrc`.
 
-It sees through `sudo`, `env`, variable assignments, `xargs`, `timeout`, `nohup`, `sh -c`, `$( )` and backticks. Deleting `/`, `~`, the project or a system directory is **never** allowed, whatever the settings.
+It sees through `sudo`, `env`, `npx`, variable assignments, `xargs`, `timeout`, `nohup`, `sh -c`, `$( )` and backticks. Deleting `/`, `~`, the project or a system directory is **never** allowed, whatever the settings.
 
 `setup` installs it as your agent's pre-tool hook, in `.claude/settings.json` (Claude Code) or `.gemini/settings.json` (Gemini CLI), keeping the rest of the file; `--no-guard` skips it. When it blocks, the agent sees the reason and has to find another way:
 
@@ -675,7 +676,41 @@ guard:
 
 `block` (default) refuses; `confirm` lets Claude Code ask you, and still blocks inside the loop, where nobody can answer; `off` lets everything through but the hard denies. `allow` takes command patterns, `*` matching anything. An unreadable hook request, or an invalid `specforge.yaml`, blocks: the guard never fails open. `specforge guard --selftest` proves it blocks; `doctor` checks it is installed.
 
-It is lexical recognition, not a sandbox: scripts, programs and variable expansions are not inspected. For real containment, run the agent in a container. The loop verifies its work with or without the guard.
+### What it reads
+
+Not only the command line. Before a command runs, the guard reads what it runs, and blocks it if that destroys work:
+
+| The agent runs | The guard reads |
+| :--- | :--- |
+| `sh x.sh`, `./x.sh`, `source x`, `scripts/nuke` | the script, and the scripts it runs in turn; a shebang (`#!/usr/bin/env python3`) names the language |
+| `python x.py`, `node x.js`, `ruby`, `perl`, `php`, `go run x.go`, `deno run`, `bun x.ts` | the file, for calls that delete a tree (`shutil.rmtree`, a recursive `fs.rm`, `FileUtils.rm_rf`, `os.RemoveAll`…) and for shell or SQL in its strings (`os.system("rm -rf …")`, `["git", "reset", "--hard"]`, `"DELETE FROM users"`) |
+| `python -c "…"`, `node -e "…"`, `ruby -e`, `perl -e`, `php -r`, `bun -e`, `deno eval` | the code given inline, the same way |
+| `npm run clean`, `pnpm clean`, `yarn clean`, `bun run clean` | the script in `package.json`, and its `pre` script |
+| `make clean` | the target's recipe in the `Makefile`, and its prerequisites' |
+| `echo '…' > x.sh && sh x.sh`, a heredoc | the text the command writes into the file it then runs |
+
+A file the same command writes without showing what (`curl -o x.sh … && sh x.sh`, `base64 -d > x.sh`, `cp`) is refused: the agent writes it first and runs it in a second command, where the guard can read it. Scripts are read up to 1 MB; binary files are not read. `guard.allow` matches what the agent typed (`sh ./scripts/clean.sh`), so a script you trust can be let through.
+
+What stays out of reach: what a program imports, a compiled binary, a variable's value at run time. That is what checkpoints are for.
+
+### Checkpoints: `restore`
+
+Before every agent turn, the loop saves a **checkpoint** of your working tree: uncommitted and untracked files included, ignored ones (`node_modules`, `.env`) not. A checkpoint lives under `refs/specforge/checkpoints/`: no branch, commit, index, stash or push carries it, `git status` does not show it, and the newest 50 are kept. Only what changed is hashed, so one takes tens of milliseconds.
+
+If something gets past the guard, nothing is lost:
+
+```text
+$ specforge restore
+  20261005T142655.383500121Z · 2026-10-05 14:26:55 · 0001 · scenario 1 (SDD_0001_001) · before GREEN
+  restore one with `specforge restore <checkpoint>` (or `latest`); nothing written since is deleted
+$ specforge restore latest
+  ✓ restored checkpoint 20261005T142655.383500121Z (0001 · scenario 1 (SDD_0001_001) · before GREEN)
+  your files just before are checkpoint 20261005T142734.969173443Z: `specforge restore 20261005T142734.969173443Z` undoes this
+```
+
+Restoring brings back every file of the checkpoint as it was, deleted or changed since, and **never deletes** a file written after it. Your working tree is checkpointed first, so a restore is undone the same way. Outside a git repository there are no checkpoints.
+
+The guard and the checkpoints protect your repository from mistakes. They are not a sandbox against an agent determined to do harm outside it (another directory, a remote, a database): for that, run the agent in a container. The loop verifies its work with or without them.
 
 ## 17. Your files: what to edit
 
@@ -716,6 +751,13 @@ Read them; don't edit them by hand.
 Commit everything else: the specifications, plans, logs and the delivery are the project's history.
 
 ## 18. Recipes
+
+**Get back work an agent destroyed.** The loop saved a checkpoint before the turn:
+
+```bash
+specforge restore          # list them
+specforge restore latest   # bring the newest back
+```
 
 **Change an approved specification.** Edit `specs/0001-slug.md`, then:
 
@@ -885,7 +927,8 @@ Every failure prints what happened, why and what to do next.
 - **A review finding was discarded.** Its proof did not point at a line the change added or modified: the record in `review/SDD_….json` says which reference failed.
 - **"A review step failed closed".** The lens, refuter or verifier never returned valid JSON. Run again; if it repeats, try another model with `models.review` or `models.verify`.
 - **"A refused file was not put back".** Restore it (`git checkout -- <file>`) and `loop --resume`.
-- **The guard blocks a command you need.** Run it yourself, or add its pattern to `guard.allow`.
+- **The guard blocks a command you need.** Run it yourself, or add its pattern to `guard.allow` (for a script, the command that runs it: `"sh ./scripts/clean.sh"`).
+- **An agent destroyed work anyway.** `specforge restore` lists the checkpoints the loop saved before each agent turn; `specforge restore latest` brings the newest back without deleting anything written since.
 
 ## 22. Architecture
 
@@ -915,6 +958,7 @@ internal/
     verifier/   the verifier in a copy
     doctor/     environment checks
     guardhook/  the guard as a hook
+    restore/    checkpoints back
     answer/     schema-checked answers
     specs/      spec lifecycle
     planning/   the plan

@@ -11,6 +11,10 @@ Si algo que necesitas no está en la especificación, en su registro de decision
 - En GREEN y REFACTOR, nunca crees, edites, renombres ni borres un fichero de test.
 - Nunca incluyas un fichero que no hayas escrito.
 
+### Tu shell
+- Una guardia lee cada comando que ejecutas, y los scripts, ficheros y scripts de paquete que este ejecuta. Escribe un script en un paso y ejecútalo en otro, para que pueda leerse; nunca ejecutes en el mismo comando un fichero que descargas, decodificas o copias.
+- Nunca borres directorios de forma recursiva, descartes trabajo sin commit ni reescribas el historial de git. Si una tarea parece necesitarlo, pregunta.
+
 ### Oficio
 - Escribe el código mínimo que hace pasar el test actual (YAGNI, KISS); refactoriza solo con los tests en verde.
 - Mantén el dominio libre de frameworks y de E/S; depende de interfaces pequeñas definidas donde se usan.

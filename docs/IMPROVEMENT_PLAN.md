@@ -818,6 +818,33 @@ Origen: el análisis fichero a fichero de [gentle-shell](https://github.com/Gent
   - Más barato: el diff de líneas recorta cabeza y cola comunes antes de la tabla, y la línea base compara por conjuntos.
 - **Hecho:** loop real con Claude Code sobre un proyecto Go con un test roto heredado: línea base, riesgo medio y alto, una y cuatro lentes, dos escenarios en paralelo, verificador, commits por escenario; la guardia bloqueó un `git reset --hard` real de Claude Code sin tocar el trabajo sin commit. Cobertura 78,9 %, suelo de CI 75 %, `golangci-lint` 0 avisos, builds en Linux, macOS y Windows.
 
+### Fase 6.1 — cerrar los dos huecos de la v6 ✅ · P3, P5
+
+La valoración de la v6 dejó dos huecos que pesaban: la guardia solo leía la línea de comando (un script escrito por el agente pasaba sin verse) y cada copia escribía el proyecto entero, a veces dos y tres veces.
+
+- [x] **La guardia lee lo que el comando ejecuta** (`guard.Inspect` con un `Reader` inyectado; el dominio sigue sin E/S):
+  - scripts, también los que ejecutan otros scripts, con el shebang;
+  - ficheros e intérpretes, y código en línea;
+  - scripts de `package.json` y objetivos de `make`;
+  - lo que la misma línea escribe antes de ejecutarlo.
+- [x] **Checkpoints antes de cada turno del agente** (`ports.Checkpoints`, adaptador git con índice privado en `refs/specforge/checkpoints/`; se guardan los 50 últimos) y **`specforge restore`** (`app/restore`): devuelve lo destruido, no borra lo escrito después, y el propio restore se puede deshacer.
+- [x] **Copias que escriben cada byte una vez como mucho**:
+  - la base, con `read-tree` + `checkout-index` sobre un índice privado;
+  - los sandboxes, con alternates hacia los objetos del proyecto;
+  - copy-on-write en APFS, Btrfs y XFS;
+  - el límite de tamaño, comprobado antes de escribir.
+  - Medido en bytes escritos: la copia del verificador pasa de 477 a 310 MB en 177 MB de proyecto, y el sandbox de ficheros incompresibles de 96 a 48 MB.
+  - Clonar el repositorio se probó y se descartó: escribía lo mismo con más CPU.
+- **Hallazgos, cada uno con su arreglo y su test:**
+  - Claude Code escribió `reset.sh` y lo ejecutó en el mismo comando, cuando el fichero aún no existía al leerlo el hook: el `git reset --hard` pasó.
+  - Un fuzz de 260.000 líneas encontró un pánico con una línea que solo era una redirección.
+  - Un intento fallido de clon copy-on-write dejaba el fichero en 0600 y un script perdía su bit `x`.
+  - `rimraf` no se reconocía.
+- **Hecho:**
+  - Con Claude Code, la misma petición destructiva en tres formas quedó bloqueada tres veces.
+  - Un binario compilado destruyó el trabajo sin commit y `specforge restore latest` lo devolvió entero.
+  - El CI ejecuta los tests de copias y guardia también en macOS y Windows.
+
 ## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)
 
 | Métrica | v3 | Objetivo | v4 medido | Principio |
