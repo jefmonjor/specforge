@@ -515,3 +515,59 @@ Measured on two repositories, as bytes written (the disk of the test machine was
 
 The base is checked out straight from git instead of through an archive written and extracted, and a sandbox borrows the project's git objects instead of storing them again. Cloning the repository was tried first and dropped: it wrote as much and cost more CPU. On APFS (macOS), Btrfs and XFS, files are cloned copy-on-write, so a copy writes almost nothing; CI checks that on macOS. The size limit is now checked before anything is written. Its test also found a bug: on a file system without copy-on-write, a failed clone attempt left the file with mode 0600, and an executable script lost its `x` bit.
 
+### Changing what was built
+
+The gap section 8's verifier found on the payroll module (`INVALID_RATE` is never returned) became a change request. It asks for the new scenario to go right after the first one, the case that used to break: before 6.1 a marker was a scenario's position, so every scenario after it would have changed marker, and the new one could have been taken as done by the old test of the scenario it displaced.
+
+```text
+$ specforge spec change 0001 "A tax rate below 0 or above 100 is refused with INVALID_RATE. Add it as a scenario right after the first one."
+  … claude is working (CHANGE)
+  ✓ change written into specs/0001-net-pay.md; approving it will record:
+      ADDED · SDD_0001_004 · A tax rate outside 0 to 100 is refused
+$ specforge spec approve 0001
+      ADDED · SDD_0001_004 · A tax rate outside 0 to 100 is refused
+  next: specforge plan 0001 (it revises the plan for the added or removed scenarios), then plan approve 0001 and loop 0001
+```
+
+The new scenario is second in the file and gets the next number, `SDD_0001_004`; the two after it keep `002` and `003`, and their tests keep their names. The plan was revised, not rewritten, and the loop did only the new scenario:
+
+```text
+Scenario 2/4 · RED · A tax rate outside 0 to 100 is refused
+  … running go test -run SDD_0001_004 ./...
+  ✓ RED accepted
+…
+  ✓ committed 20de3b4
+```
+
+```markdown
+| 2 | A tax rate outside 0 to 100 is refused | `TestNet_SDD_0001_004_TaxRateOutsideRangeIsRefused` | `20de3b4` |
+| 3 | Deductions larger than the pay leave a net of zero (INV-01) | `TestNet_SDD_0001_002_DeductionsLargerThanPayLeaveZero` | `29a06d6` |
+```
+
+Scenario 3 kept the commit, the review and the test it had in section 8. The first preview of this run reported every scenario as `MODIFIED`: the specification had been approved under 6.0, and the ledger started from its loop did not compare with the fingerprint that loop recorded. Fixed before release.
+
+### Three ways in
+
+The same lifecycle was run from the three starting points:
+
+- **A technical requirement.** *Cache exchange rates for ten minutes* went through `spec interview` in nine questions: what the cache protects (a provider that charges per call and allows 100 a minute), what a rate is (one per ordered pair), what happens when the provider is down (the expired rate, marked stale, for one more hour). The result was twelve scenarios, one per guarantee; then `plan` and `plan approve`.
+- **Legacy code in another language.** A Python discount module, through `spec from-legacy`: thirteen scenarios, every rule cited, and seven questions about what the code does that nobody explains (floating-point rounding, a magic 50 % cap, an error with only a code).
+- **The answers.** `spec clarify` first wrote each decision only on its question's line: the errors table still said the legacy *"shows only this code, no sentence"* while the decision gave the message. Now the agent writes the decisions into every section they affect:
+
+```text
+  ✓ change written into specs/0001-order-discount.md; approving it will record:
+      ADDED · SDD_0001_014 · Discount halves are rounded up
+      MODIFIED · SDD_0001_012 · Order total of zero is rejected
+      MODIFIED · SDD_0001_013 · Negative order total is rejected
+```
+
+```gherkin
+  Scenario: Discount halves are rounded up
+    Given an order total of 10.05
+    And the customer has the gold tier
+    When the discount is requested
+    Then the discount is 1.01
+```
+
+The legacy code returns 1.0 there: `round(1.005, 2)` in floating point. The developer decided not to reproduce that, and the new scenario makes the rewrite prove it.
+

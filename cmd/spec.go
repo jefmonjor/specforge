@@ -30,9 +30,11 @@ with the acceptance criteria as Gherkin scenarios. Its lifecycle:
 
   new → interview (or edit by hand) → clarify → lint → approve → loop
 
-To change an approved specification, edit it and approve it again: the
-approval history (specs/NNNN-slug/approvals.md) records which scenarios were
-added, modified or removed, and the loop redoes only those.
+To change an approved specification, run spec change (or edit it) and
+approve it again. Every scenario keeps its marker, and so its tests, while
+its title stays; the approval history (specs/NNNN-slug/approvals.md)
+records which scenarios were added, modified, renamed or removed, and the
+loop redoes only those.
 
 approve is the review gate: it refuses while a TODO or an open question is
 left, records who approved it and seals the content. The loop only runs an

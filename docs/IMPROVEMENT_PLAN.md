@@ -835,6 +835,15 @@ La valoración de la v6 dejó dos huecos que pesaban: la guardia solo leía la l
   - el límite de tamaño, comprobado antes de escribir.
   - Medido en bytes escritos: la copia del verificador pasa de 477 a 310 MB en 177 MB de proyecto, y el sandbox de ficheros incompresibles de 96 a 48 MB.
   - Clonar el repositorio se probó y se descartó: escribía lo mismo con más CPU.
+- [x] **Especificaciones que cambian sin romperse** (auditoría de los puntos de entrada y del flujo de cambios):
+  - un marcador era la posición del escenario, así que insertar, quitar o reordenar movía todos los siguientes; un escenario nuevo podía darse por hecho con el test de otro y la entrega trazaba tests ajenos. Ahora `spec.Ledger` (en `specs/NNNN-slug/scenarios.json`) conserva cada marcador por título, o por pasos si se renombró, y no reutiliza números;
+  - la huella son los pasos y las invariantes que nombra;
+  - el loop arrastra el estado por marcador (con revisión, verificación y riesgo), y un escenario modificado vuelve a RED con su versión anterior en el prompt;
+  - los checkpoints llevan el marcador;
+  - un plan que nombra un escenario quitado está desfasado;
+  - `spec change` aplica una petición de cambio guiada;
+  - `spec clarify` escribe las decisiones en todas las secciones;
+  - se avisa de los tests de escenarios quitados.
 - **Hallazgos, cada uno con su arreglo y su test:**
   - Claude Code escribió `reset.sh` y lo ejecutó en el mismo comando, cuando el fichero aún no existía al leerlo el hook: el `git reset --hard` pasó.
   - Un fuzz de 260.000 líneas encontró un pánico con una línea que solo era una redirección.
@@ -843,6 +852,10 @@ La valoración de la v6 dejó dos huecos que pesaban: la guardia solo leía la l
 - **Hecho:**
   - Con Claude Code, la misma petición destructiva en tres formas quedó bloqueada tres veces.
   - Un binario compilado destruyó el trabajo sin commit y `specforge restore latest` lo devolvió entero.
+  - Los tres puntos de entrada, en real:
+    - un cambio funcional en la nómina de la v6 (escenario insertado en medio, hecho solo, los demás conservan tests y commits);
+    - un requisito técnico (caché de tipos de cambio);
+    - una spec desde código Python legado, cuyas decisiones ahora llegan a todas las secciones.
   - El CI ejecuta los tests de copias y guardia también en macOS y Windows.
 
 ## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)

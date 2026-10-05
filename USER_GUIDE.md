@@ -13,6 +13,7 @@ This guide covers every command, every file SpecForge writes, what you edit by h
 
 **Daily work**
 - [6. Specifications: `spec`](#6-specifications-spec)
+  - [Three ways in](#three-ways-in-functional-technical-from-code) · [Changing a specification: `spec change`](#changing-a-specification-spec-change)
 - [7. The plan: `plan`](#7-the-plan-plan)
 - [8. The loop: `loop`](#8-the-loop-loop)
 - [9. Risk, review and verification](#9-risk-review-and-verification)
@@ -204,12 +205,14 @@ specforge spec interview 0001
 specforge spec clarify 0001
 specforge spec lint 0001
 specforge spec approve 0001
+specforge spec change 0001 "Links expire after 15 minutes"
 specforge spec list
 ```
 
 - **`new`** creates `specs/0001-password-reset.md` from the template.
 - **`interview`** completes it in a conversation with your agent.
-- **`clarify`** asks the open questions, one at a time.
+- **`clarify`** asks the open questions, one at a time, then has your agent write the decisions everywhere they apply.
+- **`change`** applies a change request, approved specification or not.
 - **`lint`** shows what blocks approval, and advice.
 - **`approve`** is review gate R0: lint, approver, seal.
 - **`list`** shows number, state and title.
@@ -234,6 +237,14 @@ A specification is named by its number (`1`, `0001`), a file-name prefix (`0001-
 12. **Open questions**: `- [NEEDS CLARIFICATION]: …`, empty before approval.
 
 A specification drafted from legacy code adds `13. Legacy sources` ([section 15](#15-legacy-rewrites-legacy-spec-from-legacy)).
+
+### Three ways in: functional, technical, from code
+
+Every specification follows the same template and the same lifecycle; only how the first draft comes changes.
+
+- **A feature** (*password reset*, *discount codes*): `spec new`, then `spec interview`. The interview starts from the intent, the actors and the rules that are never broken.
+- **A technical requirement** (*cache exchange rates for ten minutes*, *rate-limit the login*, *structured logs*): the same `spec new` and `spec interview`. The actors are the systems involved (*the checkout service*, *the rate provider*); the invariants are the guarantees (*never more than 100 provider calls per minute*, *never an expired rate unmarked*); section 9 holds the numbers; the scenarios describe what another system observes, not the code. A real run turned *cache exchange rates for ten minutes* into twelve scenarios, one per guarantee, in nine questions.
+- **Existing code, in any language**: `setup --legacy <repo>`, `legacy scan`, `legacy map`, then `spec from-legacy "<capability>"` drafts the specification from what the code really does, citing each source ([section 15](#15-legacy-rewrites-legacy-spec-from-legacy)). What the code does that nobody can explain becomes an open question; `spec clarify` asks them and writes the decisions into the scenarios.
 
 ### Writing good scenarios
 
@@ -312,6 +323,8 @@ You can always skip the interview and edit the file by hand.
 
 So the specification itself says what was decided. Answers also go to `specs/0001-slug/decisions.md`. `--by` sets the name recorded (default: `git config user.name`). Without a terminal the questions go to `questions.md` (exit 5); answer them there and run `clarify` again.
 
+A decision usually changes more than its own line: a message, a limit, a rounding rule. Once every question is answered, your agent writes the decisions into every section they affect (scenarios, invariants, data contracts, errors, out of scope), the way `spec change` does, asking if one is unclear. In a real run on legacy Python code, *"Half-up to two decimals, on exact decimal amounts"* became a changed invariant, a changed data contract and a new scenario pinning the case where the legacy code's floating point rounded the wrong way. `--no-apply` only records the decisions.
+
 ### Approve
 
 `spec approve` lints, then records the approver (`--by`, else `git config user.name`, else a question) and the UTC time in the front matter, and appends the seal:
@@ -322,11 +335,26 @@ So the specification itself says what was decided. Answers also go to `specs/000
 
 The hash ignores line endings and trailing spaces, so a Windows checkout verifies the same. Specifications sealed by SpecForge 3 (`sha256:`) still verify.
 
-### Changing an approved specification
+### Changing a specification: `spec change`
 
-Edit the file, then approve it again. Until you do, it is `changed` and the loop refuses it, so a stray edit never reaches the agent.
+```bash
+specforge spec change 0001 "A tax rate below 0 or above 100 is refused with INVALID_RATE"
+```
 
-Every approval is appended to `specs/0001-slug/approvals.md` with the date, the approver, the seal and each scenario marked `ADDED`, `MODIFIED`, `UNCHANGED` or `REMOVED` compared with the previous approval. `approve` prints the changes, and the loop redoes only the scenarios whose text changed.
+Your agent applies the request to every section it touches, asks what the request leaves open or contradicts, and changes no other file; the conversation is kept in `specs/0001-slug/change.jsonl`. It ends by showing what the next approval will record. You can also edit the file by hand: either way, until you approve it again the specification is `changed` and the loop refuses it, so a stray edit never reaches the agent.
+
+**A scenario keeps its marker for good.** The marker (`SDD_0001_003`) names its tests, its review and verification records, and its row in the plan, so it never moves:
+
+| You… | The scenario | The loop |
+| :--- | :--- | :--- |
+| edit its steps, same title | keeps its marker: `MODIFIED` | redoes it from RED, showing the agent what it said before, so its test is updated rather than taken as done |
+| change its title, same steps | keeps its marker: `RENAMED` | nothing to redo |
+| change an invariant it names | `MODIFIED` | redoes it |
+| insert, move or reorder scenarios | the others keep theirs | nothing to redo for them |
+| add one | gets the next number, never a used one | does it; the plan must place it first |
+| remove one | its number is retired: `REMOVED` | warns that its tests are still in the project |
+
+`spec approve` keeps the markers in `specs/0001-slug/scenarios.json` and appends each approval to `specs/0001-slug/approvals.md` (date, approver, seal, every scenario with its marker and how it changed). When scenarios were added or removed and a plan exists, it says to revise the plan: `specforge plan 0001` revises the existing plan rather than starting over, and a plan that names a scenario that is gone is refused. A specification approved before SpecForge 6.1 takes its markers from its loop at its first new approval, so its tests keep their names.
 
 ## 7. The plan: `plan`
 
@@ -734,7 +762,8 @@ Read them; don't edit them by hand.
 - The front matter fields **`approved_by`** and **`approved_at`**, written by approval.
 - **`specs/0001-slug/approvals.md`**: every approval and what changed in it.
 - **`specs/0001-slug/decisions.md`**: every question and answer, reused in later prompts.
-- **`specs/0001-slug/interview.jsonl`**: the interview transcript.
+- **`specs/0001-slug/interview.jsonl`** and **`change.jsonl`**: the interview and change-request transcripts.
+- **`specs/0001-slug/scenarios.json`**: each scenario's marker, kept across changes.
 - **`specs/0001-slug/review/SDD_….json`** and **`verify/SDD_….json`**: each scenario's lens review and verification, discarded findings and their reasons included. `review/branch.json` and `verify/feature.json` come from `specforge review` and `specforge verify`.
 - **`specs/0001-slug/DELIVERY.md`, `trace.json`, `PR_BODY.md`**: the hand-over, rewritten by each `deliver`.
 - **`.claude/settings.json`**, **`.gemini/settings.json`**: the guard hook entry; the rest of each file is yours.
@@ -759,22 +788,24 @@ specforge restore          # list them
 specforge restore latest   # bring the newest back
 ```
 
-**Change an approved specification.** Edit `specs/0001-slug.md`, then:
+**Change an approved specification.** Say what to change, or edit `specs/0001-slug.md` by hand, then approve:
 
 ```bash
+specforge spec change 0001 "Links expire after 15 minutes"
 specforge spec approve 0001
-specforge loop --resume
+specforge loop 0001
 ```
 
-Approval prints which scenarios were added, modified or removed; the loop redoes only those.
+Approval prints each scenario's marker and how it changed; the loop redoes only those.
 
-**Add a scenario to an approved specification.** Add it to section 6 and approve. If there is a plan, it must place the new scenario:
+**Add or remove a scenario.** The same, and the plan must follow:
 
 ```bash
+specforge spec change 0001 "Admins can revoke every link of a user"
 specforge spec approve 0001
 specforge plan 0001
 specforge plan approve 0001
-specforge loop --resume
+specforge loop 0001
 ```
 
 **Change the approved plan.** Edit `plan.md` and run `specforge plan approve 0001`.
