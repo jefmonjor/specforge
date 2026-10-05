@@ -433,7 +433,7 @@ With `blind_review: true`, a high-risk change runs every lens twice, independent
 
 Everything is kept in `specs/0001-slug/review/SDD_….json`, and `--resume` never runs the lenses twice.
 
-**A whole branch.** `specforge review [spec] [--base ref] [--lens risk]` runs the same lenses and checks over your branch, for code that did not come out of the loop. It never corrects anything: exit 2 when a finding blocks or needs your judgement. With a specification, the report goes to `specs/0001-slug/review/branch.json` and `deliver` shows it.
+**A whole branch.** `specforge review [spec] [--base ref] [--lens risk]` runs the same lenses and checks over your branch, for code that did not come out of the loop. It never corrects anything: exit 2 when a finding blocks or needs your judgement. With a specification, the report goes to `specs/0001-slug/review/branch.json` and `deliver` shows it. A documentation-only branch needs no lens, and `review` says so.
 
 ### The independent verifier
 
@@ -459,6 +459,8 @@ With an approved plan, the files the agent may change are its components (paths 
 With `loop.parallel: 2` (or more), consecutive scenarios whose plan surfaces do not overlap run at the same time, each in its own **sandbox**: a copy of the project made into a fresh git repository. A component line that names scenario markers (`· SDD_0001_002`) belongs to those; one that names none is shared by all, so an unmarked plan never runs anything in parallel.
 
 In its sandbox each scenario goes through RED, GREEN, REFACTOR and the review. Questions reach you one at a time. Then the work comes back in order: a file another scenario of the batch also wrote sends that scenario back to run on its own; the whole suite runs once over the combination (the **seam check**), and if it fails every file goes back as it was and the scenarios run again one by one. Only then does each scenario get your review and its own commit, in turn.
+
+The scenarios share the specification's logs. What each one adds to `decisions.md`, `questions.md` and `LESSONS.md` in its sandbox is appended to the project's, never copied over it, so no scenario loses another's answers. A scenario that stops in its sandbox (a question nobody can answer there, a collision, a failed seam check) runs again on its own right after the batch: your product answers from the first attempt still count, but its process decisions (risk, review, verification) stay behind with the attempt.
 
 ### A model per phase
 

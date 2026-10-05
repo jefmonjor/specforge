@@ -209,8 +209,9 @@ For each stage, what SpecForge checks itself:
 | **🔵 Refactor** | The whole suite passes, except tests that already failed before the loop (named from the runner's report), and no quality gate blocks. A gate whose tool is missing shows ⚠ *skipped*, never ✓. |
 | **⚖️ Risk** | Passive, medium or high, from the paths and lines git says the scenario touched. The agent can raise it with a reason, never lower it. |
 | **🔎 Review lenses** | None for a passive change, one for a medium one, four for a high one. Each lens is read-only and its JSON must validate; a finding whose proof is not a changed line is discarded; inferential ones go to a refuter. What blocks gets **one** correction, within a line budget, then a check of those findings only. |
-| **🔍 Verifier** | For high risk: a verdict for every invariant and scenario, probed in a copy of the project, with the command and its output for every failure. Your project must stay untouched. |
+| **🔍 Verifier** | For high risk: a verdict for the scenario and every invariant it names, probed in a disposable copy of the project, the only place an agent may run commands without asking. Every failure comes with its command and output, and SpecForge runs the command again before believing it. Your project must stay untouched. |
 | **🗺️ Plan surfaces** | Every file the agent changes is in the approved plan, or you are asked. A refused file must be put back. |
+| **⏩ Side by side** | With `loop.parallel`, scenarios whose plan files do not overlap run at once, each in its own sandbox. Their work comes back in order, the whole suite runs over the combination, and each one still gets your review and its own commit. |
 | **👀 Review** | You accept, say what should change, or send it back to RED. Then one commit per scenario. |
 | **❓ Questions** | Asked at the terminal, or written to `questions.md` with exit code 5 in CI. Your answer is reused in every later prompt. |
 
@@ -346,7 +347,7 @@ Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.
 | `plan` · `plan approve` | The technical plan and its approval. |
 | `loop` | Red → Green → Refactor → review. `--resume`, `--restart`, `--scenario N --from green`, `--review scenario\|risk\|off`, `--no-commit`, `--strict`. |
 | `deliver` | The hand-over: report, trace and PR body. `--slices` writes one PR body per proposed slice. |
-| `review` | The review lenses over your whole branch, read-only. |
+| `review` | The review lenses over your whole branch, read-only. A documentation-only branch needs none. |
 | `verify` | The independent verifier over a whole specification. |
 | `guard` | The destructive-command guard, run by your agent's hook. `--selftest` proves it blocks. |
 | `audit` | Adversarial security review of your branch; fails closed. |
@@ -412,6 +413,7 @@ SpecForge 6 keeps the one rule, **verify, don't trust**, and makes the checking 
 - [x] Review lenses with proof checked against the diff; refuter; one correction
 - [x] Independent verifier in a copy; destructive-command guard
 - [x] Blind double review; scenarios side by side · [docs/V6_PLAN.md](docs/V6_PLAN.md)
+- [x] Proven end to end with Claude Code: baseline, risk, lenses, two scenarios side by side, the verifier and the guard · [docs/DEMO.md](docs/DEMO.md#8-specforge-6-risk-lenses-verifier-parallel-guard)
 
 The reasoning behind every item is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bugs are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 

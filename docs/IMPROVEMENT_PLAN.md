@@ -807,7 +807,16 @@ Origen: el análisis fichero a fichero de [gentle-shell](https://github.com/Gent
   - Un escenario paralelo que se paraba con una pregunta apuntaba al `questions.md` del sandbox, ya borrado: ahora se repite solo, justo después, con su estado en el proyecto.
   - Los registros de revisión y verificación quedaban fuera del commit del escenario.
   - Un límite de uso del agente llegaba como «exited with code 1:» sin motivo: el adaptador lo toma de stdout cuando stderr está vacío.
-- **Hecho:** loop real con Claude Code sobre un proyecto Go con un test roto heredado: línea base, riesgo medio y alto, una y cuatro lentes, dos escenarios en paralelo, verificador, commits por escenario; la guardia bloqueó un `git reset --hard` real de Claude Code sin tocar el trabajo sin commit. Cobertura 78 %, suelo de CI 75 %, `golangci-lint` 0 avisos.
+  - En modo headless el verificador no podía ejecutar sus sondas (esperaba una aprobación que nunca llega): `AgentRequest.Commands` lo permite solo al verificador, en su copia desechable. Con ello, `specforge verify 0001` dio 5 cumplidos de 5 y señaló un hueco real de la especificación (`INVALID_RATE` nunca se devuelve).
+  - El escenario que se repetía tras pararse registraba dos veces su escalada de riesgo, y el que venía de un sandbox perdía sus gates en `DELIVERY.md`.
+  - `review --base` con una rama inexistente imprimía una revisión vacía antes del error.
+- **Revisión de calidad de la rama** (reutilización, simplificación, eficiencia y profundidad de cada arreglo), con un test de regresión por fallo:
+  - Si dos escenarios de un lote respondían una pregunta, el segundo en volver perdía su respuesta: los logs se anexan desde donde empezó el lote (`child.logs`).
+  - Los logs de SpecForge contaban como ficheros del escenario y provocaban «colisiones»: solo se comparan y copian los ficheros de trabajo.
+  - La revisión del desarrollador mostraba los gates del escenario anterior (índice 0 frente a 1): `tdd.State.Adopt` adopta el escenario entero, con su historia; las decisiones de proceso de un intento descartado se filtran con `clarify.Without`, el mismo parser del log.
+  - Compartido lo que estaba escrito dos veces: `choose` (7 preguntas de opciones), `review.Check`, `verifier.ForSpec`/`FeatureRequirements`/`Result.Blocked`, `layout.BranchReview`, `answer.Load` también en audit, `change.IsBinary`/`Lines`, `process.NodeBin`; código muerto fuera.
+  - Más barato: el diff de líneas recorta cabeza y cola comunes antes de la tabla, y la línea base compara por conjuntos.
+- **Hecho:** loop real con Claude Code sobre un proyecto Go con un test roto heredado: línea base, riesgo medio y alto, una y cuatro lentes, dos escenarios en paralelo, verificador, commits por escenario; la guardia bloqueó un `git reset --hard` real de Claude Code sin tocar el trabajo sin commit. Cobertura 78,9 %, suelo de CI 75 %, `golangci-lint` 0 avisos, builds en Linux, macOS y Windows.
 
 ## 18. Métricas: v3 → v4 (medidas en la rama de la Fase 4)
 

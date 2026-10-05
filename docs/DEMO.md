@@ -435,3 +435,14 @@ $ git status --short
 | The scenario integrated from a sandbox showed no gates in `DELIVERY.md`. | Its RED, GREEN and REFACTOR join the project's record. |
 | The review and verification records were left out of the commit. | They are committed with the scenario. |
 | A stop on the agent's usage limit showed an empty reason. | The reason is taken from the agent's output when its error stream is empty. |
+| `review --base` with a branch that does not exist printed an empty review before the error. | Only a review that ran is reported. |
+
+A quality review of the branch afterwards (reuse, simplification, efficiency, and whether each fix sits at the right depth) found three more problems in the same path the run used, where scenarios come back from their sandboxes:
+
+| What it found | Fix |
+| :--- | :--- |
+| When two scenarios of a batch both answered a question, the second to come back lost its answer. | Each sandbox's logs are appended from where the batch started. |
+| SpecForge's own logs counted as a scenario's files, so two scenarios that logged a decision "collided". | Only the scenario's work files are compared and copied; the logs come back by appending. |
+| The developer's review of an integrated scenario showed the previous scenario's gates. | The scenario is adopted whole from its sandbox, history included. |
+
+Each has a regression test that fails without the fix. The same pass shared what had been written twice (questions with fixed options, the verifier's request, a schema loader, record paths), and made a small edit to a large file cheap to measure.
