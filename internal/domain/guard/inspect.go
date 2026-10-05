@@ -24,16 +24,21 @@ const maxDepth = 4
 // written in these files (what a script imports, a compiled binary) is
 // out of reach: the loop's checkpoints are the way back from that.
 func Inspect(line string, read Reader) []Match {
-	in := inspector{read: read, seen: map[string]bool{}}
+	in := inspector{read: read, seen: map[string]bool{}, written: map[string]*string{}}
 	return dedupe(in.line(line, 0))
 }
 
 type inspector struct {
 	read Reader
 	seen map[string]bool
+	// written are files the command line itself writes before running
+	// them: their content when the line shows it (echo, printf, a
+	// heredoc), nil when it does not (curl, cp, base64 -d).
+	written map[string]*string
 }
 
 func (in *inspector) line(line string, depth int) []Match {
+	in.collectWrites(line)
 	var out []Match
 	for _, seg := range segments(line) {
 		out = append(out, in.command(seg, words(seg), depth)...)
@@ -132,6 +137,14 @@ func (in *inspector) file(seg string, t target, depth int) []Match {
 	}
 	in.seen[key] = true
 	text, ok := in.read(t.file)
+	if !ok {
+		if content, written := in.written[cleanPath(t.file)]; written {
+			if content == nil {
+				return []Match{{Kind: FS, Segment: seg, Reason: "runs `" + t.file + "`, which this same command writes and the guard cannot read first: write the file, then run it"}}
+			}
+			text, ok = *content, true
+		}
+	}
 	if t.kind == "make" && !ok {
 		for _, alt := range []string{"makefile", "GNUmakefile"} {
 			if text, ok = in.read(alt); ok {
@@ -198,7 +211,7 @@ var destructiveCalls = []struct {
 	{regexp.MustCompile(`\b(rimraf|removeSync|emptyDirSync|emptyDir)\s*[.(]`), "rimraf / fs-extra remove deletes a directory tree"},
 	{regexp.MustCompile(`\bDeno\.remove\s*\([^)]*recursive\s*:\s*true`), "Deno.remove with recursive deletes a directory tree"},
 	{regexp.MustCompile(`\bFileUtils\.(rm_rf|rm_r|remove_dir|remove_entry|rmtree)\b`), "FileUtils deletes a directory tree"},
-	{regexp.MustCompile(`\b(remove_tree|rmtree)\s*\(`), "File::Path deletes a directory tree"},
+	{regexp.MustCompile(`(?:^|[^.\w])(remove_tree|rmtree)\s*\(`), "File::Path deletes a directory tree"},
 	{regexp.MustCompile(`\bos\.RemoveAll\s*\(`), "os.RemoveAll deletes a directory tree"},
 }
 
@@ -374,4 +387,114 @@ func makeRecipes(text string, targets []string) string {
 		visit(t, 0)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// cleanPath is a path as the command line names it, without "./".
+func cleanPath(p string) string { return path.Clean(strings.TrimPrefix(p, "./")) }
+
+var heredoc = regexp.MustCompile(`<<-?\s*['"]?([A-Za-z_][A-Za-z0-9_]*)['"]?`)
+
+// collectWrites records the files the line writes: the target of > and
+// >> (and of tee), with the text echo, printf or a heredoc puts there.
+func (in *inspector) collectWrites(line string) {
+	bodies := heredocBodies(line)
+	for _, seg := range segments(line) {
+		ws := unwrap(words(seg))
+		if len(ws) == 0 {
+			continue
+		}
+		var targets, rest []string
+		for i := 0; i < len(ws); i++ {
+			w := ws[i]
+			switch {
+			case w == ">" || w == ">>" || w == "1>" || w == "1>>" || w == ">|":
+				if i+1 < len(ws) {
+					targets = append(targets, ws[i+1])
+					i++
+				}
+			case strings.HasPrefix(w, ">") && !strings.HasPrefix(w, ">&"):
+				targets = append(targets, strings.TrimLeft(w, ">|"))
+			case strings.HasPrefix(w, "<<"):
+			default:
+				rest = append(rest, w)
+			}
+		}
+		name := path.Base(ws[0])
+		if len(rest) > 0 {
+			targets = append(targets, writtenByArguments(name, rest[1:])...)
+		}
+		if len(targets) == 0 {
+			continue
+		}
+		var content *string
+		switch {
+		case strings.Contains(seg, "<<") && len(bodies) > 0:
+			content = &bodies[0]
+			bodies = bodies[1:]
+		case name == "echo" && len(rest) > 1:
+			text := strings.Join(slices.DeleteFunc(rest[1:], func(w string) bool { return w == "-n" || w == "-e" || w == "-E" }), " ")
+			content = &text
+		case name == "printf" && len(rest) > 1:
+			text := strings.NewReplacer(`\n`, "\n", `\t`, "\t").Replace(strings.Join(rest[1:], " "))
+			content = &text
+		}
+		for _, f := range targets {
+			in.written[cleanPath(f)] = content
+		}
+	}
+}
+
+// writtenByArguments are the files a command writes through its
+// arguments: tee's files, the destination of cp, mv, install and ln, the
+// output of curl -o and wget -O.
+func writtenByArguments(name string, args []string) []string {
+	operands := slices.DeleteFunc(slices.Clone(args), func(w string) bool { return strings.HasPrefix(w, "-") })
+	switch name {
+	case "tee":
+		return operands
+	case "cp", "mv", "install", "ln":
+		if len(operands) > 1 {
+			return operands[len(operands)-1:]
+		}
+	case "curl":
+		return outputOption(args, 'o', "--output")
+	case "wget":
+		return outputOption(args, 'O', "--output-document")
+	}
+	return nil
+}
+
+// outputOption finds the file of an output option: -o file, -sSo file,
+// --output file or --output=file.
+func outputOption(args []string, short byte, long string) []string {
+	for i, a := range args {
+		switch {
+		case strings.HasPrefix(a, long+"="):
+			return []string{strings.TrimPrefix(a, long+"=")}
+		case a == long || (len(a) > 1 && a[0] == '-' && a[1] != '-' && a[len(a)-1] == short):
+			if i+1 < len(args) {
+				return []string{args[i+1]}
+			}
+		}
+	}
+	return nil
+}
+
+// heredocBodies returns the bodies of the heredocs of a command line, in
+// order.
+func heredocBodies(line string) []string {
+	lines := strings.Split(line, "\n")
+	var out []string
+	for i := 0; i < len(lines); i++ {
+		m := heredoc.FindStringSubmatch(lines[i])
+		if m == nil {
+			continue
+		}
+		var body []string
+		for i++; i < len(lines) && strings.TrimSpace(lines[i]) != m[1]; i++ {
+			body = append(body, lines[i])
+		}
+		out = append(out, strings.Join(body, "\n"))
+	}
+	return out
 }
