@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"specforge/internal/adapters/process"
@@ -118,5 +119,148 @@ func TestSandboxIsARepositoryOfTheCopy(t *testing.T) {
 	write(t, c.Dir, "a.go", "package a // changed\n")
 	if out, _ := exec.Command("git", "-C", c.Dir, "status", "--porcelain").CombinedOutput(); string(out) != " M a.go\n" {
 		t.Fatalf("changes in the sandbox are measured from the copy: %q", out)
+	}
+}
+
+// committed makes a repository at root with files committed.
+func committed(t *testing.T, root string, files map[string]string) {
+	t.Helper()
+	if !process.Available("git") {
+		t.Skip("git not installed")
+	}
+	for rel, content := range files {
+		write(t, root, rel, content)
+	}
+	git(t, root, "init", "-q")
+	git(t, root, "add", "-A")
+	git(t, root, "commit", "-qm", "base")
+}
+
+func exists(dir, rel string) bool {
+	_, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(rel)))
+	return err == nil
+}
+
+func TestTheCopyIsTheWorkingTreeAndTheBaseTheCommit(t *testing.T) {
+	root := t.TempDir()
+	committed(t, root, map[string]string{"keep.go": "package a\n", "gone.go": "package a\n", "staged.go": "package a // v1\n"})
+	if err := os.Remove(filepath.Join(root, "gone.go")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, root, "staged.go", "package a // v2\n")
+	git(t, root, "add", "staged.go")
+	write(t, root, "new/new.go", "package new\n")
+
+	c, err := New(process.NewRunner(nil), 0).Copy(context.Background(), root, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Remove() }()
+	got, _ := os.ReadFile(filepath.Join(c.Dir, "staged.go"))
+	if exists(c.Dir, "gone.go") || !exists(c.Dir, "new/new.go") || !exists(c.Dir, "keep.go") || string(got) != "package a // v2\n" {
+		t.Fatalf("the copy is the working tree: gone=%v new=%v staged=%q", exists(c.Dir, "gone.go"), exists(c.Dir, "new/new.go"), got)
+	}
+	if !exists(c.BaseDir, "gone.go") || exists(c.BaseDir, "new/new.go") {
+		t.Fatal("the base is the commit")
+	}
+	if out, _ := exec.Command("git", "-C", root, "status", "--porcelain").CombinedOutput(); string(out) != "D  gone.go\nM  staged.go\n?? new/\n" && string(out) != " D gone.go\nM  staged.go\n?? new/\n" {
+		t.Fatalf("the project is untouched: %q", out)
+	}
+}
+
+func TestAProjectInsideALargerRepositoryIsCopiedAlone(t *testing.T) {
+	top := t.TempDir()
+	committed(t, top, map[string]string{"service/pay.go": "package pay // v1\n", "other/huge.go": "package other\n"})
+	write(t, top, "service/pay.go", "package pay // v2\n")
+	root := filepath.Join(top, "service")
+	c, err := New(process.NewRunner(nil), 0).Copy(context.Background(), root, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Remove() }()
+	work, _ := os.ReadFile(filepath.Join(c.Dir, "pay.go"))
+	base, _ := os.ReadFile(filepath.Join(c.BaseDir, "pay.go"))
+	if string(work) != "package pay // v2\n" || string(base) != "package pay // v1\n" {
+		t.Fatalf("work %q, base %q", work, base)
+	}
+	if exists(c.Dir, "other/huge.go") || exists(c.BaseDir, "other/huge.go") || exists(c.BaseDir, "service") {
+		t.Fatal("only the project's directory is copied, at the copy's root")
+	}
+}
+
+func TestASandboxBorrowsTheProjectsGitObjects(t *testing.T) {
+	root := t.TempDir()
+	committed(t, root, map[string]string{"a.go": "package a\n", "b.go": "package b\n"})
+	write(t, root, "c.go", "package c\n")
+	c, err := New(process.NewRunner(nil), 0).Sandbox(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Remove() }()
+	alternates, _ := os.ReadFile(filepath.Join(c.Dir, ".git", "objects", "info", "alternates"))
+	if !strings.Contains(filepath.ToSlash(string(alternates)), filepath.ToSlash(filepath.Join(filepath.Base(root), ".git", "objects"))) {
+		t.Fatalf("the sandbox borrows the project's objects: %q", alternates)
+	}
+	// a.go and b.go are already in the project: only c.go's blob, the
+	// trees and the commit are stored in the sandbox.
+	var loose int
+	_ = filepath.WalkDir(filepath.Join(c.Dir, ".git", "objects"), func(p string, d os.DirEntry, _ error) error {
+		if d != nil && !d.IsDir() && len(filepath.Base(filepath.Dir(p))) == 2 {
+			loose++
+		}
+		return nil
+	})
+	if loose != 3 {
+		t.Fatalf("objects stored in the sandbox = %d, want 3 (c.go, the tree, the commit)", loose)
+	}
+	if out, _ := exec.Command("git", "-C", c.Dir, "status", "--porcelain").CombinedOutput(); len(out) != 0 {
+		t.Fatalf("the sandbox starts clean: %q", out)
+	}
+}
+
+func TestFilesInGitLFSKeepTheirContent(t *testing.T) {
+	root := t.TempDir()
+	committed(t, root, map[string]string{".gitattributes": "*.bin filter=lfs diff=lfs merge=lfs -text\n", "a.go": "package a\n"})
+	write(t, root, "model.bin", "real content, not a pointer")
+	git(t, root, "-c", "filter.lfs.clean=cat", "-c", "filter.lfs.smudge=cat", "add", "model.bin")
+	git(t, root, "-c", "filter.lfs.clean=cat", "-c", "filter.lfs.smudge=cat", "commit", "-qm", "lfs")
+	c, err := New(process.NewRunner(nil), 0).Copy(context.Background(), root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Remove() }()
+	if got, _ := os.ReadFile(filepath.Join(c.Dir, "model.bin")); string(got) != "real content, not a pointer" {
+		t.Fatalf("LFS files hold their content: %q", got)
+	}
+}
+
+func TestATooLargeProjectIsRefusedBeforeAnyCopy(t *testing.T) {
+	root := t.TempDir()
+	committed(t, root, map[string]string{"big.bin": string(make([]byte, 4096))})
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	t.Setenv("TMP", tmp)
+	t.Setenv("TEMP", tmp)
+	if _, err := New(process.NewRunner(nil), 1024).Sandbox(context.Background(), root); !errors.Is(err, ports.ErrTooLarge) {
+		t.Fatalf("want ErrTooLarge, got %v", err)
+	}
+	if left, _ := os.ReadDir(tmp); len(left) != 0 {
+		t.Fatalf("nothing was written: %v", left)
+	}
+}
+
+func TestAnUnknownBaseGivesNoBaseCopy(t *testing.T) {
+	root := t.TempDir()
+	committed(t, root, map[string]string{"a.go": "package a\n"})
+	c, err := New(process.NewRunner(nil), 0).Copy(context.Background(), root, "no-such-branch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = c.Remove() }()
+	if c.BaseDir != "" || !exists(c.Dir, "a.go") {
+		t.Fatalf("base %q", c.BaseDir)
+	}
+	if _, err := New(process.NewRunner(nil), 0).Copy(context.Background(), root, "--output=x"); err == nil {
+		t.Fatal("an option is never taken as a ref")
 	}
 }
