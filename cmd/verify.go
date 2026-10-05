@@ -78,7 +78,7 @@ command that reproduces it.`,
 			con.Title(con.T("verify.title", doc.Title))
 			events := &ui.LoopEvents{C: con, Agent: ag.Name(), Stack: stackName}
 			report := p.layout.FeatureVerify(entry.Path)
-			svc := verifier.New(verifier.Deps{Agent: ag, Scratch: scratch.New(proc, p.settings.VerifyMaxBytes),
+			svc := verifier.New(verifier.Deps{Agent: ag, Proc: proc, Scratch: scratch.New(proc, p.settings.VerifyMaxBytes),
 				Workspace: workspace.New(proc), Files: files, Events: events})
 			res, err := svc.Verify(ctx, verifier.Request{
 				Root: p.root, Language: p.settings.Language, Stack: stackName, Base: "HEAD",

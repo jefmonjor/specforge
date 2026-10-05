@@ -99,8 +99,10 @@ func (s *Service) commit(ctx context.Context, r *run, sc tdd.ScenarioRef, files 
 	if !r.o.Commit || s.d.VCS == nil || len(files) == 0 {
 		return "", nil
 	}
-	// The decisions and questions taken for the scenario travel with it.
-	for _, doc := range []string{r.lay.Decisions(r.o.SpecPath), r.lay.Questions(r.o.SpecPath)} {
+	// The decisions and questions taken for the scenario, and its review
+	// and verification records, travel with it.
+	for _, doc := range []string{r.lay.Decisions(r.o.SpecPath), r.lay.Questions(r.o.SpecPath),
+		r.lay.ReviewRecord(r.o.SpecPath, sc.Marker), r.lay.VerifyRecord(r.o.SpecPath, sc.Marker)} {
 		if rel := r.lay.Rel(doc); s.d.Files.Exists(doc) && !slices.Contains(files, rel) {
 			files = append(files, rel)
 		}

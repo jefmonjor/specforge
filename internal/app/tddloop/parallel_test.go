@@ -1,11 +1,13 @@
 package tddloop
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	"specforge/internal/adapters/process"
 	"specforge/internal/adapters/scratch"
+	"specforge/internal/app/clarify"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 )
@@ -100,19 +102,22 @@ func TestASeamFailureRunsTheScenariosAgainInTurn(t *testing.T) {
 	}
 }
 
-func TestAScenarioThatStopsIsLeftForLater(t *testing.T) {
+func TestAScenarioThatStopsRunsAgainOnItsOwn(t *testing.T) {
 	h := parallelHarness(t)
-	h.agent.byScenario[2] = []reply{ask("Which clock?")}
+	// In its sandbox scenario 2 asks and nobody answers; on its own, right
+	// after, it asks again, now with its state in the project.
+	h.agent.byScenario[2] = []reply{ask("Which clock?"), ask("Which clock?")}
 	h.prompter.nonTTY = true
 	_, err := h.run(inParallel)
-	if err == nil || !strings.Contains(err.Error(), "Which clock?") {
-		t.Fatalf("the question reaches the developer: %v", err)
+	var pending *clarify.PendingQuestionError
+	if !errors.As(err, &pending) || !strings.HasPrefix(pending.File, h.p.root) {
+		t.Fatalf("the question is the project's: %v", err)
 	}
 	st := h.state(t)
-	if !st.Scenarios[0].Done || st.Scenarios[1].Done || strings.Join(h.events.integrated, ",") != "SDD_0001_001" {
-		t.Fatalf("scenario 1 is integrated, scenario 2 waits: %+v %v", st.Scenarios, h.events.integrated)
+	if !st.Scenarios[0].Done || st.Scenarios[1].Done || st.Pending == nil || st.Current != 1 {
+		t.Fatalf("scenario 1 is integrated, scenario 2 waits with its state: %+v", st)
 	}
-	if !strings.Contains(h.p.read("specs/0001-reset/questions.md"), "Which clock?") {
-		t.Fatal("the question is in the project's questions.md")
+	if n := strings.Count(h.p.read("specs/0001-reset/questions.md"), "Which clock?"); n != 1 {
+		t.Fatalf("the question is written once: %d", n)
 	}
 }

@@ -13,7 +13,7 @@ Give a verdict for **every one** of these: {{range $i, $id := .Required}}{{if $i
 1. For each invariant and scenario, derive your own probes: the positive case, the negative ones, the limits (zero, empty, negative, the largest value, time boundaries), and the exact messages and exit codes the specification names.
 2. Run every example the specification gives, exactly as written.
 3. For an operation the specification says must be refused, hash the data before and after: a refusal must leave it unchanged.
-4. `met`: your probes pass. `unmet`: a probe shows the requirement broken: add a blocker with the **exact command** you ran and the output you **observed**. `unverified`: you could not check it (say why in `reason`).
+4. `met`: your probes pass. `unmet`: a probe shows the requirement broken: add a blocker with the **exact shell command** you ran, from the project's root, and paste the first line of its output in `observed`. SpecForge runs every blocker's command again and refuses a blocker it cannot reproduce: a reasoning or a code reading is not a command. `unverified`: you could not check it (say why in `reason`).
 5. Propose a regression test for each `unmet` requirement, and for any requirement no existing test covers, in the project's test style; SpecForge offers them to the developer.
 {{if .Feedback}}
 ## Your previous answer was not accepted

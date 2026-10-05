@@ -26,7 +26,9 @@ func (f *fakeVerifier) Verify(_ context.Context, req verifier.Request) (verifier
 	return verifier.Result{Report: r, Required: req.Required}, nil
 }
 
-const invSpec = specBody + "\n## 4. Invariants\n\n- **INV-01**: a link is used once.\n"
+// invSpec names INV-01 in scenario 1 only; INV-02 in no scenario.
+var invSpec = strings.Replace(specBody, "Scenario: Request a link", "Scenario: Request a link (INV-01)", 1) +
+	"\n## 4. Invariants\n\n- **INV-01**: a link is used once.\n- **INV-02**: a link expires.\n"
 
 var brokenOnce = verification.Report{
 	Verdicts: []verification.Verdict{{ID: "INV-01", Status: verification.Unmet}, {ID: "SDD_0001_001", Status: verification.Met}},
@@ -49,7 +51,7 @@ func TestTheVerifierChecksTheScenarioAndItsCorrection(t *testing.T) {
 		t.Fatalf("want the script to end at scenario 2, got %v", err)
 	}
 	if got := strings.Join(f.requests[0].Required, ","); got != "INV-01,SDD_0001_001" {
-		t.Fatalf("the verifier answers for every invariant and the scenario: %s", got)
+		t.Fatalf("the verifier answers for the scenario and the invariants it names: %s", got)
 	}
 	if got := strings.Join(f.requests[1].Required, ","); got != "INV-01" {
 		t.Fatalf("the recheck asks only for what was broken: %s", got)
@@ -121,7 +123,7 @@ func TestFeatureVerificationRunsOnceAtTheEnd(t *testing.T) {
 	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), red(1), green(), green()}
 	_, err := h.run(func(o *Options) { o.Verify = VerifyFeature })
 	var blocked *verifier.BlockedError
-	if !errors.As(err, &blocked) || len(f.requests) != 1 || strings.Join(f.requests[0].Required, ",") != "INV-01,SDD_0001_001,SDD_0001_002" {
+	if !errors.As(err, &blocked) || len(f.requests) != 1 || strings.Join(f.requests[0].Required, ",") != "INV-01,INV-02,SDD_0001_001,SDD_0001_002" {
 		t.Fatalf("err=%v requests=%+v", err, f.requests)
 	}
 	if !strings.HasSuffix(f.requests[0].Report, "verify/feature.json") {

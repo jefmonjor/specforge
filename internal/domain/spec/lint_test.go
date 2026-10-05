@@ -100,3 +100,9 @@ func TestInvariantIDs(t *testing.T) {
 		t.Fatalf("InvariantIDs = %v", got)
 	}
 }
+
+func TestInvariantRefs(t *testing.T) {
+	if got := InvariantRefs("Scenario: a used link fails (INV-02, INV-01)\n Then INV-02 holds"); strings.Join(got, ",") != "INV-02,INV-01" {
+		t.Fatalf("InvariantRefs = %v", got)
+	}
+}

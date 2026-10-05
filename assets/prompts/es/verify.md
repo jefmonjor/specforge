@@ -13,7 +13,7 @@ Da un veredicto para **cada uno** de estos: {{range $i, $id := .Required}}{{if $
 1. Para cada invariante y escenario, deriva tus propios sondeos: el caso positivo, los negativos, los límites (cero, vacío, negativo, el mayor valor, fronteras de tiempo) y los mensajes y códigos de salida exactos que nombra la especificación.
 2. Ejecuta cada ejemplo que da la especificación, tal como está escrito.
 3. Para una operación que la especificación dice que debe rechazarse, calcula el hash de los datos antes y después: un rechazo debe dejarlos intactos.
-4. `met`: tus sondeos pasan. `unmet`: un sondeo muestra el requisito roto: añade un bloqueante con el **comando exacto** que ejecutaste y la salida que **observaste**. `unverified`: no pudiste comprobarlo (di por qué en `reason`).
+4. `met`: tus sondeos pasan. `unmet`: un sondeo muestra el requisito roto: añade un bloqueante con el **comando de shell exacto** que ejecutaste, desde la raíz del proyecto, y pega la primera línea de su salida en `observed`. SpecForge vuelve a ejecutar el comando de cada bloqueante y rechaza el que no puede reproducir: un razonamiento o una lectura del código no son un comando. `unverified`: no pudiste comprobarlo (di por qué en `reason`).
 5. Propón un test de regresión para cada requisito `unmet`, y para cualquier requisito que ningún test cubra, al estilo de los tests del proyecto; SpecForge se los ofrece al desarrollador.
 {{if .Feedback}}
 ## Tu respuesta anterior no se aceptó

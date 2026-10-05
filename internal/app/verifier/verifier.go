@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -48,7 +49,9 @@ func (e *BlockedError) Error() string {
 
 // Deps are the collaborators of a verification.
 type Deps struct {
-	Agent     ports.Agent
+	Agent ports.Agent
+	// Proc runs each blocker's command again, in the copy.
+	Proc      ports.CommandRunner
 	Scratch   ports.Scratch
 	Workspace ports.Workspace
 	Files     ports.Files
@@ -164,12 +167,60 @@ func (s *Service) ask(ctx context.Context, req Request, c ports.Copies) (verific
 			problems = []string{"the answer did not end with a JSON object valid for the verification schema"}
 			continue
 		}
-		if problems = r.Problems(req.Required); len(problems) == 0 {
+		if problems = r.Problems(req.Required); len(problems) > 0 {
+			continue
+		}
+		if problems = s.reproduce(ctx, c.Dir, r.Blockers); len(problems) == 0 {
 			return r, nil
 		}
 	}
 	return verification.Report{}, &StepError{Problems: problems}
 }
+
+// reproduceTimeout bounds each blocker's command when SpecForge runs it.
+const reproduceTimeout = 2 * time.Minute
+
+// reproduce runs every blocker's command again in the copy and requires
+// its output to contain the first line the verifier says it observed. A
+// failure SpecForge cannot reproduce is not evidence.
+func (s *Service) reproduce(ctx context.Context, dir string, blockers []verification.Blocker) []string {
+	if s.d.Proc == nil {
+		return nil
+	}
+	var problems []string
+	for _, b := range blockers {
+		name, args := shell(b.Command)
+		res, err := s.d.Proc.Run(ctx, ports.Command{Name: name, Args: args, Dir: dir, Timeout: reproduceTimeout})
+		want := normalize(firstLine(b.Observed))
+		if err == nil && strings.Contains(normalize(res.Combined()), want) {
+			continue
+		}
+		got := firstLine(res.Combined())
+		if err != nil {
+			got = err.Error()
+		}
+		problems = append(problems, fmt.Sprintf("blocker %s: SpecForge ran `%s` and it did not print %q (it printed %q); give the exact command you ran and paste its output", b.ID, b.Command, firstLine(b.Observed), got))
+	}
+	return problems
+}
+
+func shell(command string) (string, []string) {
+	if runtime.GOOS == "windows" {
+		return "cmd", []string{"/C", command}
+	}
+	return "sh", []string{"-c", command}
+}
+
+func firstLine(s string) string {
+	for _, line := range strings.Split(s, "\n") {
+		if t := strings.TrimSpace(line); t != "" {
+			return t
+		}
+	}
+	return ""
+}
+
+func normalize(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 func (s *Service) write(req Request, res Result) error {
 	if req.Report == "" || s.d.Files == nil {

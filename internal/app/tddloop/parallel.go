@@ -132,15 +132,14 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 	if r.sequential == nil {
 		r.sequential = map[int]bool{}
 	}
-	var firstErr error
 	var arrived []arrival
 	taken := map[string]bool{}
 	for _, c := range children {
-		ref, ok := s.finished(r, c, &firstErr)
+		ref, ok := s.finished(r, c)
 		if !ok {
-			// Its questions and decisions still reach the developer.
+			// The decisions the developer took there still count.
 			if c.box.Dir != "" {
-				if err := s.bringLogs(r, sandboxLayout(r, c)); err != nil {
+				if err := s.bringLogs(r, sandboxLayout(r, c), false); err != nil {
 					return err
 				}
 			}
@@ -161,7 +160,7 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 		arrived = append(arrived, a)
 	}
 	if len(arrived) == 0 {
-		return firstErr
+		return nil
 	}
 	if failure, err := s.runSuite(ctx, r); err != nil || failure != "" {
 		for _, a := range arrived {
@@ -172,7 +171,7 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 		}
 		r.st.Record("parallel", "seam check failed", failure, s.d.Now())
 		s.d.Events.SeamFailed(failure)
-		return firstErr
+		return nil
 	}
 	for n, a := range arrived {
 		if err := s.closeArrival(ctx, r, a); err != nil || !r.st.Scenarios[a.index].Done {
@@ -181,14 +180,14 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 			for _, later := range arrived[n+1:] {
 				r.sequential[later.index] = true
 			}
-			return errors.Join(err, s.takeBack(r, arrived[n+1:]), firstErr)
+			return errors.Join(err, s.takeBack(r, arrived[n+1:]))
 		}
 	}
-	return firstErr
+	return nil
 }
 
 // finished returns the scenario a child completed, or records why not.
-func (s *Service) finished(r *run, c child, firstErr *error) (tdd.ScenarioRef, bool) {
+func (s *Service) finished(r *run, c child) (tdd.ScenarioRef, bool) {
 	sc := r.st.Scenarios[c.index]
 	if c.err == nil && c.st != nil && c.st.Scenarios[c.index].Done {
 		return c.st.Scenarios[c.index], true
@@ -196,10 +195,9 @@ func (s *Service) finished(r *run, c child, firstErr *error) (tdd.ScenarioRef, b
 	r.sequential[c.index] = true
 	why := "it did not finish"
 	if c.err != nil {
+		// Run on its own, right after the batch, it stops (or asks) again
+		// with its state in the project, where --resume finds it.
 		why = c.err.Error()
-		if *firstErr == nil && isQuestion(c.err) {
-			*firstErr = c.err
-		}
 	}
 	r.st.Record("parallel", "not integrated", sc.Marker+": "+why, s.d.Now())
 	s.d.Events.ParallelSkipped(sc, why)
@@ -240,7 +238,7 @@ func sandboxLayout(r *run, c child) layout.Layout {
 // bringRecords brings a child's logs and copies its review and
 // verification records.
 func (s *Service) bringRecords(r *run, box layout.Layout, ref tdd.ScenarioRef) error {
-	if err := s.bringLogs(r, box); err != nil {
+	if err := s.bringLogs(r, box, true); err != nil {
 		return err
 	}
 	childSpec := box.Abs(r.lay.Rel(r.o.SpecPath))
@@ -257,15 +255,18 @@ func (s *Service) bringRecords(r *run, box layout.Layout, ref tdd.ScenarioRef) e
 	return nil
 }
 
-// bringLogs appends what a child added to the decisions, questions and
-// lessons.
-func (s *Service) bringLogs(r *run, box layout.Layout) error {
+// bringLogs appends what a child added to the decisions and lessons and,
+// for a finished scenario, to the questions.
+func (s *Service) bringLogs(r *run, box layout.Layout, questions bool) error {
 	childSpec := box.Abs(r.lay.Rel(r.o.SpecPath))
-	for _, pair := range [][2]string{
+	pairs := [][2]string{
 		{r.lay.Decisions(r.o.SpecPath), box.Decisions(childSpec)},
-		{r.lay.Questions(r.o.SpecPath), box.Questions(childSpec)},
 		{r.lay.Lessons(), box.Lessons()},
-	} {
+	}
+	if questions {
+		pairs = append(pairs, [2]string{r.lay.Questions(r.o.SpecPath), box.Questions(childSpec)})
+	}
+	for _, pair := range pairs {
 		mine, _ := s.d.Files.ReadFile(pair[0])
 		theirs, err := s.d.Files.ReadFile(pair[1])
 		if err != nil || len(theirs) <= len(mine) || string(theirs[:len(mine)]) != string(mine) {
@@ -312,11 +313,6 @@ func (s *Service) closeArrival(ctx context.Context, r *run, a arrival) error {
 	r.st.Record("parallel", "integrated", joinPaths(a.files), s.d.Now())
 	s.d.Events.Integrated(*ref)
 	return s.close(ctx, r, *ref, a.gates)
-}
-
-func isQuestion(err error) bool {
-	var p *clarify.PendingQuestionError
-	return errors.As(err, &p)
 }
 
 // lockedPrompter lets one scenario of a batch ask at a time.

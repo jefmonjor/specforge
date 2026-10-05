@@ -29,7 +29,7 @@ jobs:
         run: |
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {sub("%","",$3); print $3}')
           echo "total coverage: ${total}%"
-          awk -v t="$total" 'BEGIN { if (t+0 < 70.0) { print "coverage below 70% floor"; exit 1 } }'
+          awk -v t="$total" 'BEGIN { if (t+0 < 75.0) { print "coverage below 75% floor"; exit 1 } }'
 
   lint:
     name: golangci-lint

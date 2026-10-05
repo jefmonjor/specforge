@@ -170,6 +170,18 @@ func InvariantIDs(markdown string) []string {
 	return ids
 }
 
+// InvariantRefs returns the invariants text mentions (a scenario's title
+// and steps), in order, without duplicates.
+func InvariantRefs(text string) []string {
+	var ids []string
+	for _, id := range invariantID.FindAllString(text, -1) {
+		if !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 // invariants advises on invariants that nothing else in the specification
 // mentions: an invariant without a scenario is a rule nobody tests.
 func invariants(markdown string) []Issue {

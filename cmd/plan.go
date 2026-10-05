@@ -147,6 +147,7 @@ accepts the change.`,
 			} else {
 				con.OK(con.T("plan.approved", rel, approver, short(res.Hash)))
 			}
+			a.printAdvice(res.Advice)
 			con.Info(con.T("spec.next.approved", entry.ID))
 			return nil
 		},

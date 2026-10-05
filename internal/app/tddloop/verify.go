@@ -41,7 +41,7 @@ func (s *Service) verifyStep(ctx context.Context, r *run, sc tdd.ScenarioRef) (p
 		return true, nil
 	}
 	if ref.Verify == nil {
-		res, err := s.d.Verifier.Verify(ctx, s.verifyRequest(r, append(spec.InvariantIDs(r.md), sc.Marker), ""))
+		res, err := s.d.Verifier.Verify(ctx, s.verifyRequest(r, s.scenarioRequirements(r, sc), ""))
 		if err != nil {
 			return false, err
 		}
@@ -89,6 +89,26 @@ func (s *Service) verifyStep(ctx context.Context, r *run, sc tdd.ScenarioRef) (p
 	}
 	rec.Done = true
 	return true, s.keepVerify(r, sc)
+}
+
+// scenarioRequirements are what a scenario's verification answers for:
+// the scenario and the invariants it names. Other invariants belong to
+// other scenarios, which may not exist yet; verify: feature checks them
+// all at the end.
+func (s *Service) scenarioRequirements(r *run, sc tdd.ScenarioRef) []string {
+	defined := spec.InvariantIDs(r.md)
+	var out []string
+	for _, d := range r.doc.Scenarios {
+		if d.Index != sc.Index {
+			continue
+		}
+		for _, id := range spec.InvariantRefs(d.Title + "\n" + d.Source) {
+			if slices.Contains(defined, id) {
+				out = append(out, id)
+			}
+		}
+	}
+	return append(out, sc.Marker)
 }
 
 func (s *Service) verifies(r *run, ref *tdd.ScenarioRef) bool {

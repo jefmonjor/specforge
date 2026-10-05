@@ -36,8 +36,8 @@ func says(s string) func(ports.AgentRequest) string {
 	return func(ports.AgentRequest) string { return "```json\n" + s + "\n```" }
 }
 
-const complete = `{"verdicts":[{"id":"INV-01","status":"unmet","command":"go run . -5","observed":"net: -5"},{"id":"SDD_0001_001","status":"met"}],` +
-	`"blockers":[{"id":"INV-01","command":"go run . -5","observed":"net: -5","expected":"error"}],"advisories":[],` +
+const complete = `{"verdicts":[{"id":"INV-01","status":"unmet","command":"echo net: -5","observed":"net: -5"},{"id":"SDD_0001_001","status":"met"}],` +
+	`"blockers":[{"id":"INV-01","command":"echo net: -5","observed":"net: -5","expected":"error"}],"advisories":[],` +
 	`"regression_tests":[{"path":"net_regression_test.go","covers":["INV-01"],"content":"package m"}]}`
 
 func setup(t *testing.T, replies ...func(ports.AgentRequest) string) (*Service, *agent, Request) {
@@ -48,7 +48,7 @@ func setup(t *testing.T, replies ...func(ports.AgentRequest) string) (*Service, 
 	}
 	a := &agent{replies: replies}
 	proc := process.NewRunner(nil)
-	svc := New(Deps{Agent: a, Scratch: scratch.New(proc, 0), Workspace: workspace.New(proc), Files: fsys.OS{}})
+	svc := New(Deps{Agent: a, Proc: proc, Scratch: scratch.New(proc, 0), Workspace: workspace.New(proc), Files: fsys.OS{}})
 	req := Request{Root: root, Language: "en", Stack: "go", SpecTitle: "Net pay", Spec: "INV-01: net ≥ 0",
 		Required: []string{"INV-01", "SDD_0001_001"}, Report: filepath.Join(root, "specs", "verify.json"),
 		Model: func(p string) string { return "m-" + p }}
@@ -111,5 +111,20 @@ func TestATooLargeProjectIsSkippedWithTheReason(t *testing.T) {
 	res, err := svc.Verify(context.Background(), req)
 	if err != nil || !strings.Contains(res.Skipped, "too large") || len(a.reqs) != 0 {
 		t.Fatalf("res=%+v err=%v", res, err)
+	}
+}
+
+func TestABlockerSpecForgeCannotReproduceIsRefused(t *testing.T) {
+	reasoned := `{"verdicts":[{"id":"INV-01","status":"unmet"},{"id":"SDD_0001_001","status":"met"}],` +
+		`"blockers":[{"id":"INV-01","command":"static review of net.go","observed":"deductions are ignored","expected":"0"}],"advisories":[],"regression_tests":[]}`
+	reproducible := `{"verdicts":[{"id":"INV-01","status":"unmet"},{"id":"SDD_0001_001","status":"met"}],` +
+		`"blockers":[{"id":"INV-01","command":"echo net: -5","observed":"net:   -5\nmore lines","expected":"an error"}],"advisories":[],"regression_tests":[]}`
+	svc, a, req := setup(t, says(reasoned), says(reproducible))
+	res, err := svc.Verify(context.Background(), req)
+	if err != nil {
+		t.Fatalf("the second, reproducible answer is accepted: %v", err)
+	}
+	if !strings.Contains(a.reqs[1].Prompt, "SpecForge ran `static review of net.go`") || len(res.Report.Blockers) != 1 {
+		t.Fatalf("the retry says which blocker did not reproduce:\n%s", a.reqs[1].Prompt)
 	}
 }
