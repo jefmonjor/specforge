@@ -65,6 +65,9 @@ func TestDisjointScenariosRunSideBySide(t *testing.T) {
 	if got := st.Scenarios[1].Files; strings.Join(got, ",") != "expiry.go,expiry_test.go" {
 		t.Fatalf("each scenario keeps its own files: %v", got)
 	}
+	if lastGates(st, 1) == "" {
+		t.Fatalf("the sandbox's REFACTOR, with its gates, is in the project's record: %+v", st.Checkpoints)
+	}
 }
 
 func TestOverlappingScenariosRunInTurn(t *testing.T) {

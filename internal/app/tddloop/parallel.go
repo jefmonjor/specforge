@@ -116,8 +116,10 @@ func (s *Service) runChild(ctx context.Context, r *run, i int, asked ports.Promp
 type arrival struct {
 	index int
 	ref   tdd.ScenarioRef
-	gates string
-	files []string
+	// history is the scenario's checkpoints in its sandbox: its RED,
+	// GREEN and REFACTOR, with the gates, belong to the project's record.
+	history []tdd.Checkpoint
+	files   []string
 	// before holds each file's content in the project before; nil when the
 	// file did not exist.
 	before map[string][]byte
@@ -207,7 +209,7 @@ func (s *Service) finished(r *run, c child) (tdd.ScenarioRef, bool) {
 
 // bringBack copies a child's files and records into the project.
 func (s *Service) bringBack(r *run, c child, ref tdd.ScenarioRef) (arrival, error) {
-	a := arrival{index: c.index, ref: ref, gates: lastGates(c.st, ref.Index), files: ref.Files, before: map[string][]byte{}}
+	a := arrival{index: c.index, ref: ref, history: scenarioHistory(c.st, ref.Index), files: ref.Files, before: map[string][]byte{}}
 	box := sandboxLayout(r, c)
 	for _, f := range ref.Files {
 		if old, err := s.d.Files.ReadFile(r.lay.Abs(f)); err == nil {
@@ -337,9 +339,15 @@ func (s *Service) closeArrival(ctx context.Context, r *run, a arrival) error {
 		return err
 	}
 	r.st.TestHashes = hashes
+	r.st.Checkpoints = append(r.st.Checkpoints, a.history...)
 	r.st.Record("parallel", "integrated", joinPaths(a.files), s.d.Now())
 	s.d.Events.Integrated(*ref)
-	return s.close(ctx, r, *ref, a.gates)
+	return s.close(ctx, r, *ref, lastGates(r.st, a.index))
+}
+
+// scenarioHistory is what a child's state recorded about one scenario.
+func scenarioHistory(st *tdd.State, index int) []tdd.Checkpoint {
+	return slices.DeleteFunc(slices.Clone(st.Checkpoints), func(c tdd.Checkpoint) bool { return c.Scenario != index })
 }
 
 // lockedPrompter lets one scenario of a batch ask at a time.
