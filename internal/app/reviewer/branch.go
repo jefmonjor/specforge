@@ -29,7 +29,9 @@ type BranchOptions struct {
 	// LensesAuto picks the lenses by risk; otherwise Lenses run.
 	LensesAuto bool
 	Lenses     []review.Lens
-	Rules      risk.Rules
+	// Blind doubles the lenses of a high-risk branch.
+	Blind bool
+	Rules risk.Rules
 	// SpecTitle, Invariants and Plan give context when the branch
 	// implements a specification.
 	SpecTitle, Invariants, Plan string
@@ -83,7 +85,7 @@ func (s *Service) Branch(ctx context.Context, diffs ports.DiffSource, files port
 		return out, s.write(files, o.Report, out)
 	}
 	res, err := s.Review(ctx, Request{
-		Root: o.Root, Language: o.Language, Stack: o.Stack, Lenses: lenses, Diff: text,
+		Root: o.Root, Language: o.Language, Stack: o.Stack, Lenses: lenses, Diff: text, Blind: o.Blind && out.Risk.Tier == risk.High,
 		SpecTitle: o.SpecTitle, Invariants: o.Invariants, Plan: o.Plan,
 		Model: o.Model, Timeout: o.Timeout,
 	})

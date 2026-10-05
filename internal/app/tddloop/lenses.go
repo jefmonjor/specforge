@@ -12,6 +12,7 @@ import (
 	"specforge/internal/app/reviewer"
 	"specforge/internal/domain/change"
 	"specforge/internal/domain/review"
+	"specforge/internal/domain/risk"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/ports"
@@ -102,7 +103,9 @@ func (s *Service) runLenses(ctx context.Context, r *run, sc tdd.ScenarioRef) (*t
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.d.Reviewer.Review(ctx, s.reviewRequest(r, sc, lenses, diff))
+	req := s.reviewRequest(r, sc, lenses, diff)
+	req.Blind = r.o.Blind && a.Tier == risk.High
+	res, err := s.d.Reviewer.Review(ctx, req)
 	if err != nil {
 		return nil, err
 	}

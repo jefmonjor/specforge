@@ -130,6 +130,7 @@ The state is saved after every step: --resume continues where it stopped.`,
 				LensesAuto:   p.settings.LensesAuto,
 				Lenses:       p.settings.Lenses,
 				Verify:       p.settings.Verify,
+				Blind:        p.settings.BlindReview,
 				// The agents the loop runs cannot answer the guard's questions.
 				AgentEnv: []string{guardhook.LoopEnv + "=1"},
 				Strict:   p.settings.Quality.Strict,

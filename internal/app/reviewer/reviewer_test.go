@@ -165,3 +165,19 @@ func TestBranchReviewOfNothing(t *testing.T) {
 		t.Fatalf("an empty branch costs nothing: %+v %v", res, err)
 	}
 }
+
+func TestBlindReviewRunsTwoPassesAndCorroborates(t *testing.T) {
+	second := strings.Replace(realFinding, `"line":11}]`, `"line":12}]`, 1) // same hunk, other line
+	svc, a, req := setup(t, lensSays(realFinding, inventedOne), lensSays(second))
+	req.Blind = true
+	res, err := svc.Review(context.Background(), req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a.prompts) != 2 || a.models[0] != "model-review" || a.models[1] != "model-review2" {
+		t.Fatalf("two independent passes with their own models: %v", a.models)
+	}
+	if len(res.Verdict.Blocking) != 1 || res.Verdict.Blocking[0].Evidence != review.Deterministic || !res.Blind {
+		t.Fatalf("corroborated by both passes, no refuter: %+v", res.Verdict)
+	}
+}

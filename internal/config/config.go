@@ -32,7 +32,7 @@ var (
 	// GuardModes are the values of guard.mode.
 	GuardModes = []string{"block", "confirm", "off"}
 	// Phases are the steps of work a model can be chosen for.
-	Phases = []string{"interview", "plan", "legacy", "red", "green", "refactor", "review", "refute", "verify", "audit", "e2e"}
+	Phases = []string{"interview", "plan", "legacy", "red", "green", "refactor", "review", "review2", "refute", "verify", "audit", "e2e"}
 )
 
 // ProjectFile is the committed per-repository configuration file.
@@ -76,6 +76,9 @@ type Project struct {
 	// Lenses are the review lenses after REFACTOR: auto (by risk), off, or
 	// a list of lenses.
 	Lenses StringList `yaml:"lenses,omitempty"`
+	// BlindReview runs the lenses of high-risk changes twice,
+	// independently (models.review2 for the second pass).
+	BlindReview bool `yaml:"blind_review,omitempty"`
 	// Verify is when the independent verifier runs: high (default),
 	// always, feature or off. VerifyMaxMB bounds the copy it works in.
 	Verify      string `yaml:"verify,omitempty"`
@@ -188,6 +191,8 @@ type Settings struct {
 	// lenses of every scenario (none: no lens review).
 	LensesAuto bool
 	Lenses     []review.Lens
+	// BlindReview doubles the lenses of high-risk changes.
+	BlindReview bool
 	// Verify is when the verifier runs; VerifyMaxBytes bounds its copy.
 	Verify         string
 	VerifyMaxBytes int64
@@ -247,6 +252,7 @@ func Resolve(u User, p Project, f Overrides, requireAgent bool) (Settings, error
 		Verify:         strings.ToLower(first(p.Verify, "high")),
 		GuardMode:      strings.ToLower(first(p.Guard.Mode, "block")),
 		GuardAllow:     p.Guard.Allow,
+		BlindReview:    p.BlindReview,
 		VerifyMaxBytes: int64(max(p.VerifyMaxMB, 0)) << 20,
 		BudgetLines:    DefaultBudgetLines,
 	}

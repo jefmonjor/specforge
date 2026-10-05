@@ -70,6 +70,11 @@ type Request struct {
 	// Context: what the change implements.
 	SpecTitle, Marker, Scenario, Invariants, Plan string
 
+	// Blind runs every lens twice, independently (the second pass with the
+	// "review2" model); only what both prove on the same hunk skips the
+	// refuter.
+	Blind bool
+
 	Model   ports.ModelFor
 	Env     []string
 	Timeout time.Duration
@@ -78,6 +83,7 @@ type Request struct {
 // Result is a finished review.
 type Result struct {
 	Lenses   []review.Lens  `json:"lenses"`
+	Blind    bool           `json:"blind,omitempty"`
 	Reported int            `json:"reported"`
 	Verdict  review.Verdict `json:"verdict"`
 }
@@ -104,15 +110,17 @@ func (s *Service) Review(ctx context.Context, req Request) (Result, error) {
 	if err != nil {
 		return Result{}, fmt.Errorf("reading the diff under review: %w", err)
 	}
-	res := Result{Lenses: req.Lenses}
-	var found []review.Finding
-	for _, lens := range req.Lenses {
-		s.d.Events.Lens(lens)
-		fs, err := s.lens(ctx, req, lens)
+	res := Result{Lenses: req.Lenses, Blind: req.Blind}
+	found, err := s.pass(ctx, req, "review")
+	if err != nil {
+		return res, err
+	}
+	if req.Blind {
+		second, err := s.pass(ctx, req, "review2")
 		if err != nil {
 			return res, err
 		}
-		found = append(found, fs...)
+		found = review.Blind(found, second, diff)
 	}
 	res.Reported = len(found)
 	res.Verdict = review.Verify(found, diff)
@@ -127,18 +135,32 @@ func (s *Service) Review(ctx context.Context, req Request) (Result, error) {
 	return res, nil
 }
 
+// pass runs every lens once with the model of phase.
+func (s *Service) pass(ctx context.Context, req Request, phase string) ([]review.Finding, error) {
+	var found []review.Finding
+	for _, lens := range req.Lenses {
+		s.d.Events.Lens(lens)
+		fs, err := s.lens(ctx, req, lens, phase)
+		if err != nil {
+			return nil, err
+		}
+		found = append(found, fs...)
+	}
+	return found, nil
+}
+
 type lensAnswer struct {
 	Lens     review.Lens      `json:"lens"`
 	Findings []review.Finding `json:"findings"`
 }
 
-func (s *Service) lens(ctx context.Context, req Request, lens review.Lens) ([]review.Finding, error) {
+func (s *Service) lens(ctx context.Context, req Request, lens review.Lens, phase string) ([]review.Finding, error) {
 	data := s.data(req)
 	data.Lens, data.Prefix = lens, prefixes[lens]
 	var a lensAnswer
 	step := "lens " + string(lens)
 	valid := func() bool { return a.Lens == lens }
-	if err := s.turn(ctx, req, step, "review", "review/lens-schema.json", prompts.Review, data, &a, valid); err != nil {
+	if err := s.turn(ctx, req, step, phase, "review/lens-schema.json", prompts.Review, data, &a, valid); err != nil {
 		return nil, err
 	}
 	for i := range a.Findings {

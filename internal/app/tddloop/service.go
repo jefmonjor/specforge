@@ -118,6 +118,8 @@ type Options struct {
 	// lenses of every scenario (none: no lens review).
 	LensesAuto bool
 	Lenses     []review.Lens
+	// Blind doubles the lenses of high-risk scenarios.
+	Blind bool
 	// Verify is when the independent verifier runs: "high" (scenarios of
 	// high risk, the default), "always", "feature" (once, at the end) or
 	// "off".

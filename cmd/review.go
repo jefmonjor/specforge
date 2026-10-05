@@ -49,7 +49,7 @@ automatic correction outside the loop.`,
 			}
 			opts := reviewer.BranchOptions{
 				Root: p.root, Base: base, Language: p.settings.Language, Rules: p.settings.Risk,
-				LensesAuto: p.settings.LensesAuto, Lenses: p.settings.Lenses,
+				LensesAuto: p.settings.LensesAuto, Lenses: p.settings.Lenses, Blind: p.settings.BlindReview,
 				Report: filepath.Join(p.root, "docs", "review", "branch.json"),
 				Model:  p.settings.ModelFor, Timeout: p.settings.AgentTimeout, Now: a.Now(),
 			}
