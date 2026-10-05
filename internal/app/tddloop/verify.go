@@ -2,7 +2,6 @@ package tddloop
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path"
 	"slices"
@@ -14,7 +13,6 @@ import (
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 	"specforge/internal/domain/verification"
-	"specforge/internal/ports"
 )
 
 // Verify modes (verify in specforge.yaml).
@@ -97,15 +95,11 @@ func (s *Service) verifyStep(ctx context.Context, r *run, sc tdd.ScenarioRef) (p
 // all at the end.
 func (s *Service) scenarioRequirements(r *run, sc tdd.ScenarioRef) []string {
 	defined := spec.InvariantIDs(r.md)
+	d := r.docScenario(sc)
 	var out []string
-	for _, d := range r.doc.Scenarios {
-		if d.Index != sc.Index {
-			continue
-		}
-		for _, id := range spec.InvariantRefs(d.Title + "\n" + d.Source) {
-			if slices.Contains(defined, id) {
-				out = append(out, id)
-			}
+	for _, id := range spec.InvariantRefs(d.Title + "\n" + d.Source) {
+		if slices.Contains(defined, id) {
+			out = append(out, id)
 		}
 	}
 	return append(out, sc.Marker)
@@ -134,13 +128,11 @@ func (s *Service) settleUnmet(ctx context.Context, r *run, sc tdd.ScenarioRef, r
 		if slices.Contains(rec.FollowUps, b.ID) {
 			continue
 		}
-		q := question(r.o.Language, "unmet")
-		text := fmt.Sprintf(q.text, sc.Index, b.ID, b.Command, b.Observed, b.Expected)
-		answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginVerify), ports.Question{Text: text, Options: q.options, Strict: true})
+		picked, err := s.choose(ctx, r, sc, OriginVerify, "unmet", b.ID, b.Command, b.Observed, b.Expected)
 		if err != nil {
 			return err
 		}
-		if pick(answer, q.options) != 0 {
+		if picked != 0 {
 			return fmt.Errorf("%w (%s still broken)", ErrReviewStopped, b.ID)
 		}
 		rec.FollowUps = append(rec.FollowUps, b.ID)
@@ -164,13 +156,12 @@ func (s *Service) offerRegressionTests(ctx context.Context, r *run, sc tdd.Scena
 	for _, t := range tests {
 		paths = append(paths, t.Path+" ("+strings.Join(t.Covers, ", ")+")")
 	}
-	q := question(r.o.Language, "regression-tests")
-	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginVerify), ports.Question{Text: fmt.Sprintf(q.text, sc.Index, strings.Join(paths, "; ")), Options: q.options, Strict: true})
+	picked, err := s.choose(ctx, r, sc, OriginVerify, "regression-tests", strings.Join(paths, "; "))
 	if err != nil {
 		return err
 	}
 	rec.TestsDecided = true
-	if pick(answer, q.options) != 0 {
+	if picked != 0 {
 		return s.keepVerify(r, sc)
 	}
 	var written []string
@@ -227,38 +218,28 @@ func (s *Service) verifyFeature(ctx context.Context, r *run) error {
 	if s.d.Verifier == nil || r.o.Verify != VerifyFeature {
 		return nil
 	}
-	required := spec.InvariantIDs(r.md)
+	var markers []string
 	for _, sc := range r.st.Scenarios {
-		required = append(required, sc.Marker)
+		markers = append(markers, sc.Marker)
 	}
+	required := verifier.FeatureRequirements(r.md, markers)
 	res, err := s.d.Verifier.Verify(ctx, s.verifyRequest(r, required, r.lay.FeatureVerify(r.o.SpecPath)))
 	if err != nil {
 		return err
 	}
 	r.st.Record("verify", "feature", verifySummary(res), s.d.Now())
-	if len(res.Report.Blockers) > 0 {
-		return &verifier.BlockedError{Blockers: res.Report.Blockers}
-	}
-	return nil
+	return res.Blocked()
 }
 
 func (s *Service) verifyRequest(r *run, required []string, report string) verifier.Request {
-	return verifier.Request{
-		Root: r.o.Root, Language: r.o.Language, Stack: r.o.Profile.Name(), Base: "HEAD",
-		SpecTitle: r.doc.Title, Spec: strings.TrimSpace(spec.StripSeal(r.md)), Required: required,
-		Report: report, Model: r.o.Models, Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout, Now: s.d.Now(),
-	}
+	req := verifier.ForSpec(r.md, r.doc.Title, required)
+	req.Root, req.Language, req.Stack, req.Report = r.o.Root, r.o.Language, r.o.Profile.Name(), report
+	req.Model, req.Env, req.Timeout, req.Now = r.o.Models, r.o.AgentEnv, r.o.AgentTimeout, s.d.Now()
+	return req
 }
 
 func (s *Service) keepVerify(r *run, sc tdd.ScenarioRef) error {
-	data, err := json.MarshalIndent(r.st.Scenarios[r.st.Current].Verify, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := s.d.Files.WriteFile(r.lay.VerifyRecord(r.o.SpecPath, sc.Marker), append(data, '\n')); err != nil {
-		return fmt.Errorf("saving the verification of %s: %w", sc.Marker, err)
-	}
-	return s.save(r)
+	return s.keepRecord(r, r.lay.VerifyRecord(r.o.SpecPath, sc.Marker), r.st.Scenarios[r.st.Current].Verify)
 }
 
 // asFindings presents the verifier's blockers to the correction turn.

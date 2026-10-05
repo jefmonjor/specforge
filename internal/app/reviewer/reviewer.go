@@ -188,16 +188,10 @@ func (s *Service) refute(ctx context.Context, req Request, fs []review.Finding) 
 	return confirmed, reasons, nil
 }
 
-// Validation is the verdict on one corrected finding.
-type Validation struct {
-	Status string `json:"status"` // resolved | regression
-	Reason string `json:"reason"`
-}
-
 // Validate checks only the corrected findings against the code as it is
 // now. A finding the validator does not answer is a regression: nothing is
 // resolved without saying so.
-func (s *Service) Validate(ctx context.Context, req Request, fixed []review.Finding) (map[string]Validation, error) {
+func (s *Service) Validate(ctx context.Context, req Request, fixed []review.Finding) (map[string]review.Check, error) {
 	s.d.Events.Validating(len(fixed))
 	data := s.data(req)
 	data.Findings = fixed
@@ -209,13 +203,13 @@ func (s *Service) Validate(ctx context.Context, req Request, fixed []review.Find
 	if err := s.turn(ctx, req, "validation", "review", "review/validate-schema.json", prompts.Validate, data, &a, nil); err != nil {
 		return nil, err
 	}
-	out := map[string]Validation{}
+	out := map[string]review.Check{}
 	for _, f := range fixed {
-		out[f.ID] = Validation{Status: "regression", Reason: "the validator did not answer for it"}
+		out[f.ID] = review.Check{Status: "regression", Reason: "the validator did not answer for it"}
 	}
 	for _, r := range a.Results {
 		if _, ok := out[r.ID]; ok {
-			out[r.ID] = Validation{Status: r.Status, Reason: r.Reason}
+			out[r.ID] = review.Check{Status: r.Status, Reason: r.Reason}
 		}
 	}
 	return out, nil

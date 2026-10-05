@@ -51,15 +51,6 @@ func (d Diff) Changed(path string, line int) bool {
 // IsNew reports whether the diff creates path.
 func (d Diff) IsNew(path string) bool { return slices.Contains(d.New, path) }
 
-// Lines is how many lines the diff adds or removes.
-func (d Diff) Lines() int {
-	n := 0
-	for _, h := range d.Hunks {
-		n += h.End - h.Start
-	}
-	return n
-}
-
 var (
 	fileHeader = regexp.MustCompile(`^\+\+\+ (?:b/)?(.+?)\s*$`)
 	hunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
@@ -145,12 +136,12 @@ func ParseDiff(unified string) (Diff, error) {
 func NewFileDiff(path string, content []byte) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "diff --git a/%s b/%s\nnew file mode 100644\n--- /dev/null\n+++ b/%s\n", path, path, path)
-	if strings.IndexByte(string(content[:min(len(content), 8000)]), 0) >= 0 {
+	if change.IsBinary(content) {
 		fmt.Fprintf(&b, "Binary files /dev/null and b/%s differ\n", path)
 		return b.String()
 	}
-	lines := strings.Split(strings.TrimSuffix(string(content), "\n"), "\n")
-	if len(content) == 0 {
+	lines := change.Lines(content)
+	if len(lines) == 0 {
 		return b.String()
 	}
 	fmt.Fprintf(&b, "@@ -0,0 +1,%d @@\n", len(lines))

@@ -554,12 +554,11 @@ func (s *Service) existingRed(ctx context.Context, r *run, sc tdd.ScenarioRef) (
 // decidePremature asks the developer what a test that passes before any
 // implementation means. accepted is true when the scenario was closed.
 func (s *Service) decidePremature(ctx context.Context, r *run, sc tdd.ScenarioRef, written []string) (accepted bool, stricterFeedback string, err error) {
-	q := question(r.o.Language, "premature")
-	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginVerify), ports.Question{Text: fmt.Sprintf(q.text, sc.Index), Options: q.options, Strict: true})
+	picked, err := s.choose(ctx, r, sc, OriginVerify, "premature")
 	if err != nil {
 		return false, "", fmt.Errorf("%w: %w", tdd.ErrPrematureGreen, err)
 	}
-	switch pick(answer, q.options) {
+	switch picked {
 	case 0:
 		// The test still documents the behaviour: record it like any scenario.
 		r.st.AddFiles(written...)

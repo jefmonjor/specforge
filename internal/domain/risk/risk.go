@@ -40,14 +40,6 @@ func (t Tier) rank() int {
 // AtLeast reports whether t is o or stricter.
 func (t Tier) AtLeast(o Tier) bool { return t.rank() >= o.rank() }
 
-// Max returns the stricter of t and o.
-func (t Tier) Max(o Tier) Tier {
-	if o.rank() > t.rank() {
-		return o
-	}
-	return t
-}
-
 // ParseTier reads a tier name; "" is Passive, the floor.
 func ParseTier(s string) (Tier, error) {
 	t := Tier(strings.ToLower(strings.TrimSpace(s)))
@@ -135,8 +127,6 @@ type Assessment struct {
 	Lines   int      `json:"lines"`
 	Files   int      `json:"files"`
 	Reasons []string `json:"reasons"`
-	// Raised is the agent's reason when it raised the tier.
-	Raised string `json:"raised,omitempty"`
 }
 
 // Classify assesses a change. Generated files (lock files, vendored code)
@@ -148,16 +138,13 @@ func Classify(files []change.File, r Rules) Assessment {
 	var high []string
 	passive := len(files) > 0
 	for _, f := range files {
-		for _, re := range r.High {
-			if re.MatchString(f.Path) {
-				high = append(high, fmt.Sprintf("`%s` is a sensitive path", f.Path))
-				break
-			}
+		if r.Sensitive(f.Path) {
+			high = append(high, fmt.Sprintf("`%s` is a sensitive path", f.Path))
 		}
 		if f.Binary {
 			a.Reasons = append(a.Reasons, fmt.Sprintf("`%s` is binary", f.Path))
 		}
-		if !matchesAny(f.Path, r.Passive) {
+		if !r.Documentation(f.Path) {
 			passive = false
 		}
 	}
@@ -190,8 +177,7 @@ func (a Assessment) Escalate(to Tier, why string) Assessment {
 		return a
 	}
 	a.Tier = to
-	a.Raised = strings.TrimSpace(why)
-	a.Reasons = append(a.Reasons, "raised by the agent: "+a.Raised)
+	a.Reasons = append(a.Reasons, "raised by the agent: "+strings.TrimSpace(why))
 	return a
 }
 

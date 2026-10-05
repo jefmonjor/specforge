@@ -79,7 +79,7 @@ const binarySniff = 8000
 // FromContent measures a new file from its content: every line is added.
 func FromContent(p string, data []byte) File {
 	f := File{Path: p}
-	if bytes.IndexByte(data[:min(len(data), binarySniff)], 0) >= 0 {
+	if IsBinary(data) {
 		f.Binary = true
 		return f
 	}
@@ -98,7 +98,15 @@ const maxCells = 4_000_000
 // a line diff would: the lines of old not kept are deleted, the lines of
 // new not kept are added.
 func Between(p string, old, new []byte) File {
-	a, b := lines(old), lines(new)
+	a, b := Lines(old), Lines(new)
+	// The lines both share at the start and the end are kept: only the
+	// middle needs the table, which keeps a small edit to a large file cheap.
+	for len(a) > 0 && len(b) > 0 && a[0] == b[0] {
+		a, b = a[1:], b[1:]
+	}
+	for len(a) > 0 && len(b) > 0 && a[len(a)-1] == b[len(b)-1] {
+		a, b = a[:len(a)-1], b[:len(b)-1]
+	}
 	if len(a)*len(b) > maxCells {
 		return File{Path: p, Added: len(b), Deleted: len(a)}
 	}
@@ -106,7 +114,14 @@ func Between(p string, old, new []byte) File {
 	return File{Path: p, Added: len(b) - kept, Deleted: len(a) - kept}
 }
 
-func lines(data []byte) []string {
+// IsBinary reports whether data looks binary, as git decides it: a NUL
+// byte near the start.
+func IsBinary(data []byte) bool {
+	return bytes.IndexByte(data[:min(len(data), binarySniff)], 0) >= 0
+}
+
+// Lines splits text into its lines; nil for empty text.
+func Lines(data []byte) []string {
 	s := strings.TrimSuffix(string(data), "\n")
 	if s == "" {
 		return nil

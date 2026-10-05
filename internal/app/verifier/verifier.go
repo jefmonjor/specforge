@@ -16,6 +16,7 @@ import (
 
 	"specforge/internal/app/answer"
 	"specforge/internal/app/prompts"
+	"specforge/internal/domain/spec"
 	"specforge/internal/domain/verification"
 	"specforge/internal/ports"
 )
@@ -94,6 +95,26 @@ type Result struct {
 	// Skipped says why the verifier did not run (a project too large to
 	// copy); never silent.
 	Skipped string `json:"skipped,omitempty"`
+}
+
+// Blocked is a BlockedError when the report shows a requirement broken.
+func (r Result) Blocked() error {
+	if len(r.Report.Blockers) > 0 {
+		return &BlockedError{Blockers: r.Report.Blockers}
+	}
+	return nil
+}
+
+// ForSpec starts a request about the specification md, compared with the
+// last commit: the caller adds where and how it runs.
+func ForSpec(md, title string, required []string) Request {
+	return Request{Base: "HEAD", SpecTitle: title, Spec: strings.TrimSpace(spec.StripSeal(md)), Required: required}
+}
+
+// FeatureRequirements are what a whole specification requires: its
+// invariants and every scenario.
+func FeatureRequirements(md string, markers []string) []string {
+	return append(spec.InvariantIDs(md), markers...)
 }
 
 // Service runs verifications.

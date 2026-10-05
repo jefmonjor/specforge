@@ -78,10 +78,9 @@ func (s *Service) Branch(ctx context.Context, diffs ports.DiffSource, files port
 	out.Risk = risk.Classify(d.Changes(), o.Rules)
 	lenses := o.Lenses
 	if o.LensesAuto {
-		lenses = review.Select(out.Risk.Tier, d.Files, o.Rules.Sensitive, func(p string) bool { return !o.Rules.Documentation(p) })
+		lenses = review.Select(out.Risk.Tier, d.Files, o.Rules)
 	}
 	if len(lenses) == 0 {
-		out.Result = Result{}
 		return out, s.write(files, o.Report, out)
 	}
 	res, err := s.Review(ctx, Request{

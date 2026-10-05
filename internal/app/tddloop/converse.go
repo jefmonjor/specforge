@@ -88,7 +88,11 @@ func modelPhase(p tdd.Phase) string {
 const (
 	OriginReview = "REVIEW"
 	OriginVerify = "VERIFY"
+	OriginRisk   = "RISK"
 )
+
+// ProcessOrigins are the phases of SpecForge's own questions.
+var ProcessOrigins = []string{OriginReview, OriginVerify, OriginRisk}
 
 func (s *Service) origin(r *run, sc tdd.ScenarioRef) clarify.Origin {
 	return s.originAs(r, sc, string(r.st.Phase))

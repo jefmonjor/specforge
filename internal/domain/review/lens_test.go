@@ -2,15 +2,16 @@ package review
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	"specforge/internal/domain/risk"
 )
 
 func TestSelect(t *testing.T) {
-	sensitive := func(p string) bool { return strings.Contains(p, "auth") }
-	code := func(p string) bool { return strings.HasSuffix(p, ".go") }
+	rules, err := risk.NewRules(0, []string{`auth`}, []string{`\.(md|yaml)$`}, risk.Passive)
+	if err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
 		tier  risk.Tier
 		files []string
@@ -23,7 +24,7 @@ func TestSelect(t *testing.T) {
 		{risk.Medium, []string{"config.yaml"}, []Lens{LensReadability}},
 	}
 	for _, c := range cases {
-		if got := Select(c.tier, c.files, sensitive, code); !reflect.DeepEqual(got, c.want) {
+		if got := Select(c.tier, c.files, rules); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("Select(%s, %v) = %v, want %v", c.tier, c.files, got, c.want)
 		}
 	}

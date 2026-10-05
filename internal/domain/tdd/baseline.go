@@ -65,10 +65,10 @@ func (b *Baseline) Judge(o Outcome) SuiteVerdict {
 		return SuiteVerdict{OK: o.Green(), Fresh: sortedRefs(o.Failures)}
 	}
 	var v SuiteVerdict
-	failing := map[TestRef]bool{}
+	known := refSet(b.Failures)
+	failing := refSet(o.Failures)
 	for _, f := range o.Failures {
-		failing[f] = true
-		if b.Has(f) {
+		if known[f] {
 			v.Known = append(v.Known, f)
 		} else {
 			v.Fresh = append(v.Fresh, f)
@@ -93,7 +93,16 @@ func (b *Baseline) Retire(fixed []TestRef) {
 	if b == nil || len(fixed) == 0 {
 		return
 	}
-	b.Failures = slices.DeleteFunc(b.Failures, func(t TestRef) bool { return slices.Contains(fixed, t) })
+	gone := refSet(fixed)
+	b.Failures = slices.DeleteFunc(b.Failures, func(t TestRef) bool { return gone[t] })
+}
+
+func refSet(refs []TestRef) map[TestRef]bool {
+	set := make(map[TestRef]bool, len(refs))
+	for _, r := range refs {
+		set[r] = true
+	}
+	return set
 }
 
 // Names renders refs for messages and prompts, one per line.

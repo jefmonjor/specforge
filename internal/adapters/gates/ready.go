@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 
 	"specforge/internal/adapters/process"
@@ -48,19 +47,6 @@ func missing(detail, hint string) ports.Readiness {
 	return ports.Readiness{Detail: detail, Hint: hint}
 }
 
-// nodeBin finds a tool installed in the project's node_modules.
-func nodeBin(root, tool string) (string, bool) {
-	name := tool
-	if runtime.GOOS == "windows" {
-		name += ".cmd"
-	}
-	p := filepath.Join(root, "node_modules", ".bin", name)
-	if _, err := os.Stat(p); err == nil {
-		return p, true
-	}
-	return "", false
-}
-
 // Ready implements ports.Readier.
 func (l *Lint) Ready(_ context.Context, root string, p stack.Profile) ports.Readiness {
 	switch p.Kind {
@@ -100,7 +86,7 @@ func (*Duplication) Ready(_ context.Context, root string, _ stack.Profile) ports
 	if process.Available("jscpd") {
 		return ready("jscpd")
 	}
-	if bin, ok := nodeBin(root, "jscpd"); ok {
+	if bin, ok := process.NodeBin(root, "jscpd"); ok {
 		return ready(bin)
 	}
 	return missing("jscpd not found", "npm install -g jscpd (or add it to devDependencies)")
@@ -108,7 +94,7 @@ func (*Duplication) Ready(_ context.Context, root string, _ stack.Profile) ports
 
 // Ready implements ports.Readier.
 func (*DeadCode) Ready(_ context.Context, root string, _ stack.Profile) ports.Readiness {
-	if bin, ok := nodeBin(root, "knip"); ok {
+	if bin, ok := process.NodeBin(root, "knip"); ok {
 		return ready(bin)
 	}
 	return missing("knip not installed in the project", "npm install --save-dev knip")
@@ -123,7 +109,7 @@ func (*Mutation) Ready(_ context.Context, root string, _ stack.Profile) ports.Re
 	if !configured {
 		return missing("Stryker is not configured (no stryker.conf.*)", "npm init stryker")
 	}
-	if bin, ok := nodeBin(root, "stryker"); ok {
+	if bin, ok := process.NodeBin(root, "stryker"); ok {
 		return ready(bin)
 	}
 	return missing("Stryker is configured but not installed", "npm install --save-dev @stryker-mutator/core")

@@ -66,7 +66,7 @@ func TestTheAgentCanRaiseTheRiskButNotLowerIt(t *testing.T) {
 	_, _ = h.run()
 	st := h.state(t)
 	a := st.Scenarios[0].Risk
-	if a == nil || a.Tier != risk.High || a.Raised != "the link embeds a signed token" {
+	if a == nil || a.Tier != risk.High || !slices.Contains(a.Reasons, "raised by the agent: the link embeds a signed token") {
 		t.Fatalf("risk = %+v", a)
 	}
 	if d := h.p.read("specs/0001-reset/decisions.md"); !strings.Contains(d, "· RISK ·") || !strings.Contains(d, "high · the link embeds a signed token") {

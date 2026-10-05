@@ -52,16 +52,16 @@ func ParseLenses(values []string) (lenses []Lens, auto bool, err error) {
 // Select picks the lenses for a change by its tier: none when passive,
 // every lens when high, and for a medium change the one that matters most:
 // risk when a path is sensitive, reliability when code changed, else
-// readability.
-func Select(tier risk.Tier, files []string, sensitive, isCode func(string) bool) []Lens {
+// readability. Code is whatever the rules do not call documentation.
+func Select(tier risk.Tier, files []string, rules risk.Rules) []Lens {
 	switch tier {
 	case risk.High:
 		return slices.Clone(AllLenses)
 	case risk.Medium:
 		switch {
-		case slices.ContainsFunc(files, sensitive):
+		case slices.ContainsFunc(files, rules.Sensitive):
 			return []Lens{LensRisk}
-		case slices.ContainsFunc(files, isCode):
+		case slices.ContainsFunc(files, func(p string) bool { return !rules.Documentation(p) }):
 			return []Lens{LensReliability}
 		}
 		return []Lens{LensReadability}

@@ -76,9 +76,6 @@ func TestParseDiff(t *testing.T) {
 			t.Errorf("Changed(%s:%d) = %v, want %v", c.path, c.line, got, c.want)
 		}
 	}
-	if d.Lines() != 5 {
-		t.Errorf("Lines = %d", d.Lines())
-	}
 }
 
 func TestParseDiffZeroContext(t *testing.T) {

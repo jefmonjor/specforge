@@ -1,6 +1,13 @@
 package tddloop
 
-import "strings"
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"specforge/internal/domain/tdd"
+	"specforge/internal/ports"
+)
 
 // choice is a localized question with fixed options.
 type choice struct {
@@ -111,4 +118,17 @@ func pick(answer string, options []string) int {
 		}
 	}
 	return -1
+}
+
+// choose asks one of SpecForge's own fixed-choice questions about scenario
+// sc and returns the option picked. The question's text takes sc.Index
+// first, then args.
+func (s *Service) choose(ctx context.Context, r *run, sc tdd.ScenarioRef, origin, key string, args ...any) (int, error) {
+	q := question(r.o.Language, key)
+	text := fmt.Sprintf(q.text, append([]any{sc.Index}, args...)...)
+	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, origin), ports.Question{Text: text, Options: q.options, Strict: true})
+	if err != nil {
+		return -1, err
+	}
+	return pick(answer, q.options), nil
 }

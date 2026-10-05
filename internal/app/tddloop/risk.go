@@ -12,10 +12,6 @@ import (
 	"specforge/internal/ports"
 )
 
-// OriginRisk labels the agent's requests for more scrutiny in the
-// decisions log.
-const OriginRisk = "RISK"
-
 // assess classifies the scenario's change from what version control says
 // it touched, applies the agent's request for more scrutiny, and keeps the
 // result in the state. quiet skips the event when the tier did not change.

@@ -2,13 +2,12 @@ package tddloop
 
 import (
 	"context"
-	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
 	"specforge/internal/domain/change"
 	"specforge/internal/domain/tdd"
-	"specforge/internal/ports"
 )
 
 // Surface modes (plan.surfaces in specforge.yaml).
@@ -38,11 +37,13 @@ func (s *Service) checkSurfaces(ctx context.Context, r *run, sc tdd.ScenarioRef,
 	if r.o.Surfaces == SurfacesOff || r.surfaces.Empty() {
 		return "", nil
 	}
-	refused := sortedKeys(r.st.Refused)
+	// A file refused before is not asked about again: put back, it is
+	// fine (and forgotten); still there, the attempt fails.
+	refused := maps.Clone(r.st.Refused)
 	stillRefused := r.st.Unreverted(t.After)
-	putBack := slices.DeleteFunc(refused, func(p string) bool { return slices.Contains(stillRefused, p) })
 	outside := slices.DeleteFunc(s.outsidePlan(r, t.Changed), func(p string) bool {
-		return slices.Contains(putBack, p) || slices.Contains(stillRefused, p)
+		_, was := refused[p]
+		return was
 	})
 	if len(stillRefused) > 0 {
 		// Already refused once: no second question, the attempt fails.
@@ -57,12 +58,11 @@ func (s *Service) checkSurfaces(ctx context.Context, r *run, sc tdd.ScenarioRef,
 		s.refuse(r, t, outside)
 		return s.reject(r, RejectOutsidePlan, list, ""), nil
 	}
-	q := question(r.o.Language, "surfaces")
-	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginVerify), ports.Question{Text: fmt.Sprintf(q.text, sc.Index, list), Options: q.options, Strict: true})
+	picked, err := s.choose(ctx, r, sc, OriginVerify, "surfaces", list)
 	if err != nil {
 		return "", err
 	}
-	if pick(answer, q.options) == 0 {
+	if picked == 0 {
 		r.st.Accept(outside...)
 		r.st.Record("surfaces", "accepted", list, s.d.Now())
 		return "", s.save(r)
@@ -131,12 +131,4 @@ func notRefused(st *tdd.State, paths []string) []string {
 		_, refused := st.Refused[p]
 		return refused
 	})
-}
-
-func sortedKeys(m map[string]string) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	return sortedStrings(out)
 }

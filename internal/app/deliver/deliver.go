@@ -17,7 +17,9 @@ import (
 
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/layout"
+	"specforge/internal/app/reviewer"
 	"specforge/internal/app/tddloop"
+	"specforge/internal/app/verifier"
 	"specforge/internal/domain/change"
 	"specforge/internal/domain/delivery"
 	"specforge/internal/domain/e2e"
@@ -43,11 +45,6 @@ type Options struct {
 	// SliceBodies also writes PR_BODY-1.md … PR_BODY-n.md, one per slice.
 	SliceBodies bool
 }
-
-// processOrigins label the questions SpecForge asked about its own process
-// (reviews, verification, risk): already shown per scenario, they are not
-// product decisions.
-var processOrigins = []string{tddloop.OriginReview, tddloop.OriginVerify, tddloop.OriginRisk}
 
 var outOfScope = regexp.MustCompile(`(?i)out of scope|fuera de alcance`)
 
@@ -96,7 +93,7 @@ func Build(ctx context.Context, files ports.Files, measure ports.Measurer, o Opt
 			answered[e.Question] = e.Answer != ""
 			// Reviews and verification checks are process, already shown
 			// per scenario; the decisions are the product answers.
-			if e.Answer != "" && !slices.Contains(processOrigins, e.Phase) {
+			if e.Answer != "" && !slices.Contains(tddloop.ProcessOrigins, e.Phase) {
 				t.Decisions = append(t.Decisions, e.Question+" → "+e.Answer)
 			}
 		}
@@ -287,10 +284,7 @@ func featureVerification(files ports.Files, path string) *delivery.Verification 
 	if err != nil {
 		return nil
 	}
-	var res struct {
-		Report  verification.Report `json:"report"`
-		Skipped string              `json:"skipped"`
-	}
+	var res verifier.Result
 	if json.Unmarshal(data, &res) != nil {
 		return nil
 	}
@@ -323,23 +317,17 @@ func branchReview(files ports.Files, path string) *delivery.Review {
 	if err != nil {
 		return nil
 	}
-	var r struct {
-		Review struct {
-			Lenses   []review.Lens  `json:"lenses"`
-			Reported int            `json:"reported"`
-			Verdict  review.Verdict `json:"verdict"`
-		} `json:"review"`
-	}
+	var r reviewer.BranchResult
 	if json.Unmarshal(data, &r) != nil {
 		return nil
 	}
-	v := r.Review.Verdict
-	return reviewOf(r.Review.Lenses, r.Review.Reported, 0, v, v.FollowUps, append(slices.Clone(v.Blocking), v.Escalated...))
+	v := r.Verdict
+	return reviewOf(r.Lenses, r.Reported, 0, v, v.FollowUps, append(slices.Clone(v.Blocking), v.Escalated...))
 }
 
 func checks(files ports.Files, o Options, lay layout.Layout) delivery.Checks {
 	var c delivery.Checks
-	c.BranchReview = branchReview(files, filepath.Join(lay.SpecDir(o.SpecPath), "review", "branch.json"))
+	c.BranchReview = branchReview(files, lay.BranchReview(o.SpecPath))
 	c.Verify = featureVerification(files, lay.FeatureVerify(o.SpecPath))
 	if data, err := files.ReadFile(filepath.Join(o.Root, "docs", "security", "findings.json")); err == nil {
 		var r security.Report

@@ -59,6 +59,12 @@ func (l Layout) ReviewRecord(specPath, marker string) string {
 	return filepath.Join(l.SpecDir(specPath), "review", marker+".json")
 }
 
+// BranchReview is where `specforge review` keeps its report for a
+// specification.
+func (l Layout) BranchReview(specPath string) string {
+	return filepath.Join(l.SpecDir(specPath), "review", "branch.json")
+}
+
 // VerifyRecord is where the verification of one scenario is kept.
 func (l Layout) VerifyRecord(specPath, marker string) string {
 	return filepath.Join(l.SpecDir(specPath), "verify", marker+".json")

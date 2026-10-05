@@ -85,7 +85,8 @@ automatic correction outside the loop.`,
 			if ok, jerr := a.emit(res); ok {
 				return firstErr(jerr, err)
 			}
-			if res.Base != "" { // the branch was read: say what the review found
+			var blocked *reviewer.BlockedError
+			if err == nil || errors.As(err, &blocked) { // the review ran: say what it found
 				a.printBranchReview(p, opts, res)
 			}
 			return err
@@ -113,7 +114,7 @@ func (a *App) reviewContext(p project, specPath string, opts *reviewer.BranchOpt
 	if plan, err := (fsys.OS{}).ReadFile(p.layout.Plan(specPath)); err == nil {
 		opts.Plan = spec.StripSeal(string(plan))
 	}
-	opts.Report = filepath.Join(p.layout.SpecDir(specPath), "review", "branch.json")
+	opts.Report = p.layout.BranchReview(specPath)
 	return nil
 }
 

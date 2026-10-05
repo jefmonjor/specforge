@@ -1,6 +1,10 @@
 package change
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestGeneratedFilesAreNotAuthored(t *testing.T) {
 	cases := map[string]bool{
@@ -47,5 +51,16 @@ func TestBetween(t *testing.T) {
 	}
 	if f := Between("a.go", []byte("same\n"), []byte("same\n")); f.Lines() != 0 {
 		t.Fatalf("unchanged = %+v", f)
+	}
+}
+
+func TestBetweenASmallEditToALargeFileIsExact(t *testing.T) {
+	var old strings.Builder
+	for i := range 5000 {
+		fmt.Fprintf(&old, "line %d\n", i)
+	}
+	edited := strings.Replace(old.String(), "line 2500\n", "line 2500 changed\n", 1)
+	if f := Between("big.go", []byte(old.String()), []byte(edited)); f.Added != 1 || f.Deleted != 1 {
+		t.Fatalf("a one-line edit counts %+v", f)
 	}
 }

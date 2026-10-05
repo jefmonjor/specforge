@@ -54,6 +54,9 @@ type child struct {
 	box   ports.Copies
 	st    *tdd.State
 	err   error
+	// logs holds the length of each project log when the sandbox was made:
+	// what the child wrote after it is what it brings back.
+	logs map[string]int
 }
 
 // runBatch runs the scenarios of a batch side by side, each in a sandbox
@@ -69,6 +72,7 @@ func (s *Service) runBatch(ctx context.Context, r *run, batch []int) error {
 	var mu sync.Mutex
 	asked := &lockedPrompter{mu: &mu, p: s.d.Asker.Prompter}
 	events := &quietEvents{mu: &mu, e: s.d.Events}
+	logs := s.logLengths(r)
 	children := make([]child, len(batch))
 	var wg sync.WaitGroup
 	for n, i := range batch {
@@ -76,6 +80,7 @@ func (s *Service) runBatch(ctx context.Context, r *run, batch []int) error {
 		go func() {
 			defer wg.Done()
 			children[n] = s.runChild(ctx, r, i, asked, events)
+			children[n].logs = logs
 		}()
 	}
 	wg.Wait()
@@ -116,10 +121,7 @@ func (s *Service) runChild(ctx context.Context, r *run, i int, asked ports.Promp
 type arrival struct {
 	index int
 	ref   tdd.ScenarioRef
-	// history is the scenario's checkpoints in its sandbox: its RED,
-	// GREEN and REFACTOR, with the gates, belong to the project's record.
-	history []tdd.Checkpoint
-	files   []string
+	child *tdd.State
 	// before holds each file's content in the project before; nil when the
 	// file did not exist.
 	before map[string][]byte
@@ -140,15 +142,15 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 		ref, ok := s.finished(r, c)
 		if !ok {
 			// The decisions the developer took there still count; the
-			// attempt itself runs again, so its escalation does not.
+			// attempt itself runs again, so its process decisions do not.
 			if c.box.Dir != "" {
-				if err := s.bringLogs(r, sandboxLayout(r, c), false); err != nil {
+				if err := s.bringLogs(r, c, false); err != nil {
 					return err
 				}
 			}
 			continue
 		}
-		if clash := slices.DeleteFunc(slices.Clone(ref.Files), func(f string) bool { return !taken[f] }); len(clash) > 0 {
+		if clash := slices.DeleteFunc(r.workFiles(ref), func(f string) bool { return !taken[f] }); len(clash) > 0 {
 			r.sequential[c.index] = true
 			s.d.Events.ParallelSkipped(ref, "its files collide with another scenario's: "+joinPaths(clash))
 			continue
@@ -157,7 +159,7 @@ func (s *Service) integrate(ctx context.Context, r *run, children []child) error
 		if err != nil {
 			return err
 		}
-		for _, f := range a.files {
+		for f := range a.before {
 			taken[f] = true
 		}
 		arrived = append(arrived, a)
@@ -209,26 +211,32 @@ func (s *Service) finished(r *run, c child) (tdd.ScenarioRef, bool) {
 
 // bringBack copies a child's files and records into the project.
 func (s *Service) bringBack(r *run, c child, ref tdd.ScenarioRef) (arrival, error) {
-	a := arrival{index: c.index, ref: ref, history: scenarioHistory(c.st, ref.Index), files: ref.Files, before: map[string][]byte{}}
+	a := arrival{index: c.index, ref: ref, child: c.st, before: map[string][]byte{}}
 	box := sandboxLayout(r, c)
-	for _, f := range ref.Files {
-		if old, err := s.d.Files.ReadFile(r.lay.Abs(f)); err == nil {
-			a.before[f] = old
-		} else {
-			a.before[f] = nil
-		}
+	for _, f := range r.workFiles(ref) {
+		a.before[f], _ = s.d.Files.ReadFile(r.lay.Abs(f)) // nil: it did not exist
 		data, err := s.d.Files.ReadFile(box.Abs(f))
-		switch {
-		case err != nil:
+		if err != nil {
 			err = s.d.Files.Remove(r.lay.Abs(f))
-		default:
+		} else {
 			err = s.d.Files.WriteFile(r.lay.Abs(f), data)
 		}
 		if err != nil {
 			return a, fmt.Errorf("bringing %s back from scenario %d: %w", f, ref.Index, err)
 		}
 	}
-	return a, s.bringRecords(r, box, ref)
+	return a, s.bringRecords(r, c, ref)
+}
+
+// workFiles are a scenario's files but SpecForge's own records, which
+// come back through bringRecords: the decisions, lessons and questions are
+// shared by every scenario and are appended to, never replaced.
+func (r *run) workFiles(ref tdd.ScenarioRef) []string {
+	records := r.lay.SpecDir(r.o.SpecPath) + string(filepath.Separator)
+	return slices.DeleteFunc(slices.Clone(ref.Files), func(f string) bool {
+		p := r.lay.Abs(f)
+		return p == r.lay.Lessons() || strings.HasPrefix(p, records)
+	})
 }
 
 // sandboxLayout is the project layout inside a child's sandbox.
@@ -240,10 +248,11 @@ func sandboxLayout(r *run, c child) layout.Layout {
 
 // bringRecords brings a child's logs and copies its review and
 // verification records.
-func (s *Service) bringRecords(r *run, box layout.Layout, ref tdd.ScenarioRef) error {
-	if err := s.bringLogs(r, box, true); err != nil {
+func (s *Service) bringRecords(r *run, c child, ref tdd.ScenarioRef) error {
+	if err := s.bringLogs(r, c, true); err != nil {
 		return err
 	}
+	box := sandboxLayout(r, c)
 	childSpec := box.Abs(r.lay.Rel(r.o.SpecPath))
 	for _, pair := range [][2]string{
 		{r.lay.ReviewRecord(r.o.SpecPath, ref.Marker), box.ReviewRecord(childSpec, ref.Marker)},
@@ -258,28 +267,42 @@ func (s *Service) bringRecords(r *run, box layout.Layout, ref tdd.ScenarioRef) e
 	return nil
 }
 
-// bringLogs appends what a child added to the decisions and lessons and,
-// for a finished scenario, to the questions. The escalations of an
-// unfinished scenario stay behind: they judged an attempt that runs again.
-func (s *Service) bringLogs(r *run, box layout.Layout, finished bool) error {
-	childSpec := box.Abs(r.lay.Rel(r.o.SpecPath))
-	decisions := r.lay.Decisions(r.o.SpecPath)
-	pairs := [][2]string{
-		{decisions, box.Decisions(childSpec)},
-		{r.lay.Lessons(), box.Lessons()},
+// logLengths measures the project's logs, the start every sandbox shares.
+func (s *Service) logLengths(r *run) map[string]int {
+	out := map[string]int{}
+	for _, p := range r.logs() {
+		data, _ := s.d.Files.ReadFile(p)
+		out[p] = len(data)
 	}
+	return out
+}
+
+// logs are the project's decisions, lessons and questions files.
+func (r *run) logs() []string {
+	return []string{r.lay.Decisions(r.o.SpecPath), r.lay.Lessons(), r.lay.Questions(r.o.SpecPath)}
+}
+
+// bringLogs appends what a child added to the decisions and lessons and,
+// for a finished scenario, to the questions. An unfinished scenario runs
+// again, so the process decisions of its attempt (risk, review,
+// verification) stay behind.
+func (s *Service) bringLogs(r *run, c child, finished bool) error {
+	box := sandboxLayout(r, c)
+	childSpec := box.Abs(r.lay.Rel(r.o.SpecPath))
+	decisions, lessons, questions := r.lay.Decisions(r.o.SpecPath), r.lay.Lessons(), r.lay.Questions(r.o.SpecPath)
+	pairs := [][2]string{{decisions, box.Decisions(childSpec)}, {lessons, box.Lessons()}}
 	if finished {
-		pairs = append(pairs, [2]string{r.lay.Questions(r.o.SpecPath), box.Questions(childSpec)})
+		pairs = append(pairs, [2]string{questions, box.Questions(childSpec)})
 	}
 	for _, pair := range pairs {
-		mine, _ := s.d.Files.ReadFile(pair[0])
 		theirs, err := s.d.Files.ReadFile(pair[1])
-		if err != nil || len(theirs) <= len(mine) || string(theirs[:len(mine)]) != string(mine) {
+		start := c.logs[pair[0]]
+		if err != nil || len(theirs) <= start {
 			continue
 		}
-		added := string(theirs[len(mine):])
+		added := string(theirs[start:])
 		if !finished && pair[0] == decisions {
-			added = withoutEntries(added, OriginRisk)
+			added = clarify.Without(added, ProcessOrigins...)
 		}
 		if added == "" {
 			continue
@@ -289,23 +312,6 @@ func (s *Service) bringLogs(r *run, box layout.Layout, finished bool) error {
 		}
 	}
 	return nil
-}
-
-// withoutEntries drops from a decisions log the entries of one phase: an
-// entry runs from its "### <time> · <phase> · …" header to the next one.
-func withoutEntries(log, phase string) string {
-	var kept strings.Builder
-	drop := false
-	for _, line := range strings.SplitAfter(log, "\n") {
-		if strings.HasPrefix(line, "### ") {
-			parts := strings.Split(strings.TrimSpace(line), " · ")
-			drop = len(parts) > 1 && parts[1] == phase
-		}
-		if !drop {
-			kept.WriteString(line)
-		}
-	}
-	return kept.String()
 }
 
 // takeBack restores the files of arrivals that will run again.
@@ -330,24 +336,17 @@ func (s *Service) takeBack(r *run, arrived []arrival) error {
 // its REVIEW, and closes it: the developer's review and the commit.
 func (s *Service) closeArrival(ctx context.Context, r *run, a arrival) error {
 	r.st.Current, r.st.Phase = a.index, tdd.PhaseReview
-	ref := &r.st.Scenarios[a.index]
-	ref.Risk, ref.Review, ref.Verify = a.ref.Risk, a.ref.Review, a.ref.Verify
-	ref.RaisedTo, ref.RaisedWhy = a.ref.RaisedTo, a.ref.RaisedWhy
-	r.st.FilesWritten = slices.Clone(a.files)
+	r.st.FilesWritten = slices.Clone(a.ref.Files)
 	hashes, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
 	if err != nil {
 		return err
 	}
 	r.st.TestHashes = hashes
-	r.st.Checkpoints = append(r.st.Checkpoints, a.history...)
-	r.st.Record("parallel", "integrated", joinPaths(a.files), s.d.Now())
-	s.d.Events.Integrated(*ref)
-	return s.close(ctx, r, *ref, lastGates(r.st, a.index))
-}
-
-// scenarioHistory is what a child's state recorded about one scenario.
-func scenarioHistory(st *tdd.State, index int) []tdd.Checkpoint {
-	return slices.DeleteFunc(slices.Clone(st.Checkpoints), func(c tdd.Checkpoint) bool { return c.Scenario != index })
+	r.st.Adopt(a.child, a.index)
+	ref := r.st.Scenarios[a.index]
+	r.st.Record("parallel", "integrated", joinPaths(ref.Files), s.d.Now())
+	s.d.Events.Integrated(ref)
+	return s.close(ctx, r, ref, lastGates(r.st, ref.Index))
 }
 
 // lockedPrompter lets one scenario of a batch ask at a time.

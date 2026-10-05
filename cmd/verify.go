@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -13,7 +12,6 @@ import (
 	"specforge/internal/config"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
-	"specforge/internal/domain/verification"
 	"specforge/internal/ui"
 )
 
@@ -58,10 +56,10 @@ command that reproduces it.`,
 			if err != nil {
 				return err
 			}
-			required := spec.InvariantIDs(md)
+			var markers []string
 			id := spec.IDFromPath(entry.Path)
 			for _, sc := range doc.Scenarios {
-				required = append(required, spec.Marker(id, sc.Index))
+				markers = append(markers, spec.Marker(id, sc.Index))
 			}
 			stackName := ""
 			if prof, err := a.resolveStack(ctx, p); err == nil {
@@ -80,11 +78,10 @@ command that reproduces it.`,
 			report := p.layout.FeatureVerify(entry.Path)
 			svc := verifier.New(verifier.Deps{Agent: ag, Proc: proc, Scratch: scratch.New(proc, p.settings.VerifyMaxBytes),
 				Workspace: workspace.New(proc), Files: files, Events: events})
-			res, err := svc.Verify(ctx, verifier.Request{
-				Root: p.root, Language: p.settings.Language, Stack: stackName, Base: "HEAD",
-				SpecTitle: doc.Title, Spec: strings.TrimSpace(spec.StripSeal(md)), Required: required, Report: report,
-				Model: p.settings.ModelFor, Timeout: p.settings.AgentTimeout, Now: a.Now(),
-			})
+			req := verifier.ForSpec(md, doc.Title, verifier.FeatureRequirements(md, markers))
+			req.Root, req.Language, req.Stack, req.Report = p.root, p.settings.Language, stackName, report
+			req.Model, req.Timeout, req.Now = p.settings.ModelFor, p.settings.AgentTimeout, a.Now()
+			res, err := svc.Verify(ctx, req)
 			if err != nil {
 				return err
 			}
@@ -93,10 +90,7 @@ command that reproduces it.`,
 			}
 			events.Verified(tdd.ScenarioRef{}, tdd.VerifyRecord{Report: res.Report, Skipped: res.Skipped})
 			con.Info(con.T("verify.report", p.layout.Rel(report)))
-			if res.Report.Count(verification.Unmet) > 0 || len(res.Report.Blockers) > 0 {
-				return &verifier.BlockedError{Blockers: res.Report.Blockers}
-			}
-			return nil
+			return res.Blocked()
 		},
 	}
 	c.Flags().StringVar(&o.Agent, "agent", "", "claude | gemini (default: configured)")

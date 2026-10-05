@@ -86,7 +86,7 @@ type Deps struct {
 // Reviewer runs review lenses over a change and validates a correction.
 type Reviewer interface {
 	Review(ctx context.Context, req reviewer.Request) (reviewer.Result, error)
-	Validate(ctx context.Context, req reviewer.Request, fixed []review.Finding) (map[string]reviewer.Validation, error)
+	Validate(ctx context.Context, req reviewer.Request, fixed []review.Finding) (map[string]review.Check, error)
 }
 
 // Options select the specification and tune the loop.

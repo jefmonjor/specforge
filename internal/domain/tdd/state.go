@@ -87,20 +87,14 @@ type ReviewRecord struct {
 	Verdict  review.Verdict `json:"verdict"`
 	// Correction: the findings sent to the one correction, its size in
 	// lines and the budget it had.
-	Corrected  []review.Finding `json:"corrected,omitempty"`
-	Lines      int              `json:"correction_lines,omitempty"`
-	Budget     int              `json:"correction_budget,omitempty"`
-	Validation map[string]Check `json:"validation,omitempty"`
+	Corrected  []review.Finding        `json:"corrected,omitempty"`
+	Lines      int                     `json:"correction_lines,omitempty"`
+	Budget     int                     `json:"correction_budget,omitempty"`
+	Validation map[string]review.Check `json:"validation,omitempty"`
 	// FollowUps are findings left for later: pre-existing ones, and those
 	// the developer accepted (escalated or regressed).
 	FollowUps []review.Finding `json:"follow_ups,omitempty"`
 	Done      bool             `json:"done,omitempty"`
-}
-
-// Check is the outcome of checking one finding again.
-type Check struct {
-	Status string `json:"status"`
-	Reason string `json:"reason,omitempty"`
 }
 
 // Checkpoint records one completed step for the audit trail.
@@ -462,6 +456,20 @@ func (s *State) AddFiles(paths ...string) {
 }
 
 // Record appends a checkpoint for the current scenario and phase.
+// Adopt takes over scenario i as another state left it (a scenario run on
+// its own, in a sandbox): everything it learned and its checkpoints, but
+// not done nor committed until this state closes it.
+func (s *State) Adopt(other *State, i int) {
+	ref := other.Scenarios[i]
+	ref.Done, ref.Commit = false, ""
+	s.Scenarios[i] = ref
+	for _, c := range other.Checkpoints {
+		if c.Scenario == ref.Index {
+			s.Checkpoints = append(s.Checkpoints, c)
+		}
+	}
+}
+
 func (s *State) Record(step, status, details string, now time.Time) {
 	s.Checkpoints = append(s.Checkpoints, Checkpoint{
 		At:       now,

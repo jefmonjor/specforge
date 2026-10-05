@@ -65,7 +65,7 @@ func TestDisjointScenariosRunSideBySide(t *testing.T) {
 	if got := st.Scenarios[1].Files; strings.Join(got, ",") != "expiry.go,expiry_test.go" {
 		t.Fatalf("each scenario keeps its own files: %v", got)
 	}
-	if lastGates(st, 1) == "" {
+	if lastGates(st, 1) == "" || lastGates(st, 2) == "" {
 		t.Fatalf("the sandbox's REFACTOR, with its gates, is in the project's record: %+v", st.Checkpoints)
 	}
 }
@@ -142,11 +142,26 @@ func TestAStoppedScenarioRecordsItsEscalationOnce(t *testing.T) {
 	}
 }
 
-func TestWithoutEntriesKeepsTheOtherDecisions(t *testing.T) {
-	log := "### t · RISK · scenario 2\n\n- **Answer:** high\n\n" +
-		"### t · GREEN · scenario 2\n\n- **Answer:** UTC\n\n" +
-		"### t · RISK\n\n- **Answer:** high\n"
-	if got := withoutEntries(log, OriginRisk); got != "### t · GREEN · scenario 2\n\n- **Answer:** UTC\n\n" {
-		t.Fatalf("got %q", got)
+func TestEveryScenarioOfABatchBringsItsDecisions(t *testing.T) {
+	h := parallelHarness(t)
+	// Both scenarios ask in their sandbox and get an answer: the second to
+	// come back must not lose its decision to the first one's.
+	asks := func(marker, test, impl, question string) []reply {
+		happy := happyScenario(marker, test, impl)
+		return []reply{happy[0], ask(question), happy[1]}
+	}
+	h.agent.byScenario = map[int][]reply{
+		1: asks("SDD_0001_001", test1, "reset.go", "Which mailer?"),
+		2: asks("SDD_0001_002", test2, "expiry.go", "Which clock?"),
+	}
+	h.prompter.answers = []string{"a", "a"}
+	if _, err := h.run(inParallel); err != nil {
+		t.Fatalf("Run: %v (skipped: %v)", err, h.events.skipped)
+	}
+	log := h.p.read("specs/0001-reset/decisions.md")
+	for _, q := range []string{"Which mailer?", "Which clock?"} {
+		if n := strings.Count(log, q); n != 1 {
+			t.Fatalf("%q recorded %d times:\n%s", q, n, log)
+		}
 	}
 }

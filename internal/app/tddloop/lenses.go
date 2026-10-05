@@ -93,7 +93,7 @@ func (s *Service) runLenses(ctx context.Context, r *run, sc tdd.ScenarioRef) (*t
 	}
 	lenses := r.o.Lenses
 	if r.o.LensesAuto {
-		lenses = review.Select(a.Tier, r.st.FilesWritten, r.o.Risk.Sensitive, func(p string) bool { return !r.o.Risk.Documentation(p) })
+		lenses = review.Select(a.Tier, r.st.FilesWritten, r.o.Risk)
 	}
 	if len(lenses) == 0 {
 		r.st.Record("review", "no lens", "risk "+string(a.Tier), s.d.Now())
@@ -121,13 +121,11 @@ func (s *Service) runLenses(ctx context.Context, r *run, sc tdd.ScenarioRef) (*t
 func (s *Service) settleEscalated(ctx context.Context, r *run, sc tdd.ScenarioRef, rec *tdd.ReviewRecord) error {
 	for len(rec.Verdict.Escalated) > 0 {
 		f := rec.Verdict.Escalated[0]
-		q := question(r.o.Language, "escalated")
-		text := fmt.Sprintf(q.text, sc.Index, f.ID, f.Location.Path, f.Location.Line, f.Claim)
-		answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginReview), ports.Question{Text: text, Options: q.options, Strict: true})
+		picked, err := s.choose(ctx, r, sc, OriginReview, "escalated", f.ID, f.Location.Path, f.Location.Line, f.Claim)
 		if err != nil {
 			return err
 		}
-		switch pick(answer, q.options) {
+		switch picked {
 		case 0:
 			rec.FollowUps = append(rec.FollowUps, f)
 		case 1:
@@ -205,12 +203,11 @@ func (s *Service) reopen(ctx context.Context, r *run, sc tdd.ScenarioRef, size, 
 }
 
 func (s *Service) acceptOverBudget(ctx context.Context, r *run, sc tdd.ScenarioRef, size, budget int) error {
-	q := question(r.o.Language, "budget")
-	answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginReview), ports.Question{Text: fmt.Sprintf(q.text, sc.Index, size, budget), Options: q.options, Strict: true})
+	picked, err := s.choose(ctx, r, sc, OriginReview, "budget", size, budget)
 	if err != nil {
 		return err
 	}
-	if pick(answer, q.options) != 0 {
+	if picked != 0 {
 		return fmt.Errorf("%w: the correction changed %d lines, over its budget of %d", ErrReviewStopped, size, budget)
 	}
 	return nil
@@ -228,10 +225,7 @@ func (s *Service) validate(ctx context.Context, r *run, sc tdd.ScenarioRef, rec 
 	if err != nil {
 		return err
 	}
-	rec.Validation = map[string]tdd.Check{}
-	for id, v := range results {
-		rec.Validation[id] = tdd.Check{Status: v.Status, Reason: v.Reason}
-	}
+	rec.Validation = results
 	if err := s.keep(r, sc, rec); err != nil {
 		return err
 	}
@@ -240,12 +234,11 @@ func (s *Service) validate(ctx context.Context, r *run, sc tdd.ScenarioRef, rec 
 		if v.Status == "resolved" || slices.ContainsFunc(rec.FollowUps, func(x review.Finding) bool { return x.ID == f.ID }) {
 			continue
 		}
-		q := question(r.o.Language, "regression")
-		answer, err := s.d.Asker.Ask(ctx, s.originAs(r, sc, OriginReview), ports.Question{Text: fmt.Sprintf(q.text, sc.Index, f.ID, v.Reason), Options: q.options, Strict: true})
+		picked, err := s.choose(ctx, r, sc, OriginReview, "regression", f.ID, v.Reason)
 		if err != nil {
 			return err
 		}
-		if pick(answer, q.options) != 0 {
+		if picked != 0 {
 			return fmt.Errorf("%w (%s not resolved)", ErrReviewStopped, f.ID)
 		}
 		rec.FollowUps = append(rec.FollowUps, f)
@@ -257,12 +250,7 @@ func (s *Service) validate(ctx context.Context, r *run, sc tdd.ScenarioRef, rec 
 }
 
 func (s *Service) reviewRequest(r *run, sc tdd.ScenarioRef, lenses []review.Lens, diff string) reviewer.Request {
-	var source string
-	for _, d := range r.doc.Scenarios {
-		if d.Index == sc.Index {
-			source = d.Source
-		}
-	}
+	source := r.docScenario(sc).Source
 	return reviewer.Request{
 		Root: r.o.Root, Language: r.o.Language, Stack: r.o.Profile.Name(), Lenses: lenses, Diff: diff,
 		SpecTitle: r.doc.Title, Marker: sc.Marker, Scenario: source,
@@ -303,12 +291,18 @@ func (s *Service) contents(r *run, paths []string) map[string][]byte {
 
 // keep saves the review record next to the specification and the state.
 func (s *Service) keep(r *run, sc tdd.ScenarioRef, rec *tdd.ReviewRecord) error {
+	return s.keepRecord(r, r.lay.ReviewRecord(r.o.SpecPath, sc.Marker), rec)
+}
+
+// keepRecord writes a scenario's record next to the specification, where
+// the commit and the delivery find it, and saves the loop state.
+func (s *Service) keepRecord(r *run, path string, rec any) error {
 	data, err := json.MarshalIndent(rec, "", "  ")
 	if err != nil {
 		return err
 	}
-	if err := s.d.Files.WriteFile(r.lay.ReviewRecord(r.o.SpecPath, sc.Marker), append(data, '\n')); err != nil {
-		return fmt.Errorf("saving the review of %s: %w", sc.Marker, err)
+	if err := s.d.Files.WriteFile(path, append(data, '\n')); err != nil {
+		return fmt.Errorf("saving %s: %w", r.lay.Rel(path), err)
 	}
 	return s.save(r)
 }

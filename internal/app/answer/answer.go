@@ -60,11 +60,15 @@ func Load(path string) (*Schema, error) {
 // reports whether there was one.
 func (s *Schema) Decode(text string, v any) bool {
 	for _, c := range jsontext.Candidates(text) {
-		inst, err := jsonschema.UnmarshalJSON(bytes.NewReader([]byte(c)))
-		if err != nil || s.schema.Validate(inst) != nil {
-			continue
+		if s.Valid([]byte(c)) {
+			return json.Unmarshal([]byte(c), v) == nil
 		}
-		return json.Unmarshal([]byte(c), v) == nil
 	}
 	return false
+}
+
+// Valid reports whether raw is JSON that the schema accepts.
+func (s *Schema) Valid(raw []byte) bool {
+	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	return err == nil && s.schema.Validate(inst) == nil
 }

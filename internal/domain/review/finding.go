@@ -206,3 +206,10 @@ func CorrectionBudget(authoredLines int) int {
 	budget := (authoredLines + 1) / 2
 	return max(min(budget, 200), 1)
 }
+
+// Check is the verdict on one corrected finding, checked again against the
+// code as it is now.
+type Check struct {
+	Status string `json:"status"` // resolved | regression
+	Reason string `json:"reason,omitempty"`
+}

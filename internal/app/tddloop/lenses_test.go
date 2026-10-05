@@ -15,7 +15,7 @@ import (
 // fakeReviewer answers with scripted verdicts.
 type fakeReviewer struct {
 	verdict    review.Verdict
-	validation map[string]reviewer.Validation
+	validation map[string]review.Check
 	reviews    []reviewer.Request
 	validated  [][]review.Finding
 }
@@ -25,7 +25,7 @@ func (f *fakeReviewer) Review(_ context.Context, req reviewer.Request) (reviewer
 	return reviewer.Result{Lenses: req.Lenses, Reported: len(f.verdict.Blocking) + len(f.verdict.Escalated), Verdict: f.verdict}, nil
 }
 
-func (f *fakeReviewer) Validate(_ context.Context, _ reviewer.Request, fixed []review.Finding) (map[string]reviewer.Validation, error) {
+func (f *fakeReviewer) Validate(_ context.Context, _ reviewer.Request, fixed []review.Finding) (map[string]review.Check, error) {
 	f.validated = append(f.validated, fixed)
 	return f.validation, nil
 }
@@ -67,7 +67,7 @@ func TestABlockingFindingGetsOneCorrectionThenValidation(t *testing.T) {
 	h := newHarness(t, specBody)
 	f := &fakeReviewer{
 		verdict:    review.Verdict{Blocking: []review.Finding{negativeNet}},
-		validation: map[string]reviewer.Validation{"REL-001": {Status: "resolved", Reason: "clamped"}},
+		validation: map[string]review.Check{"REL-001": {Status: "resolved", Reason: "clamped"}},
 	}
 	withReviewer(h, f)
 	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"),
@@ -99,7 +99,7 @@ func TestARegressionGoesToTheDeveloper(t *testing.T) {
 	h := newHarness(t, specBody)
 	f := &fakeReviewer{
 		verdict:    review.Verdict{Blocking: []review.Finding{negativeNet}},
-		validation: map[string]reviewer.Validation{"REL-001": {Status: "regression", Reason: "still negative for refunds."}},
+		validation: map[string]review.Check{"REL-001": {Status: "regression", Reason: "still negative for refunds."}},
 	}
 	withReviewer(h, f)
 	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"), writes(map[string]string{"reset.go": "package m\n// try\n"}))

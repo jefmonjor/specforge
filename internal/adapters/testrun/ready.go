@@ -2,9 +2,6 @@ package testrun
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 
 	"specforge/internal/adapters/process"
@@ -56,12 +53,7 @@ func wrapperOrPath(root, wrapper, tool, hint string) ports.Readiness {
 }
 
 func local(root, tool, hint string) ports.Readiness {
-	name := tool
-	if runtime.GOOS == "windows" {
-		name += ".cmd"
-	}
-	p := filepath.Join(root, "node_modules", ".bin", name)
-	if _, err := os.Stat(p); err == nil {
+	if p, ok := process.NodeBin(root, tool); ok {
 		return ports.Readiness{Ready: true, Detail: p}
 	}
 	return ports.Readiness{Detail: tool + " is not installed in the project", Hint: hint + " (then npm install)"}
