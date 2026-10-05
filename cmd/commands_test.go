@@ -220,10 +220,18 @@ func TestSpecClarifyThenApproveShowsTheDelta(t *testing.T) {
 	h.write("specs/0001-reset.md", readySpec+"\n- [NEEDS CLARIFICATION]: Which channel?\n")
 	h.expect(0, "init", "--agent", "claude", "--language", "en")
 	h.expect(5, "spec", "clarify", "--by", "Ana")
+	if len(h.agent.prompts) != 0 {
+		t.Fatal("with questions left, the agent is not called yet")
+	}
+	// Once answered, the agent writes the decision into the scenario.
+	h.agent.rules = []rule{{when: "# Task: CHANGE", reply: "```json\n{\"status\":\"done\",\"files_written\":[\"specs/0001-reset.md\"],\"unknowns\":[]}\n```"}}
 	h.tty, h.stdin = true, "email\n"
 	h.expect(0, "spec", "clarify", "--by", "Ana")
 	if !strings.Contains(h.read("specs/0001-reset.md"), "**Decided:** Which channel? → email") {
 		t.Fatalf("spec:\n%s", h.read("specs/0001-reset.md"))
+	}
+	if len(h.agent.prompts) != 1 || !strings.Contains(h.agent.prompts[0], "Write every decision") || !strings.Contains(h.agent.prompts[0], "Which channel? → email") {
+		t.Fatalf("the agent applies the decisions: %d prompt(s)", len(h.agent.prompts))
 	}
 	h.tty = false
 	h.expect(0, "spec", "approve", "--by", "Ana")

@@ -356,13 +356,19 @@ func (e *PlanEvents) Done() {
 type InterviewEvents struct {
 	C     *Console
 	Agent string
+	// Phase names the work in progress ("INTERVIEW" when empty).
+	Phase string
 	stop  func()
 }
 
 func (e *InterviewEvents) Working() {
 	e.Done()
 	if !e.C.Quiet {
-		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, "INTERVIEW"))
+		phase := e.Phase
+		if phase == "" {
+			phase = "INTERVIEW"
+		}
+		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, phase))
 	}
 }
 

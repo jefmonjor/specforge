@@ -27,7 +27,9 @@ type Ledger struct {
 type LedgerEntry struct {
 	Marker string `json:"marker"`
 	Title  string `json:"title"`
-	// Fingerprint covers the scenario and the invariants it names.
+	// Fingerprint covers the scenario's steps and the invariants it
+	// names. A ledger started from an older loop holds that loop's
+	// fingerprint instead, as LegacyPrefix + the scenario's text hash.
 	Fingerprint string `json:"fingerprint"`
 	// Steps covers the steps alone: same steps under a new title is a
 	// rename.
@@ -37,6 +39,10 @@ type LedgerEntry struct {
 	Previous string `json:"previous,omitempty"`
 	Removed  bool   `json:"removed,omitempty"`
 }
+
+// LegacyPrefix marks a fingerprint an older SpecForge recorded: a hash of
+// the scenario's text (Scenario.Fingerprint).
+const LegacyPrefix = "legacy:"
 
 // Change is how a scenario changed between two approvals.
 type Change string
@@ -100,7 +106,7 @@ func Assign(l Ledger, specID, markdown string, doc *Document) (Ledger, []Scenari
 		entries[i].Marker = old.Marker
 		changes[i].Change = Unchanged
 		entries[i].Previous = old.Previous
-		if old.Fingerprint != entries[i].Fingerprint {
+		if old.Fingerprint != entries[i].Fingerprint && old.Fingerprint != LegacyPrefix+sc.Fingerprint() {
 			changes[i].Change, entries[i].Previous = Modified, old.Source
 		}
 	}

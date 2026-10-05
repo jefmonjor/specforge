@@ -155,6 +155,14 @@ func TestADoneScenarioWhoseContentChangedIsAmended(t *testing.T) {
 	}
 }
 
+func TestAnUnfinishedUnchangedScenarioIsNotAmended(t *testing.T) {
+	old := NewState("s.md", "0001", "h1", []ScenarioRef{{Index: 1, Title: "a", Marker: "M1", Fingerprint: "fa", Files: []string{"a_test.go"}}}, t0)
+	amended := NewState("s.md", "0001", "h2", []ScenarioRef{{Index: 1, Title: "a", Marker: "M1", Fingerprint: "fa"}}, t0)
+	if pending := amended.Carry(old, t0, sameFingerprint); len(pending) != 1 || amended.Scenarios[0].Amended {
+		t.Fatalf("pending=%v %+v", pending, amended.Scenarios[0])
+	}
+}
+
 func TestCheckpointsFollowTheMarker(t *testing.T) {
 	s := NewState("s.md", "0001", "h", []ScenarioRef{{Index: 1, Marker: "M1"}, {Index: 2, Marker: "M2"}}, t0)
 	s.Record("refactor", "accepted", "lint ✓", t0)

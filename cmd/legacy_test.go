@@ -48,6 +48,8 @@ func TestLegacyRewriteFromScanToApproval(t *testing.T) {
 	if strings.Contains(h.out.String(), "0002") {
 		t.Fatalf("a second specification was created:\n%s", h.out)
 	}
+	// The decision goes into the scenarios it affects.
+	h.agent.rules = append([]rule{{when: "# Task: CHANGE", reply: "```json\n{\"status\":\"done\",\"files_written\":[],\"unknowns\":[]}\n```"}}, h.agent.rules...)
 	h.tty, h.stdin = true, "Yes, payroll rounds down\n"
 	h.expect(0, "spec", "clarify")
 	h.expect(0, "spec", "approve", "--by", "Ana")

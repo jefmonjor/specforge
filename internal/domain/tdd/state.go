@@ -244,7 +244,7 @@ func (s *State) Carry(old *State, now time.Time, same func(old, cur ScenarioRef)
 			p.Index, p.Title, p.Fingerprint = cur.Index, cur.Title, cur.Fingerprint
 			*cur = p
 			continue
-		case ok && (p.Done || len(p.Files) > 0):
+		case ok && (p.Done || len(p.Files) > 0) && !same(p, *cur):
 			cur.Amended = true
 		}
 		pending = append(pending, cur.Title)

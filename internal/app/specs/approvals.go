@@ -100,7 +100,7 @@ func (s Service) ledger(e Entry) (spec.Ledger, error) {
 	}
 	for _, sc := range st.Scenarios {
 		if sc.Marker != "" && !slices.ContainsFunc(l.Scenarios, func(x spec.LedgerEntry) bool { return x.Title == sc.Title }) {
-			l.Scenarios = append(l.Scenarios, spec.LedgerEntry{Marker: sc.Marker, Title: sc.Title})
+			l.Scenarios = append(l.Scenarios, spec.LedgerEntry{Marker: sc.Marker, Title: sc.Title, Fingerprint: spec.LegacyPrefix + sc.Fingerprint})
 		}
 	}
 	return l, nil

@@ -3,6 +3,7 @@ package specs
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -262,5 +263,30 @@ func TestApprovalHistoryRecordsTheDeltaByMarker(t *testing.T) {
 	l, err := ReadLedger(s.Files, s.Layout, e.Path)
 	if err != nil || len(l.Active()) != 2 || l.Next != 3 {
 		t.Fatalf("ledger %+v %v", l, err)
+	}
+}
+
+// A specification approved before the ledger existed starts from its
+// loop's markers: an unchanged scenario is not reported as modified.
+func TestTheFirstLedgerStartsFromTheLoop(t *testing.T) {
+	s, root := newService(t, "en")
+	write(t, root, "specs/0001-reset.md", ready)
+	e, _ := s.Resolve("1")
+	data, _ := os.ReadFile(e.Path)
+	doc, _ := spec.Parse(string(data), spec.ParseOptions{})
+	state := fmt.Sprintf(`{"version":3,"scenarios":[{"index":1,"title":"Link","marker":"SDD_0001_001","fingerprint":%q,"done":true}]}`, doc.Scenarios[0].Fingerprint())
+	write(t, root, ".specforge/state/0001-reset.json", state)
+	edited := strings.Replace(string(data), "  Scenario: Link", "  Scenario: Expired\n    When it is opened late\n    Then it fails\n\n  Scenario: Link", 1)
+	write(t, root, "specs/0001-reset.md", edited)
+	got, err := s.Preview(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byTitle := map[string]spec.ScenarioChange{}
+	for _, c := range got {
+		byTitle[c.Title] = c
+	}
+	if byTitle["Link"].Change != spec.Unchanged || byTitle["Link"].Marker != "SDD_0001_001" || byTitle["Expired"].Marker != "SDD_0001_002" {
+		t.Fatalf("%+v", got)
 	}
 }

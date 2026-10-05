@@ -191,7 +191,10 @@ question. Approving an edited specification again accepts the change.`,
 }
 
 func (a *App) specClarifyCommand() *cobra.Command {
-	var by string
+	var (
+		by      string
+		noApply bool
+	)
 	c := &cobra.Command{
 		Use:   "clarify [spec]",
 		Short: "Answer the open questions of a specification, one at a time",
@@ -199,7 +202,12 @@ func (a *App) specClarifyCommand() *cobra.Command {
 answer in place of its question ("- **Decided:** question → answer"), so the
 specification says what was decided. The answers also go to the decisions
 log. Without a terminal the questions go to questions.md (exit 5): answer
-them there and run clarify again.`,
+them there and run clarify again.
+
+A decision usually changes more than its line: a message, a limit, a
+behaviour. Once every question is answered, your agent writes the decisions
+into every section they affect (scenarios, data contracts, errors), as spec
+change does, asking if one is unclear; --no-apply leaves that to you.`,
 		Example: "  specforge spec clarify 0001",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -225,11 +233,19 @@ them there and run clarify again.`,
 			if err != nil {
 				return err
 			}
+			if n > 0 && !noApply {
+				if p.settings.Agent == "" {
+					con.Warn(con.T("spec.clarified.manual", e.ID))
+				} else if err := a.runChange(ctx, p, e, applyDecisions); err != nil {
+					return err
+				}
+			}
 			con.Info(con.T("spec.next.clarified", e.ID))
 			return nil
 		},
 	}
 	c.Flags().StringVar(&by, "by", "", "name recorded with each decision (default: git user.name)")
+	c.Flags().BoolVar(&noApply, "no-apply", false, "only record the decisions; do not have the agent write them into the other sections")
 	return c
 }
 
@@ -461,44 +477,11 @@ and run the same change again.`,
 			if request == "" {
 				return errors.New("say what to change: specforge spec change <spec> \"<request>\"")
 			}
-			proc := a.NewProcess(a.log)
-			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
-			if err != nil {
-				return err
-			}
 			con := a.console()
 			con.Title(con.T("change.title", e.Title))
-			events := &ui.InterviewEvents{C: con, Agent: ag.Name()}
-			defer events.Done()
-			files := fsys.OS{}
-			res, err := interview.Run(ctx, interview.Deps{
-				Agent:     ag,
-				Workspace: workspace.New(proc),
-				Files:     files,
-				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
-				Events:    events,
-				Log:       a.log,
-				Now:       a.Now,
-			}, interview.Options{
-				Root: p.root, SpecPath: e.Path, Language: p.settings.Language, Model: p.settings.ModelFor("interview"),
-				AgentTimeout: p.settings.AgentTimeout, Request: request,
-			})
-			events.Done()
-			if err != nil {
+			if err := a.runChange(ctx, p, e, request); err != nil {
 				return err
 			}
-			if !res.Changed {
-				con.OK(con.T("change.none", e.Rel))
-				return nil
-			}
-			con.OK(con.T("change.done", e.Rel))
-			if preview, err := p.specs(a).Preview(e); err == nil {
-				a.printDelta(preview)
-			}
-			if len(res.Open) > 0 {
-				con.Warn(con.T("interview.open", len(res.Open), e.ID))
-			}
-			a.printAdvice(res.Advice)
 			con.Info(con.T("change.next", e.ID))
 			return nil
 		},
@@ -507,3 +490,52 @@ and run the same change again.`,
 	c.Flags().StringVar(&o.Model, "model", "", "model passed to the agent")
 	return c
 }
+
+// runChange applies a change request to a specification with the agent,
+// in a conversation, and shows what the next approval will record.
+func (a *App) runChange(ctx context.Context, p project, e specs.Entry, request string) error {
+	proc := a.NewProcess(a.log)
+	ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
+	if err != nil {
+		return err
+	}
+	con := a.console()
+	events := &ui.InterviewEvents{C: con, Agent: ag.Name(), Phase: "CHANGE"}
+	defer events.Done()
+	files := fsys.OS{}
+	res, err := interview.Run(ctx, interview.Deps{
+		Agent:     ag,
+		Workspace: workspace.New(proc),
+		Files:     files,
+		Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
+		Events:    events,
+		Log:       a.log,
+		Now:       a.Now,
+	}, interview.Options{
+		Root: p.root, SpecPath: e.Path, Language: p.settings.Language, Model: p.settings.ModelFor("interview"),
+		AgentTimeout: p.settings.AgentTimeout, Request: request,
+	})
+	events.Done()
+	if err != nil {
+		return err
+	}
+	if !res.Changed {
+		con.OK(con.T("change.none", e.Rel))
+		return nil
+	}
+	con.OK(con.T("change.done", e.Rel))
+	if preview, err := p.specs(a).Preview(e); err == nil {
+		a.printDelta(preview)
+	}
+	if len(res.Open) > 0 {
+		con.Warn(con.T("interview.open", len(res.Open), e.ID))
+	}
+	a.printAdvice(res.Advice)
+	return nil
+}
+
+// applyDecisions is the change request that writes the decisions clarify
+// recorded into the rest of the specification.
+const applyDecisions = "Write every decision of the open questions section (the lines \"**Decided:**\") into every section it affects: " +
+	"scenarios, invariants, data contracts, errors, out of scope. Change the scenarios a decision changes and add one where a decision sets a new behaviour. " +
+	"Leave the decided lines where they are and change nothing else."
