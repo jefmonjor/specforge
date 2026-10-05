@@ -11,6 +11,8 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
+	"runtime"
 	"path/filepath"
 	"strings"
 
@@ -166,6 +168,13 @@ func link(root, dst string) error {
 			continue
 		}
 		if err := os.Symlink(src, target); err != nil {
+			if runtime.GOOS == "windows" {
+				c := exec.Command("cmd", "/c", "mklink", "/J", target, src)
+				if c.Run() == nil {
+					continue
+				}
+				continue
+			}
 			return fmt.Errorf("linking %s into the copy: %w", name, err)
 		}
 	}

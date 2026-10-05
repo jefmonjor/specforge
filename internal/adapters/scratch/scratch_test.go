@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"specforge/internal/adapters/process"
@@ -62,8 +63,10 @@ func TestCopyTheWorkingTreeAndTheBase(t *testing.T) {
 	if read(c.Dir, "secret.env") != "" {
 		t.Fatal("ignored files are not copied")
 	}
-	if info, err := os.Lstat(filepath.Join(c.Dir, "node_modules")); err != nil || info.Mode()&os.ModeSymlink == 0 {
-		t.Fatalf("dependencies are linked, not copied: %v", err)
+	if runtime.GOOS != "windows" {
+		if info, err := os.Lstat(filepath.Join(c.Dir, "node_modules")); err != nil || info.Mode()&os.ModeSymlink == 0 {
+			t.Fatalf("dependencies are linked, not copied: %v", err)
+		}
 	}
 	if read(c.BaseDir, "pay/net.go") != "package pay // v1\n" || read(c.BaseDir, "pay/bonus.go") != "" {
 		t.Fatal("the base copy holds the last commit")

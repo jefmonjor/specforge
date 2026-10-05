@@ -3,6 +3,7 @@ package tddloop
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -126,7 +127,7 @@ func TestFeatureVerificationRunsOnceAtTheEnd(t *testing.T) {
 	if !errors.As(err, &blocked) || len(f.requests) != 1 || strings.Join(f.requests[0].Required, ",") != "INV-01,INV-02,SDD_0001_001,SDD_0001_002" {
 		t.Fatalf("err=%v requests=%+v", err, f.requests)
 	}
-	if !strings.HasSuffix(f.requests[0].Report, "verify/feature.json") {
+	if !strings.HasSuffix(filepath.ToSlash(f.requests[0].Report), "verify/feature.json") {
 		t.Fatalf("report = %s", f.requests[0].Report)
 	}
 }
