@@ -104,7 +104,8 @@ func (s *Service) runChild(ctx context.Context, r *run, i int, asked ports.Promp
 	}
 	d := s.d
 	d.Asker = &clarify.Asker{Prompter: asked, Files: s.d.Asker.Files, Now: s.d.Asker.Now, Lang: s.d.Asker.Lang}
-	d.Events, d.Scratch = events, nil
+	// A sandbox is disposable: no checkpoints there.
+	d.Events, d.Scratch, d.Checkpoints = events, nil, nil
 	o := r.o
 	o.Root = c.box.Dir
 	o.SpecPath = filepath.Join(c.box.Dir, filepath.FromSlash(r.lay.Rel(r.o.SpecPath)))
@@ -346,7 +347,7 @@ func (s *Service) closeArrival(ctx context.Context, r *run, a arrival) error {
 	ref := r.st.Scenarios[a.index]
 	r.st.Record("parallel", "integrated", joinPaths(ref.Files), s.d.Now())
 	s.d.Events.Integrated(ref)
-	return s.close(ctx, r, ref, lastGates(r.st, ref.Index))
+	return s.close(ctx, r, ref, lastGates(r.st, ref))
 }
 
 // lockedPrompter lets one scenario of a batch ask at a time.
@@ -376,6 +377,7 @@ func (q *quietEvents) do(f func()) {
 
 func (q *quietEvents) Started(*tdd.State, *spec.Document) {}
 func (q *quietEvents) Amended([]string)                   {}
+func (q *quietEvents) Orphaned([]string)                  {}
 func (q *quietEvents) Baseline(*tdd.Baseline, bool)       {}
 func (q *quietEvents) Finished(*tdd.State)                {}
 func (q *quietEvents) Phase(st *tdd.State, sc tdd.ScenarioRef) {

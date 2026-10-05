@@ -59,6 +59,9 @@ type ScenarioRef struct {
 	Review *ReviewRecord `json:"review,omitempty"`
 	// Verify is the independent verification of the scenario.
 	Verify *VerifyRecord `json:"verify,omitempty"`
+	// Amended marks a scenario redone because the specification changed
+	// it after it was implemented: its test exists and must be updated.
+	Amended bool `json:"amended,omitempty"`
 }
 
 // VerifyRecord is the independent verification of one scenario and what
@@ -99,12 +102,24 @@ type ReviewRecord struct {
 
 // Checkpoint records one completed step for the audit trail.
 type Checkpoint struct {
-	At       time.Time `json:"at"`
-	Scenario int       `json:"scenario"`
-	Phase    Phase     `json:"phase"`
-	Step     string    `json:"step"`
-	Status   string    `json:"status"`
-	Details  string    `json:"details,omitempty"`
+	At time.Time `json:"at"`
+	// Scenario is the scenario's position when it was recorded; Marker
+	// its identity, which positions do not change.
+	Scenario int    `json:"scenario"`
+	Marker   string `json:"marker,omitempty"`
+	Phase    Phase  `json:"phase"`
+	Step     string `json:"step"`
+	Status   string `json:"status"`
+	Details  string `json:"details,omitempty"`
+}
+
+// About reports whether the checkpoint is about scenario ref: by marker,
+// or by position for a checkpoint recorded before markers were kept.
+func (c Checkpoint) About(ref ScenarioRef) bool {
+	if c.Marker != "" {
+		return c.Marker == ref.Marker
+	}
+	return c.Scenario == ref.Index
 }
 
 // PendingKind says what a pending question interrupted.
@@ -207,27 +222,32 @@ func NewState(specPath, specID, specHash string, scenarios []ScenarioRef, now ti
 	return s
 }
 
-// Carry adopts the progress of old after the specification was amended:
-// scenarios whose content is unchanged (same fingerprint) keep their done
-// and satisfied flags, everything else starts from RED. It returns the
-// titles of the scenarios that still need work.
-func (s *State) Carry(old *State, now time.Time) []string {
-	done := map[string]ScenarioRef{}
+// Carry adopts the progress of old after the specification was amended.
+// Scenarios are matched by marker, which moving, inserting or removing
+// others does not change. A done scenario whose content is unchanged
+// keeps everything (done, files, commit, risk, review, verification); one
+// whose content changed is marked Amended and starts from RED. same
+// compares an old and a new fingerprint (a fingerprint from an older
+// SpecForge included). It returns the titles of the scenarios that still
+// need work.
+func (s *State) Carry(old *State, now time.Time, same func(old, cur ScenarioRef) bool) []string {
+	prev := map[string]ScenarioRef{}
 	for _, sc := range old.Scenarios {
-		if sc.Done {
-			done[sc.Fingerprint] = sc
-		}
+		prev[sc.Marker] = sc
 	}
 	var pending []string
 	for i := range s.Scenarios {
-		if prev, ok := done[s.Scenarios[i].Fingerprint]; ok {
-			s.Scenarios[i].Done = true
-			s.Scenarios[i].Satisfied = prev.Satisfied
-			s.Scenarios[i].Files = prev.Files
-			s.Scenarios[i].Commit = prev.Commit
+		cur := &s.Scenarios[i]
+		p, ok := prev[cur.Marker]
+		switch {
+		case ok && p.Done && same(p, *cur):
+			p.Index, p.Title, p.Fingerprint = cur.Index, cur.Title, cur.Fingerprint
+			*cur = p
 			continue
+		case ok && (p.Done || len(p.Files) > 0) && !same(p, *cur):
+			cur.Amended = true
 		}
-		pending = append(pending, s.Scenarios[i].Title)
+		pending = append(pending, cur.Title)
 	}
 	s.Checkpoints = append(old.Checkpoints, s.Checkpoints...)
 	s.Baseline = old.Baseline
@@ -455,7 +475,6 @@ func (s *State) AddFiles(paths ...string) {
 	}
 }
 
-// Record appends a checkpoint for the current scenario and phase.
 // Adopt takes over scenario i as another state left it (a scenario run on
 // its own, in a sandbox): everything it learned and its checkpoints, but
 // not done nor committed until this state closes it.
@@ -464,20 +483,25 @@ func (s *State) Adopt(other *State, i int) {
 	ref.Done, ref.Commit = false, ""
 	s.Scenarios[i] = ref
 	for _, c := range other.Checkpoints {
-		if c.Scenario == ref.Index {
+		if c.About(ref) {
 			s.Checkpoints = append(s.Checkpoints, c)
 		}
 	}
 }
 
+// Record appends a checkpoint for the current scenario and phase.
 func (s *State) Record(step, status, details string, now time.Time) {
-	s.Checkpoints = append(s.Checkpoints, Checkpoint{
+	c := Checkpoint{
 		At:       now,
 		Scenario: s.Current + 1,
 		Phase:    s.Phase,
 		Step:     step,
 		Status:   status,
 		Details:  details,
-	})
+	}
+	if sc, ok := s.Scenario(); ok {
+		c.Marker = sc.Marker
+	}
+	s.Checkpoints = append(s.Checkpoints, c)
 	s.UpdatedAt = now
 }

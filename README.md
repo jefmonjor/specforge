@@ -32,7 +32,7 @@
 - 🧪 **Real tests, real results.** A RED test must compile and fail; GREEN may not touch it. Tests that were already broken are named, kept apart and never blamed on the agent.
 - ⚖️ **Review in proportion, every finding proved.** A change's risk comes from what git says it touched. Review lenses scale with it, and a finding that does not point at a changed line is discarded.
 - 🔍 **An independent verifier.** For risky work, a second agent probes the specification itself in a copy of your project, and every failure comes with the command that reproduces it.
-- 🛡 **A guard on the agent's shell.** `git reset --hard`, `rm -rf`, `DROP TABLE` and friends are blocked before they run.
+- 🛡 **A guard on the agent's shell, and a way back.** `git reset --hard`, `rm -rf`, `DROP TABLE` and friends are blocked before they run, in the command and in the scripts, files and package scripts it runs. The loop checkpoints your work before every agent turn; `specforge restore` brings it back.
 - 🏛 **Legacy rewrites without invention.** The old code is read-only and every source the agent cites is opened.
 - 📦 **Traceable hand-over.** Each scenario is linked to its test, its commit, its gates, its risk and its review.
 
@@ -222,7 +222,7 @@ The agent's claims are checked against the disk: the files it says it wrote, the
 Everything lives in your repository, next to your code (`0001-slug` stands for each specification's number and name). The files you work in:
 
 - 📝 **The specification** · `specs/0001-slug.md`<br>
-  Edit it freely before approving. To change an approved one, edit it and run `spec approve` again: the loop redoes only the scenarios that changed.
+  Edit it freely before approving. To change an approved one, run `spec change 0001 "<what to change>"` (or edit it) and `spec approve` again: every scenario keeps its marker and its tests, and the loop redoes only what changed.
 - 🗺️ **The plan** · `specs/0001-slug/plan.md`<br>
   After `plan`, edit what you like, then `plan approve`.
 - ❓ **Questions waiting for you** · `specs/0001-slug/questions.md`<br>
@@ -337,9 +337,10 @@ Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.
 | `doctor` | Checks the machine and the project, with install hints. Exit 4 when something required is missing. |
 | `spec new` | A numbered specification from the template. |
 | `spec interview` | Completes it, one question per turn. `--chat` hands the terminal to the agent instead. |
-| `spec clarify` | Asks each open question and writes the decision in its place. |
+| `spec clarify` | Asks each open question, writes the decision in its place, and has the agent apply it everywhere it matters. |
 | `spec lint` | What blocks approval, and advice. |
-| `spec approve` | Review gate: lint, approver, seal, change history. |
+| `spec approve` | Review gate: lint, approver, seal, change history by marker. |
+| `spec change` | Applies a change request to a specification, approved or not, asking what it leaves open. |
 | `spec list` | Number, state and title of each spec. |
 | `spec from-legacy` | A specification drafted from the legacy code. |
 | `legacy scan` | The legacy inventory, measured. |
@@ -349,7 +350,8 @@ Thresholds (duplication 0 %, mutation score 80) and `strict` live in `specforge.
 | `deliver` | The hand-over: report, trace and PR body. `--slices` writes one PR body per proposed slice. |
 | `review` | The review lenses over your whole branch, read-only. A documentation-only branch needs none. |
 | `verify` | The independent verifier over a whole specification. |
-| `guard` | The destructive-command guard, run by your agent's hook. `--selftest` proves it blocks. |
+| `guard` | The destructive-command guard, run by your agent's hook: the command, and the scripts and files it runs. `--selftest` proves it blocks. |
+| `restore` | Lists the checkpoints the loop saves before each agent turn, and brings one back. |
 | `audit` | Adversarial security review of your branch; fails closed. |
 | `e2e` | Checks each scenario in a real Chrome, Chromium or Edge, with a screenshot per step. |
 | `version` | Version, commit and build date. |
@@ -414,6 +416,7 @@ SpecForge 6 keeps the one rule, **verify, don't trust**, and makes the checking 
 - [x] Independent verifier in a copy; destructive-command guard
 - [x] Blind double review; scenarios side by side · [docs/V6_PLAN.md](docs/V6_PLAN.md)
 - [x] Proven end to end with Claude Code: baseline, risk, lenses, two scenarios side by side, the verifier and the guard · [docs/DEMO.md](docs/DEMO.md#8-specforge-6-risk-lenses-verifier-parallel-guard)
+- [x] 6.1: the guard reads what a command runs; checkpoints and `restore`; copies that write each byte once; scenarios keep their marker through any change, and `spec change` applies change requests · [docs/DEMO.md](docs/DEMO.md#9-specforge-61-closing-the-gaps)
 
 The reasoning behind every item is in [docs/IMPROVEMENT_PLAN.md](docs/IMPROVEMENT_PLAN.md). Ideas and bugs are welcome in [Issues](https://github.com/jefmonjor/specforge/issues).
 

@@ -106,3 +106,14 @@ func TestInvariantRefs(t *testing.T) {
 		t.Fatalf("InvariantRefs = %v", got)
 	}
 }
+
+func TestAPlanThatNamesAScenarioNoLongerThereIsOutdated(t *testing.T) {
+	plan := "## Tests per scenario\n| SDD_0001_001 | A | `a_test.go` | TestA |\n| SDD_0001_002 | B | `b_test.go` | TestB |\n"
+	issues := Blocking(LintPlan(plan, []string{"SDD_0001_001"}))
+	if len(issues) != 1 || !strings.Contains(issues[0].Message, "SDD_0001_002 is no longer a scenario") {
+		t.Fatalf("%+v", issues)
+	}
+	if issues := Blocking(LintPlan(plan, []string{"SDD_0001_001", "SDD_0001_002"})); len(issues) != 0 {
+		t.Fatalf("%+v", issues)
+	}
+}

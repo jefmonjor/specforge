@@ -49,7 +49,7 @@ func project(t *testing.T, commits ...string) Options {
 	}
 	st := tdd.State{Version: tdd.StateVersion, SpecPath: "specs/0001-discounts.md"}
 	for i, sc := range doc.Scenarios {
-		st.Scenarios = append(st.Scenarios, tdd.ScenarioRef{Index: sc.Index, Title: sc.Title, Fingerprint: sc.Fingerprint(), Done: true, Commit: commits[i]})
+		st.Scenarios = append(st.Scenarios, tdd.ScenarioRef{Index: sc.Index, Title: sc.Title, Marker: spec.Marker("0001", sc.Index), Fingerprint: sc.Fingerprint(), Done: true, Commit: commits[i]})
 	}
 	data, _ := json.Marshal(st)
 	if err := fsys.WriteAtomic(filepath.Join(root, ".specforge", "state", "0001-discounts.json"), data, 0o644); err != nil {

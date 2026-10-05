@@ -11,6 +11,10 @@ If anything you need is not in the specification, its decisions log (`specs/<spe
 - In GREEN and REFACTOR, never create, edit, rename or delete a test file.
 - Never list a file you did not write.
 
+### Your shell
+- A guard reads every command you run, and the scripts, files and package scripts it runs. Write a script in one step and run it in another, so it can be read; never run in the same command a file you download, decode or copy.
+- Never delete directories recursively, discard uncommitted work or rewrite git history. If a task seems to need it, ask.
+
 ### Craft
 - Write the minimum code that makes the current test pass (YAGNI, KISS); refactor only with the tests green.
 - Keep the domain free of frameworks and I/O; depend on small interfaces defined where they are used.

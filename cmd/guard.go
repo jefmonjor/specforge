@@ -3,6 +3,8 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -36,9 +38,14 @@ guard.mode in specforge.yaml: block (default) | confirm (Claude Code asks
 you; inside the loop nobody can answer, so it blocks) | off. guard.allow
 lists command patterns to let through, * matching anything.
 
-It is lexical recognition, not a sandbox: scripts, programs and variable
-expansions are not inspected. specforge setup installs the hook; doctor
-checks it; --selftest proves it blocks.`,
+It also reads what the command runs: a script (sh x.sh, ./x.sh, source),
+the file given to an interpreter (python x.py, node x.js, go run x.go),
+code given inline (python -c, node -e), an npm/pnpm/yarn/bun script or a
+make target. It is not a sandbox: what a program imports, a compiled
+binary or a variable's value at run time are out of its reach; the loop's
+checkpoints (specforge restore) recover from what gets past it.
+specforge setup installs the hook; doctor checks it; --selftest proves it
+blocks.`,
 		Example: "  specforge guard --hook claude < input.json\n  specforge guard --selftest",
 		Args:    cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
@@ -56,13 +63,17 @@ checks it; --selftest proves it blocks.`,
 			if cfgErr != nil {
 				fmt.Fprintln(a.Err, "SpecForge guard: specforge.yaml is invalid, blocking every destructive command:", cfgErr)
 			}
-			command, err := guardhook.Command(hook, a.In)
+			req, err := guardhook.Command(hook, a.In)
 			if err != nil {
 				// An unreadable request is refused: a guard never fails open.
 				fmt.Fprintln(a.Err, "SpecForge guard:", err)
 				return &exitError{code: 2}
 			}
-			d := guardhook.Decide(command, mode, allow, a.Getenv(guardhook.LoopEnv) == "")
+			if req.Dir == "" {
+				req.Dir, _ = a.Getwd()
+			}
+			read := guardhook.Files(req.Dir, func(p string) (io.ReadCloser, error) { return os.Open(p) })
+			d := guardhook.Decide(req.Command, read, mode, allow, a.Getenv(guardhook.LoopEnv) == "")
 			if code := guardhook.Respond(hook, d, a.Out, a.Err); code != 0 {
 				return &exitError{code: code}
 			}

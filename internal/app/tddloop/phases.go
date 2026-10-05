@@ -542,6 +542,11 @@ func (s *Service) existingRed(ctx context.Context, r *run, sc tdd.ScenarioRef) (
 		r.st.Advance(s.d.Now())
 		return true, "", s.save(r)
 	case tdd.RedPremature:
+		if sc.Amended {
+			// Its test passes because it still tests the old version: the
+			// agent updates it to the new one.
+			return false, "", nil
+		}
 		// Unanswered, the question waits in questions.md; the next run
 		// comes back here and finds the answer there.
 		return s.decidePremature(ctx, r, sc, withMarker)

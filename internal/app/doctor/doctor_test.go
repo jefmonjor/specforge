@@ -55,7 +55,7 @@ func deps(installed ...string) Deps {
 }
 
 func opts() Options {
-	return Options{Root: ".", Agent: "claude", AgentBinary: "claude", Profiles: []stack.Profile{goStack}, Commit: true, Version: "6.0.0"}
+	return Options{Root: ".", Agent: "claude", AgentBinary: "claude", Profiles: []stack.Profile{goStack}, Commit: true, Version: "6.1.0"}
 }
 
 func find(r Report, name string) Check {

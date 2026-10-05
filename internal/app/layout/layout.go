@@ -38,6 +38,11 @@ func (l Layout) Approvals(specPath string) string {
 	return filepath.Join(l.SpecDir(specPath), "approvals.md")
 }
 
+// Scenarios is the ledger that keeps each scenario's marker for good.
+func (l Layout) Scenarios(specPath string) string {
+	return filepath.Join(l.SpecDir(specPath), "scenarios.json")
+}
+
 // Plan is the technical plan of a specification.
 func (l Layout) Plan(specPath string) string {
 	return filepath.Join(l.SpecDir(specPath), "plan.md")

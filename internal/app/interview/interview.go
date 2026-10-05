@@ -50,10 +50,10 @@ func (e *IncompleteError) Error() string {
 	return fmt.Sprintf("the interview ended with %d issue(s) left in the specification", len(e.Issues))
 }
 
-// Event is one line of interview.jsonl.
+// Event is one line of interview.jsonl (or change.jsonl).
 type Event struct {
 	At       time.Time `json:"at"`
-	Kind     string    `json:"kind"` // "question" or "answer"
+	Kind     string    `json:"kind"` // "question", "answer"; "request" and "done" bound a change
 	Question string    `json:"question"`
 	Why      string    `json:"why,omitempty"`
 	Section  string    `json:"section,omitempty"`
@@ -86,11 +86,18 @@ type Options struct {
 	Root, SpecPath, Language, Model string
 	AgentTimeout                    time.Duration
 	MaxTurns                        int
+	// Request turns the interview into a change request (spec change):
+	// the agent applies it to the specification, asking what it leaves
+	// open. Its conversation is kept in change.jsonl.
+	Request string
 }
 
 // Result is how the interview ended.
 type Result struct {
 	Questions int
+	// Changed is false when a change request left the specification as it
+	// was.
+	Changed bool
 	// Open are the questions recorded as [NEEDS CLARIFICATION].
 	Open []string
 	// Advice are the non-blocking lint issues.
@@ -110,6 +117,10 @@ func Run(ctx context.Context, d Deps, o Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	original, _ := d.Files.ReadFile(o.SpecPath)
+	if err := s.begin(); err != nil {
+		return Result{}, err
+	}
 	resumed, err := s.resume(ctx)
 	if err != nil {
 		return s.res, err
@@ -127,8 +138,13 @@ func Run(ctx context.Context, d Deps, o Options) (Result, error) {
 			return s.res, err
 		}
 		blocking, err := s.finish()
-		if err != nil || len(blocking) == 0 {
+		if err != nil {
 			return s.res, err
+		}
+		if len(blocking) == 0 {
+			now, _ := d.Files.ReadFile(o.SpecPath)
+			s.res.Changed = string(now) != string(original)
+			return s.res, s.end()
 		}
 		if round >= maxRounds {
 			return s.res, &IncompleteError{Issues: blocking}
@@ -152,12 +168,60 @@ type session struct {
 
 func newSession(d Deps, o Options) *session {
 	lay := layout.Layout{Root: o.Root}
-	return &session{
+	s := &session{
 		d: d, o: o, lay: lay,
 		specRel:    lay.Rel(o.SpecPath),
 		transcript: filepath.Join(lay.SpecDir(o.SpecPath), "interview.jsonl"),
 		origin:     clarify.Origin{Phase: "INTERVIEW", DecisionsFile: lay.Decisions(o.SpecPath), QuestionsFile: lay.Questions(o.SpecPath)},
 	}
+	if o.Request != "" {
+		s.transcript = filepath.Join(lay.SpecDir(o.SpecPath), "change.jsonl")
+		s.origin.Phase = "CHANGE"
+	}
+	return s
+}
+
+// begin opens a change request in its transcript, unless this same request
+// is still open (a question left pending): then it continues.
+func (s *session) begin() error {
+	if s.o.Request == "" {
+		return nil
+	}
+	all := load(s.d.Files, s.transcript)
+	for i := len(all) - 1; i >= 0; i-- {
+		switch all[i].Kind {
+		case "done":
+			i = 0
+		case "request":
+			if all[i].Question == s.o.Request {
+				return nil
+			}
+			i = 0
+		}
+	}
+	return s.record(Event{Kind: "request", Question: s.o.Request})
+}
+
+// end closes a change request.
+func (s *session) end() error {
+	if s.o.Request == "" {
+		return nil
+	}
+	return s.record(Event{Kind: "done", Question: s.o.Request})
+}
+
+// history is the conversation so far: since the request, for a change.
+func (s *session) history() []Event {
+	all := load(s.d.Files, s.transcript)
+	if s.o.Request == "" {
+		return all
+	}
+	for i := len(all) - 1; i >= 0; i-- {
+		if all[i].Kind == "request" {
+			return all[i+1:]
+		}
+	}
+	return all
 }
 
 func (s *session) record(e Event) error {
@@ -172,7 +236,7 @@ func (s *session) record(e Event) error {
 // resume answers a question an earlier run left open and returns it as the
 // turn the agent continues from, or nil.
 func (s *session) resume(ctx context.Context) (*conversation.Turn, error) {
-	q, ok := unanswered(load(s.d.Files, s.transcript))
+	q, ok := unanswered(s.history())
 	if !ok {
 		return nil, nil
 	}
@@ -205,11 +269,14 @@ func (s *session) render(resumed *conversation.Turn) func(conversation.Turn) (st
 		}
 		data := prompts.Data{
 			SpecTitle: title, SpecPath: s.specRel, Draft: string(current),
-			Decisions: summary(load(s.d.Files, s.transcript)), Feedback: s.feedback,
+			Decisions: summary(s.history()), Feedback: s.feedback, Request: s.o.Request,
 			AnsweredQuestion: t.Question, Answer: t.Answer,
 		}
 		if t.Retry {
 			data.Feedback = strings.TrimSpace(s.feedback + "\nYour last answer did not end with the JSON object. Answer again and end with it.")
+		}
+		if s.o.Request != "" {
+			return prompts.RenderChangeTurn(s.o.Language, data)
 		}
 		return prompts.RenderInterviewTurn(s.o.Language, data)
 	}
@@ -257,7 +324,7 @@ func (s *session) sendBack(blocking []spec.Issue) {
 	for _, i := range blocking {
 		lines = append(lines, "- "+i.String())
 	}
-	s.feedback = "You reported the interview as finished, but the specification still has:\n" + strings.Join(lines, "\n") +
+	s.feedback = "You reported the work as finished, but the specification still has:\n" + strings.Join(lines, "\n") +
 		"\nAsk the developer what is needed to resolve them."
 	s.d.Events.Rejected(strings.Join(lines, "; "))
 }

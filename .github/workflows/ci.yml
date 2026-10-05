@@ -59,5 +59,8 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go build -trimpath -o specforge${{ runner.os == 'Windows' && '.exe' || '' }} .
+      # What depends on the platform: copies (copy-on-write on APFS,
+      # junctions on Windows) and the guard's shell parsing.
+      - run: go test ./internal/adapters/scratch/ ./internal/domain/guard/ ./internal/app/guardhook/
       - run: ./specforge${{ runner.os == 'Windows' && '.exe' || '' }} version
         shell: bash

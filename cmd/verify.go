@@ -8,6 +8,7 @@ import (
 	"specforge/internal/adapters/fsys"
 	"specforge/internal/adapters/scratch"
 	"specforge/internal/adapters/workspace"
+	"specforge/internal/app/specs"
 	"specforge/internal/app/verifier"
 	"specforge/internal/config"
 	"specforge/internal/domain/spec"
@@ -56,10 +57,9 @@ command that reproduces it.`,
 			if err != nil {
 				return err
 			}
-			var markers []string
-			id := spec.IDFromPath(entry.Path)
-			for _, sc := range doc.Scenarios {
-				markers = append(markers, spec.Marker(id, sc.Index))
+			markers, err := specs.MarkersOf(fsys.OS{}, p.layout, entry.Path, md, doc)
+			if err != nil {
+				return err
 			}
 			stackName := ""
 			if prof, err := a.resolveStack(ctx, p); err == nil {

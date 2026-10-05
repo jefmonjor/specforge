@@ -32,14 +32,11 @@ type Match struct {
 	Segment string `json:"segment"`
 }
 
-// Recognize returns every destructive command in line.
+// Recognize returns every destructive command in line, the code given
+// inline to an interpreter included. Inspect also reads the files the
+// line runs.
 func Recognize(line string) []Match {
-	var out []Match
-	for _, seg := range segments(line) {
-		out = append(out, command(seg, words(seg))...)
-	}
-	out = append(out, sql(line)...)
-	return dedupe(out)
+	return Inspect(line, nil)
 }
 
 // Allowed reports whether a match is allowed by one of the patterns
@@ -57,15 +54,8 @@ func Allowed(m Match, patterns []string) bool {
 	return false
 }
 
-// command recognises one simple command, unwrapping wrappers first.
-func command(seg string, ws []string) []Match {
-	ws = unwrap(ws)
-	if len(ws) == 0 {
-		return nil
-	}
-	if inner, ok := shellC(ws); ok {
-		return Recognize(inner)
-	}
+// simple recognises one simple command, its wrappers already unwrapped.
+func simple(seg string, ws []string) []Match {
 	var out []Match
 	add := func(k Kind, hard bool, reason string) {
 		out = append(out, Match{Kind: k, HardDeny: hard, Reason: reason, Segment: seg})
@@ -81,6 +71,8 @@ func command(seg string, ws []string) []Match {
 		if reason := gitDestructive(ws[1:]); reason != "" {
 			add(Git, false, reason)
 		}
+	case name == "rimraf" || name == "del-cli" || name == "trash":
+		add(FS, false, name+" deletes directory trees")
 	case strings.HasPrefix(name, "mkfs"), name == "shred", name == "wipefs":
 		add(FS, false, name+" destroys data")
 	case name == "dd" && slices.ContainsFunc(ws, func(w string) bool { return strings.HasPrefix(w, "of=/dev/") }):
@@ -109,6 +101,9 @@ var wrappers = map[string]map[string]bool{
 	"exec":    {},
 	"builtin": {},
 	"stdbuf":  {},
+	"npx":     {"-p": true, "--package": true, "-c": false},
+	"pnpx":    {},
+	"bunx":    {},
 }
 
 var assignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)

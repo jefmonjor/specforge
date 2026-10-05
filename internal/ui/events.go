@@ -62,6 +62,10 @@ func (e *LoopEvents) Amended(pending []string) {
 	e.C.Warn(e.C.T("loop.amended", len(pending), strings.Join(pending, " · ")))
 }
 
+func (e *LoopEvents) Orphaned(tests []string) {
+	e.C.Warn(e.C.T("loop.orphaned", strings.Join(tests, " · ")))
+}
+
 func (e *LoopEvents) Baseline(b *tdd.Baseline, builds bool) {
 	e.halt()
 	switch {
@@ -352,13 +356,19 @@ func (e *PlanEvents) Done() {
 type InterviewEvents struct {
 	C     *Console
 	Agent string
+	// Phase names the work in progress ("INTERVIEW" when empty).
+	Phase string
 	stop  func()
 }
 
 func (e *InterviewEvents) Working() {
 	e.Done()
 	if !e.C.Quiet {
-		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, "INTERVIEW"))
+		phase := e.Phase
+		if phase == "" {
+			phase = "INTERVIEW"
+		}
+		e.stop = Activity(e.C.Err, e.C.T("agent.working", e.Agent, phase))
 	}
 }
 

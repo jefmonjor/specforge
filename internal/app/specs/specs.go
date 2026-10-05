@@ -294,7 +294,7 @@ type Approval struct {
 	Advice []spec.Issue
 	// Delta is how the scenarios changed since the previous approval
 	// (specifications only).
-	Delta []ScenarioChange
+	Delta []spec.ScenarioChange
 }
 
 // Approve is the R0 review gate: the specification must lint clean, then
@@ -334,9 +334,23 @@ func (s Service) ApprovePlan(e Entry, by string) (Approval, error) {
 	if !s.Files.Exists(path) {
 		return Approval{}, ErrNoPlan
 	}
-	return s.approve(path, s.Layout.Rel(path), by, func(content string) []spec.Issue {
-		return spec.LintPlan(content, Markers(e.ID, doc))
-	})
+	data, err := s.Files.ReadFile(e.Path)
+	if err != nil {
+		return Approval{}, err
+	}
+	markers, err := MarkersOf(s.Files, s.Layout, e.Path, string(data), doc)
+	if err != nil {
+		return Approval{}, err
+	}
+	lint := func(content string) []spec.Issue { return spec.LintPlan(content, markers) }
+	// A plan approved before the specification changed is checked again:
+	// it may no longer place every scenario.
+	if data, err := s.Files.ReadFile(path); err == nil {
+		if blocking := spec.Blocking(lint(spec.StripSeal(string(data)))); len(blocking) > 0 {
+			return Approval{}, &LintError{Path: s.Layout.Rel(path), Issues: blocking}
+		}
+	}
+	return s.approve(path, s.Layout.Rel(path), by, lint)
 }
 
 // Approved parses a specification that must be approved and unchanged.
@@ -349,15 +363,6 @@ func (s Service) Approved(e Entry) (*spec.Document, error) {
 		return nil, fmt.Errorf("%w: %w", ErrPlanNeedsApprovedSpec, err)
 	}
 	return spec.Parse(string(data), spec.ParseOptions{Languages: []string{s.Language}})
-}
-
-// Markers lists the scenario markers of a parsed specification.
-func Markers(specID string, doc *spec.Document) []string {
-	out := make([]string, len(doc.Scenarios))
-	for i, sc := range doc.Scenarios {
-		out[i] = spec.Marker(specID, sc.Index)
-	}
-	return out
 }
 
 func (s Service) approve(path, rel, by string, lint func(string) []spec.Issue) (Approval, error) {

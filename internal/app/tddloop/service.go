@@ -21,6 +21,7 @@ import (
 	"specforge/internal/app/conversation"
 	"specforge/internal/app/layout"
 	"specforge/internal/app/reviewer"
+	"specforge/internal/app/specs"
 	"specforge/internal/domain/quality"
 	"specforge/internal/domain/review"
 	"specforge/internal/domain/risk"
@@ -78,9 +79,12 @@ type Deps struct {
 	// Scratch makes the sandboxes of a parallel loop; nil runs every
 	// scenario in turn.
 	Scratch ports.Scratch
-	Events  Events
-	Log     *slog.Logger
-	Now     func() time.Time
+	// Checkpoints save the working tree before every agent turn, so what
+	// an agent destroys can be restored; nil saves none.
+	Checkpoints ports.Checkpoints
+	Events      Events
+	Log         *slog.Logger
+	Now         func() time.Time
 }
 
 // Reviewer runs review lenses over a change and validates a correction.
@@ -210,7 +214,11 @@ type run struct {
 	doc    *spec.Document
 	md     string
 	specID string
-	plan   string
+	// markers are the scenarios' markers, by position; ledger keeps them
+	// across amendments.
+	markers []string
+	ledger  spec.Ledger
+	plan    string
 	// surfaces are the files the approved plan allows the agent to edit.
 	surfaces spec.Surfaces
 	// lesson is the latest lesson the agent offered in this phase.
@@ -310,6 +318,14 @@ func (s *Service) loadSpec(r *run) error {
 		return err
 	}
 	r.doc = doc
+	if r.ledger, err = specs.ReadLedger(s.d.Files, r.lay, r.o.SpecPath); err != nil {
+		return err
+	}
+	byIndex := spec.Markers(r.ledger, r.specID, r.md, doc)
+	r.markers = make([]string, len(doc.Scenarios))
+	for i, sc := range doc.Scenarios {
+		r.markers[i] = byIndex[sc.Index]
+	}
 	return s.loadPlan(r)
 }
 
@@ -328,11 +344,7 @@ func (s *Service) loadPlan(r *run) error {
 	if err := spec.Verify(content); err != nil {
 		return fmt.Errorf("%w (%w)", ErrPlanNotApproved, err)
 	}
-	markers := make([]string, len(r.doc.Scenarios))
-	for i, sc := range r.doc.Scenarios {
-		markers[i] = spec.Marker(r.specID, sc.Index)
-	}
-	if issues := spec.Blocking(spec.LintPlan(content, markers)); len(issues) > 0 {
+	if issues := spec.Blocking(spec.LintPlan(content, r.markers)); len(issues) > 0 {
 		return fmt.Errorf("%w: %s", ErrPlanOutdated, issues[0].Message)
 	}
 	r.plan = strings.TrimSpace(spec.StripSeal(content))
@@ -343,8 +355,12 @@ func (s *Service) loadPlan(r *run) error {
 func (s *Service) loadState(r *run) error {
 	seal, _ := spec.ReadSeal(r.md)
 	refs := make([]tdd.ScenarioRef, len(r.doc.Scenarios))
+	// What an older SpecForge fingerprinted (the scenario's text alone),
+	// so a loop it ran is still recognised.
+	legacy := map[string]string{}
 	for i, sc := range r.doc.Scenarios {
-		refs[i] = tdd.ScenarioRef{Index: sc.Index, Title: sc.Title, Marker: spec.Marker(r.specID, sc.Index), Fingerprint: sc.Fingerprint()}
+		refs[i] = tdd.ScenarioRef{Index: sc.Index, Title: sc.Title, Marker: r.markers[i], Fingerprint: spec.Fingerprint(r.md, sc)}
+		legacy[r.markers[i]] = sc.Fingerprint()
 	}
 	fresh := tdd.NewState(r.lay.Rel(r.o.SpecPath), r.specID, seal.Hash, refs, s.d.Now())
 
@@ -365,9 +381,15 @@ func (s *Service) loadState(r *run) error {
 	case saved.SpecHash != seal.Hash:
 		// An amended specification: keep the scenarios that did not change
 		// and redo the rest, whether or not the previous loop had finished.
-		pending := fresh.Carry(saved, s.d.Now())
+		pending := fresh.Carry(saved, s.d.Now(), func(old, cur tdd.ScenarioRef) bool {
+			return old.Fingerprint == cur.Fingerprint || old.Fingerprint == legacy[cur.Marker]
+		})
 		fresh.Record("spec-amended", "resumed", fmt.Sprintf("%d scenario(s) to (re)do", len(pending)), s.d.Now())
 		s.d.Events.Amended(pending)
+		if orphans := s.orphans(r); len(orphans) > 0 {
+			fresh.Record("spec-amended", "orphaned tests", strings.Join(orphans, ", "), s.d.Now())
+			s.d.Events.Orphaned(orphans)
+		}
 		r.st = fresh
 		return s.save(r)
 	case !r.o.Resume:
@@ -435,4 +457,26 @@ func (s *Service) save(r *run) error {
 		return fmt.Errorf("saving loop state: %w", err)
 	}
 	return nil
+}
+
+// orphans are test files that still carry the marker of a scenario the
+// specification no longer has: nothing runs them for a scenario any more.
+func (s *Service) orphans(r *run) []string {
+	removed := r.ledger.RemovedMarkers()
+	if len(removed) == 0 {
+		return nil
+	}
+	hashes, err := s.d.Workspace.HashFiles(r.o.Root, r.o.Profile.IsTestFile)
+	if err != nil {
+		return nil
+	}
+	var out []string
+	for path := range hashes {
+		for _, m := range removed {
+			if s.anyContains(r, []string{path}, m) {
+				out = append(out, path+" ("+m+")")
+			}
+		}
+	}
+	return sortedStrings(out)
 }

@@ -6,9 +6,11 @@
 package guardhook
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"specforge/internal/domain/guard"
@@ -53,12 +55,12 @@ func (d Decision) Reason() string {
 	return "SpecForge guard: " + strings.Join(parts, "; ")
 }
 
-// Decide judges a command. A hard deny is refused whatever the mode; an
-// allowed pattern lets a match through; confirm asks only when someone can
-// answer.
-func Decide(command, mode string, allow []string, canAsk bool) Decision {
+// Decide judges a command and what it runs, read through read (nil reads
+// nothing). A hard deny is refused whatever the mode; an allowed pattern
+// lets a match through; confirm asks only when someone can answer.
+func Decide(command string, read guard.Reader, mode string, allow []string, canAsk bool) Decision {
 	var hard, soft []guard.Match
-	for _, m := range guard.Recognize(command) {
+	for _, m := range guard.Inspect(command, read) {
 		switch {
 		case m.HardDeny:
 			hard = append(hard, m)
@@ -83,25 +85,65 @@ var Agents = []string{"claude", "gemini"}
 // hookInput is the JSON both agents send to a pre-tool hook.
 type hookInput struct {
 	ToolName  string `json:"tool_name"`
+	Cwd       string `json:"cwd"`
 	ToolInput struct {
 		Command string `json:"command"`
+		Dir     string `json:"dir_path"`
 	} `json:"tool_input"`
+}
+
+// Request is the command an agent is about to run and where.
+type Request struct {
+	Command string
+	// Dir is the directory it runs in, when the agent says ("" otherwise).
+	Dir string
 }
 
 // shellTools are the tools that run a shell command.
 var shellTools = map[string]string{"claude": "Bash", "gemini": "run_shell_command"}
 
-// Command reads the shell command out of a hook's input; "" when the tool
-// is not the agent's shell tool.
-func Command(agent string, in io.Reader) (string, error) {
+// Command reads the shell command out of a hook's input; an empty command
+// when the tool is not the agent's shell tool.
+func Command(agent string, in io.Reader) (Request, error) {
 	var h hookInput
 	if err := json.NewDecoder(in).Decode(&h); err != nil {
-		return "", fmt.Errorf("reading the %s hook input: %w", agent, err)
+		return Request{}, fmt.Errorf("reading the %s hook input: %w", agent, err)
 	}
 	if h.ToolName != "" && h.ToolName != shellTools[agent] {
-		return "", nil
+		return Request{}, nil
 	}
-	return h.ToolInput.Command, nil
+	dir := h.ToolInput.Dir
+	if dir == "" || !filepath.IsAbs(dir) {
+		dir = filepath.Join(h.Cwd, dir)
+	}
+	if h.Cwd == "" && h.ToolInput.Dir == "" {
+		dir = ""
+	}
+	return Request{Command: h.ToolInput.Command, Dir: dir}, nil
+}
+
+// MaxScriptBytes bounds a file the guard reads to inspect: larger, it is
+// not a script the agent just wrote.
+const MaxScriptBytes = 1 << 20
+
+// Files reads, for the guard, the text files a command runs: relative
+// paths from dir, at most MaxScriptBytes, binary files refused.
+func Files(dir string, open func(string) (io.ReadCloser, error)) guard.Reader {
+	return func(p string) (string, bool) {
+		if !filepath.IsAbs(p) {
+			p = filepath.Join(dir, filepath.FromSlash(p))
+		}
+		f, err := open(p)
+		if err != nil {
+			return "", false
+		}
+		defer func() { _ = f.Close() }()
+		data, err := io.ReadAll(io.LimitReader(f, MaxScriptBytes+1))
+		if err != nil || len(data) > MaxScriptBytes || bytes.IndexByte(data[:min(len(data), 8000)], 0) >= 0 {
+			return "", false
+		}
+		return string(data), true
+	}
 }
 
 // Respond writes the decision in the agent's hook protocol and returns the
@@ -129,11 +171,11 @@ func Respond(agent string, d Decision, stdout, stderr io.Writer) int {
 // SelfTest runs a known destructive command through the guard as a hook
 // would, and reports whether it is blocked.
 func SelfTest(mode string, allow []string) error {
-	d := Decide("git reset --hard HEAD", mode, allow, false)
+	d := Decide("git reset --hard HEAD", nil, mode, allow, false)
 	if mode != Off && d.Verdict != Deny {
 		return fmt.Errorf("the guard let `git reset --hard HEAD` through (mode %s)", mode)
 	}
-	if hard := Decide("rm -rf /", mode, allow, false); hard.Verdict != Deny {
+	if hard := Decide("rm -rf /", nil, mode, allow, false); hard.Verdict != Deny {
 		return fmt.Errorf("the guard let `rm -rf /` through")
 	}
 	return nil

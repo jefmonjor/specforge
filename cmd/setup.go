@@ -117,7 +117,11 @@ gets the migration section (see specforge legacy).`,
 			if newKind != "" {
 				con.Info(con.T("setup.new." + newKind))
 			}
-			con.Info(con.T("setup.next"))
+			if prev != "" {
+				con.Info(con.T("setup.next.legacy"))
+			} else {
+				con.Info(con.T("setup.next"))
+			}
 			return nil
 		},
 	}

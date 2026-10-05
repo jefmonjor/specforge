@@ -236,6 +236,14 @@ func LintPlan(plan string, markers []string) []Issue {
 			issues = append(issues, Issue{Rule: RulePlanMarker, Message: "no planned test for " + m, Blocking: true})
 		}
 	}
+	if len(markers) > 0 {
+		prefix := markers[0][:strings.LastIndex(markers[0], "_")+1]
+		for _, m := range regexp.MustCompile(regexp.QuoteMeta(prefix)+`\d{3}`).FindAllString(plan, -1) {
+			if !slices.Contains(markers, m) && !slices.ContainsFunc(issues, func(i Issue) bool { return strings.HasPrefix(i.Message, m+" ") }) {
+				issues = append(issues, Issue{Rule: RulePlanMarker, Message: m + " is no longer a scenario of the specification", Blocking: true})
+			}
+		}
+	}
 	for _, line := range unparsedComponents(plan) {
 		issues = append(issues, Issue{Rule: RulePlanComponent, Message: "component without a file path in backticks: " + line})
 	}

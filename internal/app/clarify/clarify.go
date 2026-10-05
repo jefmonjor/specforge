@@ -23,6 +23,18 @@ import (
 type PendingQuestionError struct {
 	Question string
 	File     string
+	// Phase is where the question was asked (RED, INTERVIEW, PLAN…).
+	Phase string
+}
+
+// InLoop reports a question asked by the TDD loop, which --resume
+// continues; any other command is simply run again.
+func (e *PendingQuestionError) InLoop() bool {
+	switch e.Phase {
+	case "RED", "GREEN", "REFACTOR", "REVIEW", "VERIFY", "RISK":
+		return true
+	}
+	return false
 }
 
 func (e *PendingQuestionError) Error() string {
@@ -64,7 +76,7 @@ func (a *Asker) Ask(ctx context.Context, o Origin, q ports.Question) (string, er
 					return "", errors.Join(err, werr)
 				}
 			}
-			return "", &PendingQuestionError{Question: q.Text, File: o.QuestionsFile}
+			return "", &PendingQuestionError{Question: q.Text, File: o.QuestionsFile, Phase: o.Phase}
 		}
 		if err != nil {
 			return "", err
