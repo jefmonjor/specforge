@@ -20,6 +20,7 @@ import (
 // blocked agent into an error. Answers are recorded in the loop state.
 func (s *Service) converse(ctx context.Context, r *run, name prompts.Name, data prompts.Data) (protocol.Response, error) {
 	sc, _ := r.st.Scenario()
+	s.checkpoint(ctx, r, sc)
 	origin := s.origin(r, sc)
 	req := ports.AgentRequest{Dir: r.o.Root, Model: r.o.Models.For(modelPhase(r.st.Phase)), Env: r.o.AgentEnv, Timeout: r.o.AgentTimeout,
 		ReadDirs: docturn.Outside(r.o.Root, r.o.Legacy)}
@@ -130,3 +131,17 @@ func changedKeys(before, after map[string]string) []string {
 }
 
 func joinPaths(p []string) string { return strings.Join(p, ", ") }
+
+// checkpoint saves the working tree before an agent turn. Whatever the
+// agent then runs, guard or no guard, `specforge restore` brings the work
+// back. A checkpoint that cannot be saved is recorded, not fatal: the
+// loop still verifies the agent's work itself.
+func (s *Service) checkpoint(ctx context.Context, r *run, sc tdd.ScenarioRef) {
+	if s.d.Checkpoints == nil {
+		return
+	}
+	label := fmt.Sprintf("%s · scenario %d (%s) · before %s", r.specID, sc.Index, sc.Marker, r.st.Phase)
+	if _, err := s.d.Checkpoints.Save(ctx, r.o.Root, label); err != nil && !errors.Is(err, ports.ErrNotARepository) {
+		r.st.Record("checkpoint", "failed", err.Error(), s.d.Now())
+	}
+}

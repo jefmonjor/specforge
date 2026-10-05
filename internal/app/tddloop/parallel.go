@@ -104,7 +104,8 @@ func (s *Service) runChild(ctx context.Context, r *run, i int, asked ports.Promp
 	}
 	d := s.d
 	d.Asker = &clarify.Asker{Prompter: asked, Files: s.d.Asker.Files, Now: s.d.Asker.Now, Lang: s.d.Asker.Lang}
-	d.Events, d.Scratch = events, nil
+	// A sandbox is disposable: no checkpoints there.
+	d.Events, d.Scratch, d.Checkpoints = events, nil, nil
 	o := r.o
 	o.Root = c.box.Dir
 	o.SpecPath = filepath.Join(c.box.Dir, filepath.FromSlash(r.lay.Rel(r.o.SpecPath)))

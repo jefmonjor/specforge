@@ -78,9 +78,12 @@ type Deps struct {
 	// Scratch makes the sandboxes of a parallel loop; nil runs every
 	// scenario in turn.
 	Scratch ports.Scratch
-	Events  Events
-	Log     *slog.Logger
-	Now     func() time.Time
+	// Checkpoints save the working tree before every agent turn, so what
+	// an agent destroys can be restored; nil saves none.
+	Checkpoints ports.Checkpoints
+	Events      Events
+	Log         *slog.Logger
+	Now         func() time.Time
 }
 
 // Reviewer runs review lenses over a change and validates a correction.

@@ -3,6 +3,7 @@ package guardhook
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,34 +29,38 @@ func TestDecide(t *testing.T) {
 		{"git push --force-with-lease origin claude/x", Block, []string{"git push --force-with-lease origin claude/*"}, false, Allow},
 	}
 	for _, c := range cases {
-		if got := Decide(c.cmd, c.mode, c.allow, c.canAsk); got.Verdict != c.want {
+		if got := Decide(c.cmd, nil, c.mode, c.allow, c.canAsk); got.Verdict != c.want {
 			t.Errorf("Decide(%q, %s, ask=%v) = %s, want %s", c.cmd, c.mode, c.canAsk, got.Verdict, c.want)
 		}
 	}
 }
 
 func TestHookProtocol(t *testing.T) {
-	cmd, err := Command("claude", strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"git clean -fdx"}}`))
-	if err != nil || cmd != "git clean -fdx" {
-		t.Fatalf("Command = %q %v", cmd, err)
+	req, err := Command("claude", strings.NewReader(`{"tool_name":"Bash","cwd":"/repo","tool_input":{"command":"git clean -fdx"}}`))
+	if err != nil || req.Command != "git clean -fdx" || req.Dir != filepath.FromSlash("/repo") {
+		t.Fatalf("Command = %+v %v", req, err)
 	}
-	if cmd, _ := Command("claude", strings.NewReader(`{"tool_name":"Write","tool_input":{"file_path":"a"}}`)); cmd != "" {
+	if req, _ := Command("claude", strings.NewReader(`{"tool_name":"Write","tool_input":{"file_path":"a"}}`)); req.Command != "" {
 		t.Fatal("other tools are not shell commands")
 	}
-	if cmd, _ := Command("gemini", strings.NewReader(`{"tool_name":"run_shell_command","tool_input":{"command":"rm -rf x"}}`)); cmd != "rm -rf x" {
-		t.Fatal("gemini's shell tool")
+	req, _ = Command("gemini", strings.NewReader(`{"tool_name":"run_shell_command","cwd":"/repo","tool_input":{"command":"rm -rf x","dir_path":"web"}}`))
+	if req.Command != "rm -rf x" || req.Dir != filepath.Join("/repo", "web") {
+		t.Fatalf("gemini's shell tool: %+v", req)
+	}
+	if req, _ := Command("claude", strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls"}}`)); req.Dir != "" {
+		t.Fatal("no directory when the agent sends none")
 	}
 	if _, err := Command("claude", strings.NewReader("not json")); err == nil {
 		t.Fatal("unreadable input is an error")
 	}
 
 	var out, errOut bytes.Buffer
-	deny := Decide("git reset --hard", Block, nil, false)
+	deny := Decide("git reset --hard", nil, Block, nil, false)
 	if code := Respond("claude", deny, &out, &errOut); code != 2 || !strings.Contains(errOut.String(), "git reset --hard discards uncommitted work") {
 		t.Fatalf("deny: exit %d, stderr %q", code, errOut.String())
 	}
 	out.Reset()
-	ask := Decide("git reset --hard", Confirm, nil, true)
+	ask := Decide("git reset --hard", nil, Confirm, nil, true)
 	if code := Respond("claude", ask, &out, &errOut); code != 0 || !strings.Contains(out.String(), `"permissionDecision":"ask"`) {
 		t.Fatalf("ask: exit %d, stdout %q", code, out.String())
 	}
@@ -117,5 +122,30 @@ func TestInstallMergesAndIsIdempotent(t *testing.T) {
 	}
 	if _, err := Install(files, lay, "claude", "specforge"); err == nil || !strings.Contains(err.Error(), "not valid JSON") {
 		t.Fatalf("a broken settings file is never overwritten: %v", err)
+	}
+}
+
+func TestTheHookReadsTheScriptsACommandRuns(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, content string) {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("clean.sh", "#!/bin/sh\nrm -rf build\n")
+	write("blob.bin", "\x00\x00rm -rf build")
+	write("big.sh", strings.Repeat("echo hi\n", MaxScriptBytes/8+1)+"rm -rf build\n")
+	read := Files(dir, func(p string) (io.ReadCloser, error) { return os.Open(p) })
+	if d := Decide("./clean.sh", read, Block, nil, false); d.Verdict != Deny || !strings.Contains(d.Reason(), "run by `./clean.sh`") {
+		t.Fatalf("a script that deletes is blocked: %+v", d)
+	}
+	if _, ok := read("blob.bin"); ok {
+		t.Fatal("binary files are not read")
+	}
+	if _, ok := read("big.sh"); ok {
+		t.Fatal("files over the limit are not read")
+	}
+	if d := Decide("./clean.sh", read, Block, []string{"./clean.sh"}, false); d.Verdict != Allow {
+		t.Fatal("guard.allow lets a known script through")
 	}
 }

@@ -1,10 +1,13 @@
 // Package guard recognises destructive shell commands before an agent runs
 // them: recursive deletes, history-rewriting git commands, SQL that drops
-// or empties data, and commands that touch secrets. It is a lexical
-// recogniser, not an interpreter and not a sandbox: it reads the command
+// or empties data, and commands that touch secrets. It reads the command
 // line the agent wrote (unwrapping sudo, env, xargs, timeout and sh -c),
-// and cannot see inside scripts, programs or variable expansions. For real
-// containment, run the agent in a container.
+// the code it gives an interpreter inline, and, with a Reader, the files
+// the line runs: scripts, the file an interpreter runs, package.json
+// scripts and Makefile recipes. It is not a sandbox: what a program
+// imports, a compiled binary or a variable's value at run time are out of
+// its reach. The loop's checkpoints recover from what gets past it; for
+// real containment, run the agent in a container.
 package guard
 
 import "strings"
