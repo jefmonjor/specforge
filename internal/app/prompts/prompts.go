@@ -25,6 +25,8 @@ const (
 	Plan      Name = "plan"
 	// InterviewTurn is one turn of the interview SpecForge runs.
 	InterviewTurn Name = "interview_turn"
+	// ChangeTurn is one turn of a change request to a specification.
+	ChangeTurn Name = "change_turn"
 	// LegacyMap maps the business capabilities of a legacy system.
 	LegacyMap Name = "legacy_map"
 	// FromLegacy drafts a specification from the legacy code.
@@ -48,12 +50,15 @@ type File struct {
 
 // Data is everything a prompt template can reference.
 type Data struct {
-	SpecTitle   string
-	SpecPath    string
-	Stack       string
-	Index       int
-	Total       int
-	Scenario    string
+	SpecTitle string
+	SpecPath  string
+	Stack     string
+	Index     int
+	Total     int
+	Scenario  string
+	// Previous is the scenario as it was implemented, when the
+	// specification changed it since: its test must be updated.
+	Previous    string
 	Marker      string
 	MarkerHint  string
 	TestCommand string
@@ -78,6 +83,8 @@ type Data struct {
 	SuiteFailure string
 	GateReport   string
 	Feedback     string
+	// Request is the change the developer asked for (spec change).
+	Request string
 	// AnsweredQuestion and Answer carry the developer's answer to the
 	// question the agent asked in this turn.
 	AnsweredQuestion string
@@ -190,6 +197,11 @@ func RenderInterview(lang string, d InterviewData) (string, error) {
 // RenderInterviewTurn renders one turn of the interview.
 func RenderInterviewTurn(lang string, d Data) (string, error) {
 	return renderStandalone(lang, InterviewTurn, d)
+}
+
+// RenderChangeTurn renders one turn of a change request.
+func RenderChangeTurn(lang string, d Data) (string, error) {
+	return renderStandalone(lang, ChangeTurn, d)
 }
 
 // renderStandalone renders a template that does not end with the response

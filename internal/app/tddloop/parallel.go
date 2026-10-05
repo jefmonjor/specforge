@@ -347,7 +347,7 @@ func (s *Service) closeArrival(ctx context.Context, r *run, a arrival) error {
 	ref := r.st.Scenarios[a.index]
 	r.st.Record("parallel", "integrated", joinPaths(ref.Files), s.d.Now())
 	s.d.Events.Integrated(ref)
-	return s.close(ctx, r, ref, lastGates(r.st, ref.Index))
+	return s.close(ctx, r, ref, lastGates(r.st, ref))
 }
 
 // lockedPrompter lets one scenario of a batch ask at a time.
@@ -377,6 +377,7 @@ func (q *quietEvents) do(f func()) {
 
 func (q *quietEvents) Started(*tdd.State, *spec.Document) {}
 func (q *quietEvents) Amended([]string)                   {}
+func (q *quietEvents) Orphaned([]string)                  {}
 func (q *quietEvents) Baseline(*tdd.Baseline, bool)       {}
 func (q *quietEvents) Finished(*tdd.State)                {}
 func (q *quietEvents) Phase(st *tdd.State, sc tdd.ScenarioRef) {

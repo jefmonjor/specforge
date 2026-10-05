@@ -228,40 +228,39 @@ func TestClarifyWritesDecisionsInPlace(t *testing.T) {
 	}
 }
 
-func TestApprovalHistoryRecordsTheDelta(t *testing.T) {
+func TestApprovalHistoryRecordsTheDeltaByMarker(t *testing.T) {
 	s, root := newService(t, "en")
 	write(t, root, "specs/0001-reset.md", ready)
 	e, _ := s.Resolve("1")
 	a, err := s.Approve(e, "Ana")
-	if err != nil || len(a.Delta) != 1 || a.Delta[0].Change != Added {
+	if err != nil || len(a.Delta) != 1 || a.Delta[0].Change != spec.Added || a.Delta[0].Marker != "SDD_0001_001" {
 		t.Fatalf("first approval %+v %v", a.Delta, err)
 	}
 
-	// Change the scenario's outcome and add one.
+	// A scenario inserted before Link, and Link's outcome changed: Link
+	// keeps its marker, the new one gets the next.
 	data, _ := os.ReadFile(e.Path)
-	edited := strings.Replace(string(data), "Then a link is sent", "Then a link is emailed\n\n  Scenario: Expired\n    When it is opened late\n    Then it fails", 1)
+	edited := strings.Replace(string(data), "  Scenario: Link", "  Scenario: Expired\n    When it is opened late\n    Then it fails\n\n  Scenario: Link", 1)
+	edited = strings.Replace(edited, "Then a link is sent", "Then a link is emailed", 1)
 	write(t, root, "specs/0001-reset.md", edited)
 	a, err = s.Approve(e, "Luis")
 	if err != nil {
 		t.Fatal(err)
 	}
-	got := map[string]Change{}
+	got := map[string]spec.ScenarioChange{}
 	for _, c := range a.Delta {
-		got[c.Title] = c.Change
+		got[c.Title] = c
 	}
-	if got["Link"] != Modified || got["Expired"] != Added || len(got) != 2 {
+	if got["Link"].Change != spec.Modified || got["Link"].Marker != "SDD_0001_001" || got["Link"].Index != 2 ||
+		got["Expired"].Change != spec.Added || got["Expired"].Marker != "SDD_0001_002" || len(got) != 2 {
 		t.Fatalf("delta %+v", a.Delta)
 	}
 	log, _ := os.ReadFile(filepath.Join(root, "specs/0001-reset/approvals.md"))
-	if strings.Count(string(log), "### ") != 2 || !strings.Contains(string(log), "· Luis · sha256-v1:") || !strings.Contains(string(log), "- MODIFIED · 1 · Link · `") {
+	if strings.Count(string(log), "### ") != 2 || !strings.Contains(string(log), "· Luis · sha256-v1:") || !strings.Contains(string(log), "- MODIFIED · SDD_0001_001 · 2 · Link") {
 		t.Fatalf("approvals.md:\n%s", log)
 	}
-}
-
-func TestDeltaRemoved(t *testing.T) {
-	doc, _ := spec.Parse("```gherkin\nFeature: F\n  Scenario: B\n    When x\n    Then y\n```\n", spec.ParseOptions{})
-	d := Delta([]ScenarioChange{{Title: "A", Fingerprint: "000000000000"}}, doc)
-	if len(d) != 2 || d[0].Change != Added || d[1].Change != Removed || d[1].Title != "A" {
-		t.Fatalf("delta %+v", d)
+	l, err := ReadLedger(s.Files, s.Layout, e.Path)
+	if err != nil || len(l.Active()) != 2 || l.Next != 3 {
+		t.Fatalf("ledger %+v %v", l, err)
 	}
 }

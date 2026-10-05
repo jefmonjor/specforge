@@ -62,6 +62,10 @@ func (e *LoopEvents) Amended(pending []string) {
 	e.C.Warn(e.C.T("loop.amended", len(pending), strings.Join(pending, " · ")))
 }
 
+func (e *LoopEvents) Orphaned(tests []string) {
+	e.C.Warn(e.C.T("loop.orphaned", strings.Join(tests, " · ")))
+}
+
 func (e *LoopEvents) Baseline(b *tdd.Baseline, builds bool) {
 	e.halt()
 	switch {

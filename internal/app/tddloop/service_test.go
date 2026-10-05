@@ -1,6 +1,7 @@
 package tddloop
 
 import (
+	"encoding/json"
 	"errors"
 	"specforge/internal/app/conversation"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"specforge/internal/app/clarify"
 	"specforge/internal/domain/quality"
+	"specforge/internal/domain/spec"
 	"specforge/internal/domain/tdd"
 )
 
@@ -378,5 +380,85 @@ func TestAQuestionWithoutOptionsIsRefusedInTheLoop(t *testing.T) {
 	}
 	if !strings.Contains(h.agent.prompts[1], "Derive the candidate answers yourself") || len(h.prompter.questions) != 0 {
 		t.Fatalf("the agent is told to derive options; the developer is never asked:\n%s", h.agent.prompts[1])
+	}
+}
+
+// approveLedger records the markers of body, as spec approve does.
+func approveLedger(t *testing.T, h *harness, l spec.Ledger, body string) spec.Ledger {
+	t.Helper()
+	doc, err := spec.Parse(body, spec.ParseOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, _ = spec.Assign(l, "0001", body, doc)
+	data, _ := json.Marshal(l)
+	h.p.write("specs/0001-reset/scenarios.json", string(data))
+	return l
+}
+
+func TestAScenarioInsertedInTheMiddleGetsItsOwnMarker(t *testing.T) {
+	h := newHarness(t, specBody)
+	l := approveLedger(t, h, spec.Ledger{}, specBody)
+	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"), happyScenario("SDD_0001_002", test2, "expiry.go")...)
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), red(1), green(), green()}
+	if st, err := h.run(); err != nil || !st.Done() {
+		t.Fatalf("first loop: %v", err)
+	}
+
+	// A scenario inserted before "Expired link", whose outcome also changes.
+	amended := strings.Replace(specBody, "  Scenario: Expired link", "  Scenario: Remember the device\n    Given a registered user\n    When she ticks remember\n    Then the device is trusted\n\n  Scenario: Expired link", 1)
+	amended = strings.Replace(amended, `Then she sees "link expired"`, `Then she sees "the link has expired"`, 1)
+	sealed, _ := specSeal(amended)
+	h.p.write("specs/0001-reset.md", sealed)
+	approveLedger(t, h, l, amended)
+
+	h.agent.prompts = nil
+	updated := []reply{
+		writes(map[string]string{test2: testFor("SDD_0001_002") + "// the link has expired\n"}),
+		writes(map[string]string{"expiry.go": "package m\n// the link has expired\n"}),
+	}
+	h.agent.turns = append(happyScenario("SDD_0001_003", "remember_test.go", "remember.go"), updated...)
+	// The new scenario: RED, GREEN, REFACTOR. The amended one: its old
+	// test still passes, then RED, GREEN, REFACTOR.
+	h.tests.outcomes = []tdd.Outcome{red(1), green(), green(), green(), red(1), green(), green()}
+	st, err := h.run()
+	if err != nil || !st.Done() {
+		t.Fatalf("amended loop: %v", err)
+	}
+	if strings.Join(h.events.amended, "|") != "Remember the device|Expired link" {
+		t.Fatalf("pending: %v", h.events.amended)
+	}
+	if m := st.Scenarios[1].Marker; m != "SDD_0001_003" || st.Scenarios[2].Marker != "SDD_0001_002" || !st.Scenarios[0].Done {
+		t.Fatalf("markers follow the scenarios: %+v", st.Scenarios)
+	}
+	if len(h.prompter.questions) != 0 {
+		t.Fatalf("no scenario is taken as already done: %+v", h.prompter.questions)
+	}
+	last := h.agent.prompts[2]
+	if !strings.Contains(last, "This scenario changed after it was implemented") || !strings.Contains(last, `link expired`) || !strings.Contains(last, "SDD_0001_002") {
+		t.Fatalf("the amended RED shows the previous version:\n%s", last)
+	}
+}
+
+func TestTheTestsOfARemovedScenarioAreReported(t *testing.T) {
+	h := newHarness(t, specBody)
+	l := approveLedger(t, h, spec.Ledger{}, specBody)
+	h.agent.turns = append(happyScenario("SDD_0001_001", test1, "reset.go"), happyScenario("SDD_0001_002", test2, "expiry.go")...)
+	h.tests.outcomes = []tdd.Outcome{baseline(), red(1), green(), green(), red(1), green(), green()}
+	if _, err := h.run(); err != nil {
+		t.Fatal(err)
+	}
+	// "Expired link" is removed from the specification.
+	i := strings.Index(specBody, "\n  Scenario: Expired link")
+	amended := specBody[:i] + "\n```\n"
+	sealed, _ := specSeal(amended)
+	h.p.write("specs/0001-reset.md", sealed)
+	approveLedger(t, h, l, amended)
+	st, err := h.run()
+	if err != nil || !st.Done() || len(h.events.amended) != 0 {
+		t.Fatalf("nothing to redo: %v %v", err, h.events.amended)
+	}
+	if strings.Join(h.events.orphaned, ",") != "expiry_test.go (SDD_0001_002)" {
+		t.Fatalf("orphaned = %v", h.events.orphaned)
 	}
 }

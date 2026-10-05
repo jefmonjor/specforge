@@ -25,6 +25,17 @@ func (r *run) docScenario(sc tdd.ScenarioRef) spec.Scenario {
 	return spec.Scenario{}
 }
 
+// previous is the version of an amended scenario that was implemented.
+func (r *run) previous(sc tdd.ScenarioRef) string {
+	if !sc.Amended {
+		return ""
+	}
+	if e, ok := r.ledger.Entry(sc.Marker); ok && e.Previous != "" {
+		return e.Previous
+	}
+	return "(the previous version was not recorded)\n"
+}
+
 // promptData builds the context shared by every prompt of a scenario.
 func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
 	source := r.docScenario(sc).Source
@@ -36,6 +47,7 @@ func (s *Service) promptData(r *run, sc tdd.ScenarioRef) prompts.Data {
 		Index:       sc.Index,
 		Total:       len(r.st.Scenarios),
 		Scenario:    source,
+		Previous:    r.previous(sc),
 		Marker:      sc.Marker,
 		MarkerHint:  p.MarkerExample(sc.Marker),
 		TestCommand: p.TestCommand(sc.Marker),

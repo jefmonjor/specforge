@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ approve is the review gate: it refuses while a TODO or an open question is
 left, records who approved it and seals the content. The loop only runs an
 approved, unchanged specification.`,
 	}
-	c.AddCommand(a.specNewCommand(), a.specListCommand(), a.specLintCommand(), a.specClarifyCommand(), a.specApproveCommand(), a.specInterviewCommand(), a.specFromLegacyCommand())
+	c.AddCommand(a.specNewCommand(), a.specListCommand(), a.specLintCommand(), a.specClarifyCommand(), a.specApproveCommand(), a.specInterviewCommand(), a.specChangeCommand(), a.specFromLegacyCommand())
 	return c
 }
 
@@ -177,15 +178,11 @@ question. Approving an edited specification again accepts the change.`,
 				}
 				con.OK(con.T("spec.approved", e.Rel, approver, short(res.Hash)))
 				if res.Resealed {
-					for _, c := range res.Delta {
-						if c.Change != specs.Unchanged {
-							con.Detail(string(c.Change) + " · " + c.Title)
-						}
-					}
+					a.printDelta(res.Delta)
 				}
 				a.printAdvice(res.Advice)
 			}
-			con.Info(con.T("spec.next.approved", e.ID))
+			con.Info(a.nextAfterApproval(p, e, res))
 			return nil
 		},
 	}
@@ -277,6 +274,11 @@ agent for a free conversation.`,
 				return a.chatInterview(ctx, p, e, ag)
 			}
 			con := a.console()
+			if data, err := (fsys.OS{}).ReadFile(e.Path); err == nil && spec.Verify(string(data)) == nil {
+				// Complete and sealed: there is nothing to interview about.
+				con.Info(con.T("interview.approved", e.Rel, e.ID))
+				return nil
+			}
 			con.Title(con.T("interview.title", e.Title))
 			events := &ui.InterviewEvents{C: con, Agent: ag.Name()}
 			defer events.Done()
@@ -390,4 +392,118 @@ func short(hash string) string {
 		return hash[:12]
 	}
 	return hash
+}
+
+// printDelta shows how the scenarios changed: their markers, which tests
+// and records carry, never move.
+func (a *App) printDelta(delta []spec.ScenarioChange) {
+	con := a.console()
+	for _, c := range delta {
+		switch c.Change {
+		case spec.Unchanged:
+		case spec.Renamed:
+			con.Detail(con.T("spec.delta.renamed", c.Marker, c.Title, c.Was))
+		case spec.Removed:
+			con.Warn(con.T("spec.delta.removed", c.Marker, c.Title))
+		default:
+			con.Detail(string(c.Change) + " · " + c.Marker + " · " + c.Title)
+		}
+	}
+}
+
+// nextAfterApproval names the next step: the plan when scenarios were
+// added or removed and a plan exists, else the loop.
+func (a *App) nextAfterApproval(p project, e specs.Entry, res specs.Approval) string {
+	con := a.console()
+	moved := slices.ContainsFunc(res.Delta, func(c spec.ScenarioChange) bool {
+		return c.Change == spec.Added || c.Change == spec.Removed
+	})
+	if res.Resealed && moved && (fsys.OS{}).Exists(p.layout.Plan(e.Path)) {
+		return con.T("spec.next.replan", e.ID)
+	}
+	return con.T("spec.next.approved", e.ID)
+}
+
+func (a *App) specChangeCommand() *cobra.Command {
+	var o config.Overrides
+	c := &cobra.Command{
+		Use:   "change <spec> <request>",
+		Short: "Apply a change request to a specification, asking what it leaves open",
+		Long: `change applies what you ask to a specification, approved or not, in a
+conversation SpecForge runs like the interview: your agent writes the change
+into every section it touches (scenarios, invariants, data contracts,
+errors), asks what the request leaves open or contradicts, and changes no
+other file. The conversation is kept in specs/NNNN-slug/change.jsonl.
+
+Each scenario keeps its marker, its tests and its history while its title
+stays, even if its steps change; a renamed scenario keeps them while its
+steps stay. change shows what the next approval will record, then:
+
+  specforge spec approve <spec>   seal the change
+  specforge plan <spec>           when scenarios were added or removed
+  specforge loop <spec>           redo what changed, nothing else
+
+Without a terminal a question goes to questions.md (exit 5): answer it there
+and run the same change again.`,
+		Example: "  specforge spec change 0001 \"Links expire after 15 minutes, not 30\"\n  specforge spec change 0001 \"Admins can revoke every link of a user\"",
+		Args:    cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			p, err := a.openProject(o, true)
+			if err != nil {
+				return err
+			}
+			e, err := a.resolveSpec(ctx, p, args[0])
+			if err != nil {
+				return err
+			}
+			request := strings.TrimSpace(args[1])
+			if request == "" {
+				return errors.New("say what to change: specforge spec change <spec> \"<request>\"")
+			}
+			proc := a.NewProcess(a.log)
+			ag, err := a.NewAgent(p.settings.Agent, proc, a.log)
+			if err != nil {
+				return err
+			}
+			con := a.console()
+			con.Title(con.T("change.title", e.Title))
+			events := &ui.InterviewEvents{C: con, Agent: ag.Name()}
+			defer events.Done()
+			files := fsys.OS{}
+			res, err := interview.Run(ctx, interview.Deps{
+				Agent:     ag,
+				Workspace: workspace.New(proc),
+				Files:     files,
+				Asker:     &clarify.Asker{Prompter: a.prompter(), Files: files, Now: a.Now, Lang: p.settings.Language},
+				Events:    events,
+				Log:       a.log,
+				Now:       a.Now,
+			}, interview.Options{
+				Root: p.root, SpecPath: e.Path, Language: p.settings.Language, Model: p.settings.ModelFor("interview"),
+				AgentTimeout: p.settings.AgentTimeout, Request: request,
+			})
+			events.Done()
+			if err != nil {
+				return err
+			}
+			if !res.Changed {
+				con.OK(con.T("change.none", e.Rel))
+				return nil
+			}
+			con.OK(con.T("change.done", e.Rel))
+			if preview, err := p.specs(a).Preview(e); err == nil {
+				a.printDelta(preview)
+			}
+			if len(res.Open) > 0 {
+				con.Warn(con.T("interview.open", len(res.Open), e.ID))
+			}
+			a.printAdvice(res.Advice)
+			con.Info(con.T("change.next", e.ID))
+			return nil
+		},
+	}
+	c.Flags().StringVar(&o.Agent, "agent", "", "claude | gemini (default: configured)")
+	c.Flags().StringVar(&o.Model, "model", "", "model passed to the agent")
+	return c
 }

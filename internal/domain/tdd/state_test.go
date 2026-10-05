@@ -105,39 +105,65 @@ func TestRedVerdict(t *testing.T) {
 	}
 }
 
-func TestCarryKeepsUnchangedScenariosDoneAfterAnAmendment(t *testing.T) {
+func sameFingerprint(old, cur ScenarioRef) bool { return old.Fingerprint == cur.Fingerprint }
+
+func TestCarryMatchesScenariosByMarkerAfterAnAmendment(t *testing.T) {
 	old := NewState("s.md", "0001", "h1", []ScenarioRef{
-		{Index: 1, Title: "a", Fingerprint: "fa"},
-		{Index: 2, Title: "b", Fingerprint: "fb"},
-		{Index: 3, Title: "c", Fingerprint: "fc"},
+		{Index: 1, Title: "a", Marker: "M1", Fingerprint: "fa"},
+		{Index: 2, Title: "b", Marker: "M2", Fingerprint: "fb"},
+		{Index: 3, Title: "c", Marker: "M3", Fingerprint: "fc"},
 	}, t0)
 	for i := 0; i < 6; i++ { // finish a and b
 		old.Advance(t0)
 	}
-	if old.Current != 2 {
-		t.Fatalf("setup: current = %d", old.Current)
-	}
+	old.Scenarios[1].Review = &ReviewRecord{Reported: 2}
+	old.Scenarios[1].Commit = "c2"
 
-	// The amendment inserts a new scenario first and edits c.
+	// The amendment inserts a new scenario first, moves b before a and
+	// edits c: markers, not positions, say which is which.
 	amended := NewState("s.md", "0001", "h2", []ScenarioRef{
-		{Index: 1, Title: "new", Fingerprint: "fn"},
-		{Index: 2, Title: "a", Fingerprint: "fa"},
-		{Index: 3, Title: "b", Fingerprint: "fb"},
-		{Index: 4, Title: "c edited", Fingerprint: "fc2"},
+		{Index: 1, Title: "new", Marker: "M4", Fingerprint: "fn"},
+		{Index: 2, Title: "b", Marker: "M2", Fingerprint: "fb"},
+		{Index: 3, Title: "a", Marker: "M1", Fingerprint: "fa"},
+		{Index: 4, Title: "c edited", Marker: "M3", Fingerprint: "fc2"},
 	}, t0)
-	pending := amended.Carry(old, t0)
+	pending := amended.Carry(old, t0, sameFingerprint)
 
 	if len(pending) != 2 || pending[0] != "new" || pending[1] != "c edited" {
 		t.Fatalf("pending = %v", pending)
 	}
+	b := amended.Scenarios[1]
+	if !b.Done || b.Index != 2 || b.Commit != "c2" || b.Review == nil || b.Review.Reported != 2 {
+		t.Fatalf("b keeps everything at its new position: %+v", b)
+	}
+	if amended.Scenarios[3].Amended {
+		t.Fatal("c was never implemented: nothing to amend")
+	}
 	if amended.Current != 0 || amended.Phase != PhaseRed {
 		t.Fatalf("must restart at the first pending scenario: %d %s", amended.Current, amended.Phase)
 	}
+}
+
+func TestADoneScenarioWhoseContentChangedIsAmended(t *testing.T) {
+	old := NewState("s.md", "0001", "h1", []ScenarioRef{{Index: 1, Title: "a", Marker: "M1", Fingerprint: "fa"}}, t0)
 	for i := 0; i < 3; i++ {
-		amended.Advance(t0)
+		old.Advance(t0)
 	}
-	if amended.Current != 3 {
-		t.Fatalf("done scenarios must be skipped, current = %d", amended.Current)
+	amended := NewState("s.md", "0001", "h2", []ScenarioRef{{Index: 1, Title: "a", Marker: "M1", Fingerprint: "fa2"}}, t0)
+	if pending := amended.Carry(old, t0, sameFingerprint); len(pending) != 1 || !amended.Scenarios[0].Amended || amended.Scenarios[0].Done {
+		t.Fatalf("pending=%v state=%+v", pending, amended.Scenarios[0])
+	}
+}
+
+func TestCheckpointsFollowTheMarker(t *testing.T) {
+	s := NewState("s.md", "0001", "h", []ScenarioRef{{Index: 1, Marker: "M1"}, {Index: 2, Marker: "M2"}}, t0)
+	s.Record("refactor", "accepted", "lint ✓", t0)
+	c := s.Checkpoints[len(s.Checkpoints)-1]
+	if c.Marker != "M1" || !c.About(ScenarioRef{Index: 7, Marker: "M1"}) || c.About(ScenarioRef{Index: 1, Marker: "M2"}) {
+		t.Fatalf("%+v", c)
+	}
+	if !(Checkpoint{Scenario: 2}).About(ScenarioRef{Index: 2, Marker: "M2"}) {
+		t.Fatal("an older checkpoint without marker matches by position")
 	}
 }
 
@@ -196,7 +222,7 @@ func TestCarryKeepsTheBaseline(t *testing.T) {
 	old := NewState("s.md", "0001", "h1", []ScenarioRef{{Index: 1, Fingerprint: "a"}}, now)
 	old.Baseline = &Baseline{Failures: []TestRef{{Name: "TestBroken"}}}
 	fresh := NewState("s.md", "0001", "h2", []ScenarioRef{{Index: 1, Fingerprint: "b"}}, now)
-	fresh.Carry(old, now)
+	fresh.Carry(old, now, sameFingerprint)
 	if !fresh.Baseline.Has(TestRef{Name: "TestBroken"}) {
 		t.Fatal("an amended specification keeps the baseline of the branch")
 	}

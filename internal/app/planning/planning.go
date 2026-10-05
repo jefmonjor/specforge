@@ -17,6 +17,7 @@ import (
 	"specforge/internal/app/docturn"
 	"specforge/internal/app/layout"
 	"specforge/internal/app/prompts"
+	"specforge/internal/app/specs"
 	"specforge/internal/domain/spec"
 	"specforge/internal/domain/stack"
 	"specforge/internal/ports"
@@ -75,9 +76,9 @@ func Draft(ctx context.Context, d Deps, o Options) (string, error) {
 	lay := layout.Layout{Root: o.Root}
 	planPath := lay.Plan(o.SpecPath)
 	planRel := lay.Rel(planPath)
-	markers := make([]string, len(o.Doc.Scenarios))
-	for i, sc := range o.Doc.Scenarios {
-		markers[i] = spec.Marker(o.SpecID, sc.Index)
+	markers, err := specs.MarkersOf(d.Files, lay, o.SpecPath, o.SpecText, o.Doc)
+	if err != nil {
+		return "", err
 	}
 	origin := clarify.Origin{Phase: "PLAN", DecisionsFile: lay.Decisions(o.SpecPath), QuestionsFile: lay.Questions(o.SpecPath)}
 

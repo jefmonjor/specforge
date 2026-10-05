@@ -247,6 +247,7 @@ type recorder struct {
 	satisfied int
 	answered  int
 	amended   []string
+	orphaned  []string
 	commits   []string
 	known     int
 	risks     []risk.Tier
@@ -263,6 +264,7 @@ type recorder struct {
 
 func (r *recorder) Started(*tdd.State, *spec.Document) {}
 func (r *recorder) Amended(p []string)                 { r.amended = p }
+func (r *recorder) Orphaned(tests []string)            { r.orphaned = tests }
 func (r *recorder) Baseline(b *tdd.Baseline, _ bool) {
 	if b != nil {
 		r.known = len(b.Failures)

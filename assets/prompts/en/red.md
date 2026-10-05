@@ -6,6 +6,14 @@ You are working on the specification **{{.SpecTitle}}** (`{{.SpecPath}}`) in a {
 ```gherkin
 {{.Scenario}}```
 
+{{- if .Previous}}
+## This scenario changed after it was implemented
+It used to say:
+```gherkin
+{{.Previous}}```
+Its test already exists, named with `{{.Marker}}`. **Update that test to the scenario as it is now**: it must test the new steps and fail against the current code. Keep no test of the old behaviour.
+{{end}}
+
 ## What to do
 1. Write the automated test that verifies this scenario's `Then` steps through observable behaviour, not implementation details. One test per scenario.
 2. The test name **must contain the marker `{{.Marker}}`** so SpecForge can run it alone. {{if .MarkerHint}}Example: `{{.MarkerHint}}`{{end}}

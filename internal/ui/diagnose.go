@@ -77,7 +77,11 @@ func questionErrors(lang string, err error, d *Diagnosis) (int, string) {
 	var pending *clarify.PendingQuestionError
 	if errors.As(err, &pending) {
 		d.Cause = pending.Question
-		d.Action = T(lang, "diag.pending.action", pending.File)
+		key := "diag.pending.action"
+		if pending.InLoop() {
+			key = "diag.pending.loop"
+		}
+		d.Action = T(lang, key, pending.File)
 		return ExitQuestion, "pending"
 	}
 	return 0, ""
@@ -262,7 +266,8 @@ func init() {
 			"diag.interrupted.title":     "Interrupted",
 			"diag.interrupted.action":    "the state was saved: continue with `specforge loop --resume`",
 			"diag.pending.title":         "A question needs your answer",
-			"diag.pending.action":        "write the answer in place of the placeholder in %s and run the same command again (the loop with --resume), or run it in a terminal and answer there",
+			"diag.pending.action":        "write the answer in place of the placeholder in %s and run the same command again, or run it in a terminal and answer there",
+			"diag.pending.loop":          "write the answer in place of the placeholder in %s and run the loop again with --resume, or run it in a terminal and answer there",
 			"diag.tampering.title":       "A test file was modified outside RED",
 			"diag.tampering.action":      "revert the test change (git checkout -- <file>) and continue with `specforge loop --resume`",
 			"diag.tampered.title":        "The specification changed after approval",
@@ -321,7 +326,8 @@ func init() {
 			"diag.interrupted.title":     "Interrumpido",
 			"diag.interrupted.action":    "el estado quedó guardado: continúa con `specforge loop --resume`",
 			"diag.pending.title":         "Una pregunta espera tu respuesta",
-			"diag.pending.action":        "escribe la respuesta en lugar del marcador en %s y vuelve a lanzar el mismo comando (el ciclo con --resume), o lánzalo en una terminal y responde allí",
+			"diag.pending.action":        "escribe la respuesta en lugar del marcador en %s y vuelve a lanzar el mismo comando, o lánzalo en una terminal y responde allí",
+			"diag.pending.loop":          "escribe la respuesta en lugar del marcador en %s y vuelve a lanzar el ciclo con --resume, o lánzalo en una terminal y responde allí",
 			"diag.tampering.title":       "Se modificó un fichero de test fuera de RED",
 			"diag.tampering.action":      "revierte el cambio del test (git checkout -- <fichero>) y continúa con `specforge loop --resume`",
 			"diag.tampered.title":        "La especificación cambió después de aprobarse",

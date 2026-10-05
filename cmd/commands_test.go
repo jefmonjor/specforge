@@ -229,7 +229,7 @@ func TestSpecClarifyThenApproveShowsTheDelta(t *testing.T) {
 	h.expect(0, "spec", "approve", "--by", "Ana")
 	h.write("specs/0001-reset.md", strings.Replace(h.read("specs/0001-reset.md"), "she gets a link", "she gets an email", 1))
 	h.expect(0, "spec", "approve", "--by", "Ana")
-	if !strings.Contains(h.err.String(), "MODIFIED · Request a link") {
+	if !strings.Contains(h.err.String(), "MODIFIED · SDD_0001_001 · Request a link") {
 		t.Fatalf("stderr:\n%s", h.err)
 	}
 }
@@ -270,4 +270,38 @@ func TestSetupNewJavaForARewrite(t *testing.T) {
 	}
 	// A second scaffold over an existing project is refused.
 	h.expect(1, "setup", "--new", "react")
+}
+
+func TestSpecChangeAppliesARequestAndShowsWhatItChanges(t *testing.T) {
+	h := newHarness(t)
+	h.expect(0, "init", "--agent", "claude", "--language", "en")
+	h.write("specs/0001-password-reset.md", readySpec)
+	h.expect(0, "spec", "approve", "1", "--by", "Ana")
+	h.expect(0, "spec", "interview", "1")
+	if !strings.Contains(h.err.String(), "to change it, run specforge spec change 0001") {
+		t.Fatalf("an approved spec points to change:\n%s", h.err)
+	}
+
+	changed := strings.Replace(readySpec, "  Scenario: Request a link", "  Scenario: Unknown email\n    Given no user with that email\n    When she asks for a reset\n    Then nothing is sent\n\n  Scenario: Request a link", 1)
+	h.agent.rules = []rule{
+		{when: "Answer: **Say nothing**", files: map[string]string{"specs/0001-password-reset.md": changed},
+			reply: "```json\n{\"status\":\"done\",\"files_written\":[\"specs/0001-password-reset.md\"],\"unknowns\":[]}\n```"},
+		{when: "# Task: CHANGE", reply: "```json\n{\"status\":\"needs_clarification\",\"question\":\"What does an unknown email see?\",\"options\":[\"Say nothing\",\"An error\"],\"section\":\"6. Scenarios\",\"unknowns\":[\"message\"]}\n```"},
+	}
+	h.tty, h.stdin = true, "Say nothing\n"
+	h.expect(0, "spec", "change", "1", "An unknown email gets no link")
+	out := h.err.String()
+	if !strings.Contains(out, "ADDED · SDD_0001_002 · Unknown email") || strings.Contains(out, "SDD_0001_001 · Request a link") {
+		t.Fatalf("the preview shows the new scenario only, with its own marker:\n%s", out)
+	}
+	if !strings.Contains(h.agent.prompts[0], "> An unknown email gets no link") {
+		t.Fatal("the request is in the prompt")
+	}
+	if !strings.Contains(h.read("specs/0001-password-reset/change.jsonl"), `"kind":"done"`) {
+		t.Fatal("the change is recorded as finished")
+	}
+	h.expect(0, "spec", "approve", "1", "--by", "Ana")
+	if log := h.read("specs/0001-password-reset/approvals.md"); !strings.Contains(log, "- ADDED · SDD_0001_002 · 1 · Unknown email") {
+		t.Fatalf("approvals.md:\n%s", log)
+	}
 }

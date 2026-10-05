@@ -18,6 +18,7 @@ import (
 	"specforge/internal/app/clarify"
 	"specforge/internal/app/layout"
 	"specforge/internal/app/reviewer"
+	"specforge/internal/app/specs"
 	"specforge/internal/app/tddloop"
 	"specforge/internal/app/verifier"
 	"specforge/internal/domain/change"
@@ -83,8 +84,12 @@ func Build(ctx context.Context, files ports.Files, measure ports.Measurer, o Opt
 
 	st := readState(files, lay.State(o.SpecPath))
 	t.Baseline = baselineOf(st)
-	for _, sc := range doc.Scenarios {
-		t.Scenarios = append(t.Scenarios, scenario(files, lay, o, id, sc, st))
+	markers, err := specs.MarkersOf(files, lay, o.SpecPath, md, doc)
+	if err != nil {
+		return delivery.Trace{}, err
+	}
+	for i, sc := range doc.Scenarios {
+		t.Scenarios = append(t.Scenarios, scenario(files, lay, o, scenarioOf{sc: sc, marker: markers[i], fingerprint: spec.Fingerprint(md, sc)}, st))
 	}
 
 	answered := map[string]bool{}
@@ -182,18 +187,28 @@ func baselineOf(st *tdd.State) *delivery.Baseline {
 	return b
 }
 
-// scenario traces one scenario. The loop state is matched by content
-// fingerprint, so progress recorded for an older version of a changed
-// scenario never counts.
-func scenario(files ports.Files, lay layout.Layout, o Options, id string, sc spec.Scenario, st *tdd.State) delivery.Scenario {
-	out := delivery.Scenario{Index: sc.Index, Marker: spec.Marker(id, sc.Index), Title: sc.Title, Status: delivery.Pending}
+// scenarioOf is a scenario of the specification with its identity.
+type scenarioOf struct {
+	sc          spec.Scenario
+	marker      string
+	fingerprint string
+}
+
+// scenario traces one scenario. The loop state is matched by marker and
+// content fingerprint (or the one an older SpecForge recorded), so
+// progress recorded for an older version of a changed scenario never
+// counts.
+func scenario(files ports.Files, lay layout.Layout, o Options, s scenarioOf, st *tdd.State) delivery.Scenario {
+	sc := s.sc
+	out := delivery.Scenario{Index: sc.Index, Marker: s.marker, Title: sc.Title, Status: delivery.Pending}
 	if st == nil {
 		return out
 	}
 	var ref *tdd.ScenarioRef
 	for i := range st.Scenarios {
-		if st.Scenarios[i].Fingerprint == sc.Fingerprint() {
-			ref = &st.Scenarios[i]
+		c := &st.Scenarios[i]
+		if c.Marker == s.marker && (c.Fingerprint == s.fingerprint || c.Fingerprint == sc.Fingerprint()) {
+			ref = c
 		}
 	}
 	if ref == nil {
@@ -226,7 +241,7 @@ func scenario(files ports.Files, lay layout.Layout, o Options, id string, sc spe
 		}
 	}
 	for _, c := range st.Checkpoints {
-		if c.Scenario != ref.Index {
+		if !c.About(*ref) {
 			continue
 		}
 		switch {

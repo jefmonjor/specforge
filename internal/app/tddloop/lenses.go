@@ -82,7 +82,7 @@ func (s *Service) reviewPhase(ctx context.Context, r *run) error {
 	if proceed, err := s.verifyStep(ctx, r, sc); err != nil || !proceed {
 		return err
 	}
-	return s.close(ctx, r, sc, lastGates(r.st, sc.Index))
+	return s.close(ctx, r, sc, lastGates(r.st, sc))
 }
 
 // runLenses picks the lenses for the scenario's risk and runs them.
@@ -307,11 +307,11 @@ func (s *Service) keepRecord(r *run, path string, rec any) error {
 	return s.save(r)
 }
 
-// lastGates is the gate summary REFACTOR accepted for scenario index.
-func lastGates(st *tdd.State, index int) string {
+// lastGates is the gate summary REFACTOR accepted for scenario sc.
+func lastGates(st *tdd.State, sc tdd.ScenarioRef) string {
 	for i := len(st.Checkpoints) - 1; i >= 0; i-- {
 		c := st.Checkpoints[i]
-		if c.Scenario == index && c.Step == "refactor" && c.Status == "accepted" {
+		if c.About(sc) && c.Step == "refactor" && c.Status == "accepted" {
 			return c.Details
 		}
 	}
