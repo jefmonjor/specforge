@@ -137,7 +137,11 @@ func (a *App) printBranchReview(p project, opts reviewer.BranchOptions, res revi
 	for _, d := range v.Discarded {
 		con.Detail(con.T("review.discarded", d.ID, d.Reason))
 	}
-	con.OK(con.T("review.done", len(res.Lenses), res.Reported, 0, len(v.FollowUps), len(v.Discarded)))
+	if len(res.Lenses) == 0 {
+		con.OK(con.T("review.nolens", res.Risk.Tier))
+	} else {
+		con.OK(con.T("review.done", len(res.Lenses), res.Reported, 0, len(v.FollowUps), len(v.Discarded)))
+	}
 	if opts.Report != "" {
 		con.Info(con.T("review.report", p.layout.Rel(opts.Report)))
 	}
