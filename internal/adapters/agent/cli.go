@@ -27,9 +27,10 @@ type Flavor struct {
 	Name   string
 	Binary string
 	// Headless returns the arguments for a non-interactive run that reads
-	// the prompt from stdin and may edit files without asking. dirs are
-	// extra directories the agent may read, such as a legacy repository.
-	Headless func(model string, dirs []string) []string
+	// the prompt from stdin and may edit files without asking, plus run
+	// shell commands when req.Commands is set. req.ReadDirs are extra
+	// directories the agent may read, such as a legacy repository.
+	Headless func(req ports.AgentRequest) []string
 	// Interactive returns the arguments for a terminal session seeded with
 	// seed.
 	Interactive func(seed, model string) []string
@@ -38,15 +39,20 @@ type Flavor struct {
 // Claude is Claude Code. acceptEdits lets the headless agent write files;
 // shell commands still need approval, which never comes in -p mode, so the
 // agent cannot run arbitrary commands: SpecForge runs the tests itself.
+// Only a request with Commands set (the verifier, in a disposable copy)
+// pre-approves Bash.
 var Claude = Flavor{
 	Name:   "claude",
 	Binary: "claude",
-	Headless: func(model string, dirs []string) []string {
+	Headless: func(req ports.AgentRequest) []string {
 		args := []string{"-p", stdinInstruction, "--permission-mode", "acceptEdits", "--no-session-persistence"}
-		if model != "" {
-			args = append(args, "--model", model)
+		if req.Commands {
+			args = append(args, "--allowedTools", "Bash")
 		}
-		for _, d := range dirs {
+		if req.Model != "" {
+			args = append(args, "--model", req.Model)
+		}
+		for _, d := range req.ReadDirs {
 			args = append(args, "--add-dir", d)
 		}
 		return args
@@ -60,17 +66,22 @@ var Claude = Flavor{
 	},
 }
 
-// Gemini is Gemini CLI. auto_edit lets the headless agent write files.
+// Gemini is Gemini CLI. auto_edit lets the headless agent write files;
+// yolo, only for a request with Commands set, also runs shell commands.
 var Gemini = Flavor{
 	Name:   "gemini",
 	Binary: "gemini",
-	Headless: func(model string, dirs []string) []string {
-		args := []string{"-p", stdinInstruction, "--approval-mode", "auto_edit"}
-		if model != "" {
-			args = append(args, "-m", model)
+	Headless: func(req ports.AgentRequest) []string {
+		mode := "auto_edit"
+		if req.Commands {
+			mode = "yolo"
 		}
-		if len(dirs) > 0 {
-			args = append(args, "--include-directories", strings.Join(dirs, ","))
+		args := []string{"-p", stdinInstruction, "--approval-mode", mode}
+		if req.Model != "" {
+			args = append(args, "-m", req.Model)
+		}
+		if len(req.ReadDirs) > 0 {
+			args = append(args, "--include-directories", strings.Join(req.ReadDirs, ","))
 		}
 		return args
 	},
@@ -130,7 +141,7 @@ func (c *CLI) Run(ctx context.Context, req ports.AgentRequest) (string, error) {
 
 	cmd := ports.Command{
 		Name:    c.flavor.Binary,
-		Args:    c.flavor.Headless(req.Model, req.ReadDirs),
+		Args:    c.flavor.Headless(req),
 		Dir:     req.Dir,
 		Env:     req.Env,
 		Stdin:   strings.NewReader(req.Prompt),

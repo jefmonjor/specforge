@@ -17,6 +17,9 @@ type AgentRequest struct {
 	// ReadDirs are directories outside Dir the agent may read (a legacy
 	// repository). SpecForge verifies they are left unchanged.
 	ReadDirs []string
+	// Commands lets the agent run shell commands without approval. Only a
+	// disposable copy of the project may be given to such an agent.
+	Commands bool
 	// Env holds extra KEY=VALUE pairs for the agent process.
 	Env []string
 	// Timeout bounds the invocation; zero means only ctx bounds it.

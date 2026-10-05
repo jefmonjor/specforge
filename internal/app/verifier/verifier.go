@@ -158,7 +158,7 @@ func (s *Service) ask(ctx context.Context, req Request, c ports.Copies) (verific
 		if err != nil {
 			return verification.Report{}, err
 		}
-		out, err := s.d.Agent.Run(ctx, ports.AgentRequest{Prompt: prompt, Dir: c.Dir, Model: req.Model.For("verify"), Env: req.Env, Timeout: req.Timeout})
+		out, err := s.d.Agent.Run(ctx, ports.AgentRequest{Prompt: prompt, Dir: c.Dir, Model: req.Model.For("verify"), Commands: true, Env: req.Env, Timeout: req.Timeout})
 		if err != nil {
 			return verification.Report{}, fmt.Errorf("agent %s: %w", s.d.Agent.Name(), err)
 		}

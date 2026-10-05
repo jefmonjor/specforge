@@ -64,8 +64,8 @@ func TestVerifyRunsInACopyAndKeepsTheReport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if a.reqs[0].Dir == req.Root || a.reqs[0].Model != "m-verify" || !strings.Contains(a.reqs[0].Prompt, "`INV-01`, `SDD_0001_001`") {
-		t.Fatalf("the verifier works in a copy: %+v", a.reqs[0].Dir)
+	if a.reqs[0].Dir == req.Root || !a.reqs[0].Commands || a.reqs[0].Model != "m-verify" || !strings.Contains(a.reqs[0].Prompt, "`INV-01`, `SDD_0001_001`") {
+		t.Fatalf("the verifier runs commands in a copy: %+v", a.reqs[0])
 	}
 	if _, err := os.Stat(a.reqs[0].Dir); !os.IsNotExist(err) {
 		t.Fatal("the copy is removed")
