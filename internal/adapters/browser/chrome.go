@@ -36,6 +36,10 @@ type Options struct {
 	IgnoreCertErrors bool
 	// ActionTimeout bounds every browser call (default 15s).
 	ActionTimeout time.Duration
+	// StartTimeout bounds how long Chrome may take to start (default 60s).
+	// chromedp's own 20s is too short for a first start on a cold or busy
+	// machine, such as a CI runner.
+	StartTimeout time.Duration
 }
 
 // Chrome is a running browser tab.
@@ -67,9 +71,13 @@ func Launch(ctx context.Context, o Options) (*Chrome, error) {
 	if o.ActionTimeout <= 0 {
 		o.ActionTimeout = 15 * time.Second
 	}
+	if o.StartTimeout <= 0 {
+		o.StartTimeout = 60 * time.Second
+	}
 
 	opts := []chromedp.ExecAllocatorOption{
 		chromedp.ExecPath(path),
+		chromedp.WSURLReadTimeout(o.StartTimeout),
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
 		chromedp.WindowSize(1280, 800),

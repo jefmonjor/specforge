@@ -21,8 +21,7 @@ func gitInit(t *testing.T, dir string) {
 	} {
 		c := exec.Command("git", args...)
 		c.Dir = dir
-		out, err := c.CombinedOutput()
-		if err != nil && len(args) > 1 && args[0] != "config" {
+		if out, err := c.CombinedOutput(); err != nil {
 			t.Fatalf("git %v: %v\n%s", args, err, out)
 		}
 	}
